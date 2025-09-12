@@ -2,26 +2,28 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Agent;
-use App\Models\Customer;
-use App\Models\DeliveryNoteItem;
-use App\Models\Grn;
 use App\Models\Invoice;
-use App\Models\ReceiveNote;
-use App\Models\Supplier;
 use App\Models\PurchaseOrder;
-use Illuminate\Http\RedirectResponse;
+use App\Models\DeliveryNoteItem;
+use App\Models\Customer;
+use App\Models\Supplier;
+use App\Models\Agent;
+use App\Models\Grn;
+use App\Models\DeliveryNote;
+use App\Models\ReceiveNote;
+use App\Models\PurchaseOrderItem;
+use App\Models\Setting;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
-
+use Illuminate\Support\Facades\DB;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Str;
 class InvoiceController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('permission:invoice-list|invoice-create|invoice-show', ['only' => ['index','show']]);
-        $this->middleware('permission:invoice-create', ['only' => ['create', 'createCustomerInvoice', 'storeCustomerInvoice', 'createAgentInvoice', 'storeAgentInvoice', 'createSupplierInvoice', 'storeSupplierInvoice']]);
+        $this->middleware('permission:invoice-list|invoice-create|invoice-show', ['only' => ['index','show', 'print']]);
+        $this->middleware('permission:invoice-create', ['only' => ['create', 'createFromPurchaseOrder', 'storeFromPurchaseOrder']]);
     }
 
     public function index(Request $request): View
@@ -55,85 +57,72 @@ class InvoiceController extends Controller
         return view('invoices.show', compact('invoice', 'outstandingBalance'));
     }
 
+    /**
+     * THE FIX IS HERE: This method was missing or not being loaded correctly.
+     * Show the print-friendly version of the invoice.
+     */
+    public function print(Invoice $invoice): View
+    {
+        $invoice->load(['items', 'invoiceable']);
+        return view('invoices.print', compact('invoice'));
+    }
+
     public function create(): View
     {
         return view('invoices.create_selection');
     }
 
-    /**
-     * CUSTOMER INVOICING (from Receive Notes)
-     */
-    public function createCustomerInvoice(): View
+    public function createFromReceiveNote(ReceiveNote $receiveNote): View
     {
-        $customers = Customer::whereHas('purchaseOrders.deliveryNotes.receiveNotes', function ($query) {
-            $query->where('status', '!=', 'invoiced');
-        })->with(['purchaseOrders.deliveryNotes.receiveNotes' => function ($query) {
-            $query->where('status', '!=', 'invoiced');
-        }])->get();
-
-        $customers->each(function ($customer) {
-            $customer->receive_notes = $customer->purchaseOrders->flatMap(function ($po) {
-                return $po->deliveryNotes->flatMap(function ($dn) {
-                    return $dn->receiveNotes;
-                });
-            })->unique('id');
-        });
-        
-        $customersWithInvoices = $customers->filter(fn($customer) => $customer->receive_notes->isNotEmpty());
-
-        return view('invoices.create_customer_invoice', compact('customersWithInvoices'));
+        $receiveNote->load('items.product', 'deliveryNotes.purchaseOrders.customer');
+        return view('invoices.create_from_rn', compact('receiveNote'));
     }
 
-    public function storeCustomerInvoice(Request $request): RedirectResponse
+    public function storeFromReceiveNote(Request $request, ReceiveNote $receiveNote): RedirectResponse
     {
-        $request->validate(['receive_note_ids' => 'required|array|min:1']);
-        
+        if ($receiveNote->status === 'invoiced') {
+            return back()->withErrors(['error' => 'An invoice has already been generated for this receive note.']);
+        }
+
         DB::beginTransaction();
         try {
-            $receiveNotes = ReceiveNote::with('items.product', 'deliveryNotes.purchaseOrders.customer')->whereIn('id', $request->receive_note_ids)->get();
-            $customer = $receiveNotes->first()->deliveryNotes->first()->purchaseOrders->first()->customer;
-
-            if (!$customer || $receiveNotes->some(fn($rn) => $rn->deliveryNotes->first()->purchaseOrders->first()->customer_id !== $customer->id)) {
-                throw new \Exception('All selected receive notes must belong to the same customer.');
+            $customer = $receiveNote->deliveryNotes->first()->purchaseOrders->first()->customer;
+            if (!$customer) {
+                throw new \Exception('The selected receive note is not associated with a customer.');
             }
 
-            $vatItems = [];
-            $nonVatItems = [];
+            $totalAmount = 0;
+            $invoiceItemsData = [];
 
-            foreach ($receiveNotes as $rn) {
-                if ($rn->status === 'invoiced') throw new \Exception("Receive Note {$rn->receive_note_id} has already been invoiced.");
-                foreach ($rn->items as $item) {
-                    if ($item->product->is_vat) {
-                        $vatItems[] = $item;
-                    } else {
-                        $nonVatItems[] = $item;
-                    }
-                }
+            foreach ($receiveNote->items as $item) {
+                $total = $item->product->selling_price * $item->quantity_received;
+                $totalAmount += $total;
+                $invoiceItemsData[] = [
+                    'description' => $item->product->name,
+                    'quantity' => $item->quantity_received,
+                    'unit_price' => $item->product->selling_price,
+                    'total' => $total,
+                ];
             }
 
-            // Create Non-VAT Invoice if there are non-vat items
-            if (!empty($nonVatItems)) {
-                $this->createInvoiceForItems($customer, $nonVatItems, false);
-            }
+            $invoice = $customer->invoices()->create([
+                'invoice_id' => 'INV-CUST-' . strtoupper(Str::random(6)),
+                'due_date' => now()->addDays(30),
+                'total_amount' => $totalAmount,
+                'status' => 'unpaid',
+            ]);
 
-            // Create VAT Invoice if there are vat items
-            if (!empty($vatItems)) {
-                $this->createInvoiceForItems($customer, $vatItems, true);
-            }
-            
-            ReceiveNote::whereIn('id', $request->receive_note_ids)->update(['status' => 'invoiced']);
+            $invoice->items()->createMany($invoiceItemsData);
+            $receiveNote->update(['status' => 'invoiced']);
 
             DB::commit();
-            return redirect()->route('invoices.index')->with('success', 'Invoice(s) generated successfully.');
+            return redirect()->route('invoices.show', $invoice->id)->with('success', 'Invoice generated from Receive Note successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
     }
 
-    /**
-     * SUPPLIER INVOICING (from GRNs)
-     */
     public function createSupplierInvoice(): View
     {
         $suppliers = Supplier::whereHas('grns', function ($query) {
@@ -147,7 +136,11 @@ class InvoiceController extends Controller
 
     public function storeSupplierInvoice(Request $request): RedirectResponse
     {
-        $request->validate(['grn_ids' => 'required|array|min:1']);
+        $request->validate([
+            'grn_ids' => 'required|array|min:1',
+            'grn_ids.*' => 'exists:grns,id',
+        ]);
+
         DB::beginTransaction();
         try {
             $grns = Grn::with('supplier', 'items.product')->whereIn('id', $request->grn_ids)->get();
@@ -161,7 +154,7 @@ class InvoiceController extends Controller
             $invoiceItemsData = [];
 
             foreach ($grns as $grn) {
-                 if ($grn->status === 'invoiced') {
+                if ($grn->status === 'invoiced') {
                     throw new \Exception("GRN {$grn->grn_id} has already been invoiced.");
                 }
                 foreach ($grn->items as $item) {
@@ -191,10 +184,144 @@ class InvoiceController extends Controller
             return back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
     }
+    public function createCustomerInvoice(): View
+    {
+        // ** THE FIX IS HERE: Create a clean data structure for the view. **
 
-    /**
-     * AGENT INVOICING (from Delivery Note Items)
-     */
+        // 1. Get all uninvoiced receive notes that have a customer.
+        $receiveNotes = ReceiveNote::where('status', '!=', 'invoiced')
+            ->whereHas('deliveryNotes.purchaseOrders.customer')
+            ->with('deliveryNotes.purchaseOrders.customer')
+            ->get();
+
+        // 2. Group these notes by their customer's ID.
+        $groupedByCustomer = $receiveNotes->groupBy(function ($rn) {
+            return $rn->deliveryNotes->first()?->purchaseOrders->first()?->customer?->id;
+        })->filter(); // Use filter() to remove any notes that failed to group (e.g., null customer ID).
+
+        // 3. Map the grouped data into a simple array for the view. This avoids model serialization issues.
+        $customersWithInvoices = $groupedByCustomer->map(function ($notes, $customerId) {
+            $customer = $notes->first()->deliveryNotes->first()->purchaseOrders->first()->customer;
+            return [
+                'id' => $customer->id,
+                'customer_name' => $customer->customer_name,
+                'customer_id' => $customer->customer_id,
+                'uninvoiced_receive_notes' => $notes->map(fn($rn) => [
+                    'id' => $rn->id,
+                    'receive_note_id' => $rn->receive_note_id,
+                    'received_date' => $rn->received_date,
+                ])->values()->all(),
+            ];
+        })->sortBy('customer_name')->values();
+
+        return view('invoices.create_customer_invoice', compact('customersWithInvoices'));
+    }
+
+    public function storeCustomerInvoice(Request $request): RedirectResponse
+    {
+        $request->validate(['receive_note_ids' => 'required|array|min:1']);
+        // ** THE FIX IS HERE: Fetch the VAT rate from the database **
+        $vatSetting = Setting::where('key', 'vat_rate')->first();
+        // Provide a fallback default if the setting is not found, and convert percentage to a decimal
+        $vatRate = $vatSetting ? (float)$vatSetting->value / 100 : 0.18;
+
+
+        DB::beginTransaction();
+        try {
+            $receiveNotes = ReceiveNote::with('items.product', 'deliveryNotes.purchaseOrders.customer')
+                ->whereIn('id', $request->receive_note_ids)
+                ->get();
+
+            $customer = $receiveNotes->first()->deliveryNotes->first()->purchaseOrders->first()->customer;
+
+            if (!$customer || $receiveNotes->some(fn($rn) => $rn->deliveryNotes->first()->purchaseOrders->first()->customer_id !== $customer->id)) {
+                throw new \Exception('All selected receive notes must belong to the same customer.');
+            }
+
+            $vatInvoiceItemsData = [];
+            $nonVatInvoiceItemsData = [];
+            $vatSubTotal = 0;
+            $nonVatTotal = 0;
+            $createdInvoices = [];
+
+            foreach ($receiveNotes as $rn) {
+                if ($rn->status === 'invoiced') {
+                    throw new \Exception("Receive Note {$rn->receive_note_id} has already been invoiced.");
+                }
+                foreach ($rn->items as $item) {
+                    $itemSubTotal = $item->product->selling_price * $item->quantity_received;
+                    
+                    if ($item->product->is_vat) {
+                        $itemVatAmount = $itemSubTotal * $vatRate;
+                        $vatInvoiceItemsData[] = [
+                            'description' => $item->product->name . " (from RN: {$rn->receive_note_id})",
+                            'quantity' => $item->quantity_received,
+                            'unit_price' => $item->product->selling_price,
+                            'total' => $itemSubTotal,
+                            'vat_amount' => $itemVatAmount,
+                        ];
+                        $vatSubTotal += $itemSubTotal;
+                    } else {
+                        $nonVatInvoiceItemsData[] = [
+                            'description' => $item->product->name . " (from RN: {$rn->receive_note_id})",
+                            'quantity' => $item->quantity_received,
+                            'unit_price' => $item->product->selling_price,
+                            'total' => $itemSubTotal,
+                            'vat_amount' => 0,
+                        ];
+                        $nonVatTotal += $itemSubTotal;
+                    }
+                }
+            }
+
+            if (!empty($vatInvoiceItemsData)) {
+                $totalVatAmount = $vatSubTotal * $vatRate;
+                $vatInvoice = $customer->invoices()->create([
+                    'invoice_id' => 'INV-CUST-V' . strtoupper(Str::random(5)),
+                    'due_date' => now()->addDays(30),
+                    'sub_total' => $vatSubTotal,
+                    'vat_percentage' => $vatRate * 100,
+                    'vat_amount' => $totalVatAmount,
+                    'total_amount' => $vatSubTotal + $totalVatAmount,
+                    'status' => 'unpaid',
+                    'is_vat_invoice' => true,
+                ]);
+                $vatInvoice->items()->createMany($vatInvoiceItemsData);
+                $createdInvoices[] = $vatInvoice->invoice_id;
+            }
+
+            if (!empty($nonVatInvoiceItemsData)) {
+                $nonVatInvoice = $customer->invoices()->create([
+                    'invoice_id' => 'INV-CUST-N' . strtoupper(Str::random(5)),
+                    'due_date' => now()->addDays(30),
+                    'sub_total' => $nonVatTotal,
+                    'vat_percentage' => 0,
+                    'vat_amount' => 0,
+                    'total_amount' => $nonVatTotal,
+                    'status' => 'unpaid',
+                    'is_vat_invoice' => false,
+                ]);
+                $nonVatInvoice->items()->createMany($nonVatInvoiceItemsData);
+                $createdInvoices[] = $nonVatInvoice->invoice_id;
+            }
+
+            if (empty($createdInvoices)) {
+                throw new \Exception('No items found to create an invoice.');
+            }
+
+            ReceiveNote::whereIn('id', $request->receive_note_ids)->update(['status' => 'invoiced']);
+
+            DB::commit();
+
+            $successMessage = 'Invoice(s) created successfully: ' . implode(', ', $createdInvoices);
+            return redirect()->route('invoices.index')->with('success', $successMessage);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
     public function createAgentInvoice(): View
     {
         $agents = Agent::whereHas('deliveryItems', function ($query) {
@@ -212,25 +339,25 @@ class InvoiceController extends Controller
 
     public function storeAgentInvoice(Request $request): RedirectResponse
     {
-        $request->validate(['delivery_item_ids' => 'required|array|min:1']);
+        $request->validate(['agent_id' => 'required|exists:agents,id']);
         DB::beginTransaction();
         try {
-            $itemsToInvoice = DeliveryNoteItem::with('agent', 'deliveryNote')
-                                ->whereIn('id', $request->delivery_item_ids)->get();
+            $agent = Agent::findOrFail($request->agent_id);
 
-            $agentId = $itemsToInvoice->first()->agent_id;
-            if ($itemsToInvoice->some(fn($item) => $item->agent_id !== $agentId)) {
-                 throw new \Exception('All selected items must belong to the same agent.');
+            $itemsToInvoice = DeliveryNoteItem::where('agent_id', $agent->id)
+                ->where('quantity_from_agent', '>', 0)
+                ->where('agent_invoiced', false)
+                ->whereHas('deliveryNote.receiveNotes')
+                ->with('deliveryNote', 'agent.product')
+                ->get();
+
+            if($itemsToInvoice->isEmpty()) {
+                return back()->withErrors(['error' => 'No pending items to invoice for this agent.']);
             }
-            
-            $agent = Agent::find($agentId);
+
             $totalAmount = 0;
             $invoiceItemsData = [];
-
             foreach ($itemsToInvoice as $item) {
-                 if ($item->agent_invoiced) {
-                    throw new \Exception("Item #{$item->id} has already been invoiced.");
-                }
                 $total = $item->agent->price_per_case * $item->quantity_from_agent;
                 $totalAmount += $total;
                 $invoiceItemsData[] = [
@@ -249,7 +376,7 @@ class InvoiceController extends Controller
             ]);
 
             $invoice->items()->createMany($invoiceItemsData);
-            DeliveryNoteItem::whereIn('id', $request->delivery_item_ids)->update(['agent_invoiced' => true]);
+            DeliveryNoteItem::whereIn('id', $itemsToInvoice->pluck('id'))->update(['agent_invoiced' => true]);
 
             DB::commit();
             return redirect()->route('invoices.show', $invoice->id)->with('success', 'Agent invoice generated successfully.');
@@ -258,47 +385,4 @@ class InvoiceController extends Controller
             return back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
     }
-
-    /**
-     * Helper function to create an invoice from a collection of items.
-     */
-    private function createInvoiceForItems($customer, $items, bool $isVatInvoice)
-    {
-        $subTotal = 0;
-        $vatAmount = 0;
-        $invoiceItemsData = [];
-
-        foreach ($items as $item) {
-            $itemTotal = $item->product->selling_price * $item->quantity_received;
-            $subTotal += $itemTotal;
-
-            $itemVat = 0;
-            if ($isVatInvoice) {
-                $itemVat = $itemTotal * 0.18; // 18% VAT
-                $vatAmount += $itemVat;
-            }
-
-            $invoiceItemsData[] = [
-                'description' => $item->product->name . " (from RN: {$item->receive_note_id})",
-                'quantity' => $item->quantity_received,
-                'unit_price' => $item->product->selling_price,
-                'total' => $itemTotal,
-                'vat_amount' => $itemVat,
-            ];
-        }
-
-        $invoice = $customer->invoices()->create([
-            'invoice_id' => 'INV-' . ($isVatInvoice ? 'VAT-' : 'NOVAT-') . strtoupper(Str::random(6)),
-            'type' => $isVatInvoice ? 'vat' : 'non-vat',
-            'due_date' => now()->addDays(30),
-            'sub_total' => $subTotal,
-            'vat_percentage' => $isVatInvoice ? 18.00 : 0.00,
-            'vat_amount' => $vatAmount,
-            'total_amount' => $subTotal + $vatAmount,
-            'status' => 'unpaid',
-        ]);
-
-        $invoice->items()->createMany($invoiceItemsData);
-    }
 }
-

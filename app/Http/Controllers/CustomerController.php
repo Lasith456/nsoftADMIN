@@ -133,5 +133,14 @@ class CustomerController extends Controller
         return redirect()->route('customers.index')
                          ->with('success','Customer deleted successfully.');
     }
+    public function getUnpaidInvoices(Customer $customer)
+    {
+        $invoices = $customer->invoices()
+            ->whereIn('status', ['unpaid', 'partially-paid'])
+            ->orderBy('created_at', 'asc')
+            ->get();
+            
+        return response()->json($invoices);
+    }
 }
 

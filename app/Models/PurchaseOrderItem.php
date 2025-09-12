@@ -22,6 +22,7 @@ class PurchaseOrderItem extends Model
         'quantity',
         'cost_price',    
         'selling_price',  
+        'is_vat',
     ];
 
     /**

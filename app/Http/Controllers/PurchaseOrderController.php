@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class PurchaseOrderController extends Controller
 {
@@ -66,16 +67,25 @@ class PurchaseOrderController extends Controller
                 'customer_id' => $request->customer_id,
                 'delivery_date' => $request->delivery_date,
                 'status' => 'pending', // Default status
+
             ]);
 
             // Create the PO items
             foreach ($request->items as $itemData) {
                 $product = Product::find($itemData['product_id']);
+
+                // Add a check to ensure the product was found
+                if (!$product) {
+                    // If not found, throw a specific exception that can be caught
+                    throw new \Exception("Product with ID {$itemData['product_id']} could not be found. The order was not created.");
+                }
+
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $po->id,
                     'product_id' => $product->id,
                     'product_name' => $product->name,
                     'quantity' => $itemData['quantity'],
+                    'is_vat' => $product->is_vat,
                 ]);
             }
 
@@ -85,7 +95,9 @@ class PurchaseOrderController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withInput()->withErrors(['error' => 'An error occurred while creating the PO.']);
+            Log::error('Error creating purchase order: ' . $e->getMessage());
+            // Now display the more specific error message from our new check
+            return back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
     }
 

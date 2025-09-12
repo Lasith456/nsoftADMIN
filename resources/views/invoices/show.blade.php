@@ -5,7 +5,7 @@
     <div id="invoice-details" class="bg-white dark:bg-gray-800 shadow-lg rounded-lg max-w-4xl mx-auto p-8">
         {{-- Header & Buttons --}}
         <div class="flex justify-between items-center mb-6 print:hidden">
-            <h2 class="text-3xl font-bold text-gray-800 dark:text-gray-200">Invoice</h2>
+            <h2 class="text-3xl font-bold text-gray-800 dark:text-gray-200">Invoice Details</h2>
             <div class="flex items-center space-x-2">
                 <a href="{{ route('invoices.index') }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-xs uppercase font-semibold">Back to List</a>
                 @can('payment-create')
@@ -25,7 +25,17 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400">contact@nsoft.com | +94 11 234 5678</p>
             </div>
             <div class="text-right">
-                <h4 class="text-xl font-semibold text-gray-700 dark:text-gray-300">INVOICE</h4>
+                <h4 class="text-xl font-semibold text-gray-700 dark:text-gray-300">
+                    @if(isset($invoice->is_vat_invoice))
+                        @if($invoice->is_vat_invoice)
+                            TAX INVOICE
+                        @else
+                            NON-TAX INVOICE
+                        @endif
+                    @else
+                        INVOICE
+                    @endif
+                </h4>
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ $invoice->invoice_id }}</p>
             </div>
         </div>
@@ -124,8 +134,6 @@
                                     $product = \App\Models\Product::where('name', $productName)->first();
                                     $productLink = $product ? "<a href='" . route('products.show', $product->id) . "' class='text-blue-500 hover:underline'>{$productName}</a>" : e($productName);
 
-                                    // **THE FIX IS HERE**
-                                    // Remove only the first "DN-" prefix to get the actual ID (e.g., "DN-DN-0001" -> "DN-0001")
                                     $actualDeliveryNoteId = preg_replace('/^DN-/', '', $sourceIdString, 1);
                                     
                                     $sourceModel = \App\Models\DeliveryNote::where('delivery_note_id', $actualDeliveryNoteId)->first();

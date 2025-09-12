@@ -3,10 +3,10 @@
 namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB; // ** Ensure this line is present **
 
 class DeliveryNote extends Model
 {
@@ -48,29 +48,28 @@ class DeliveryNote extends Model
     {
         return $this->belongsToMany(ReceiveNote::class, 'delivery_note_receive_note');
     }
+    
+    /**
+     * THE FIX IS HERE: This logic is now more robust to prevent duplicate IDs.
+     */
     protected static function boot()
     {
         parent::boot();
 
-        // This event is triggered automatically when a new delivery note is being created.
         static::creating(function ($deliveryNote) {
-            // Find the latest delivery note to determine the next ID.
-            $latestDeliveryNote = static::latest('id')->first();
+            // Lock the table to prevent race conditions where two processes might get the same last ID.
+            $latestDeliveryNote = static::lockForUpdate()->latest('id')->first();
+            $nextNumber = 1;
 
-            if (!$latestDeliveryNote) {
-                // If the table is empty, start with number 1.
-                $number = 1;
-            } else {
-                // Get the number from the last delivery_note_id (e.g., from "DN-0009"), and increment it.
-                $lastNumber = (int) substr($latestDeliveryNote->delivery_note_id, 6);
-                $number = $lastNumber + 1;
+            if ($latestDeliveryNote) {
+                // Find the highest numeric part of any existing delivery_note_id.
+                // This is reliable even if records are deleted out of order.
+                $lastIdNumber = static::lockForUpdate()->max(DB::raw("CAST(SUBSTRING(delivery_note_id, 4) AS UNSIGNED)"));
+                $nextNumber = $lastIdNumber + 1;
             }
-
-            // Format the number with 4 leading zeros (e.g., 1 becomes "0001")
-            // and assign it to the new delivery note's delivery_note_id.
-            $deliveryNote->delivery_note_id = 'DN-' . str_pad($number, 4, "0", STR_PAD_LEFT);
+            
+            // Format and assign the new, unique ID.
+            $deliveryNote->delivery_note_id = 'DN-' . str_pad($nextNumber, 4, "0", STR_PAD_LEFT);
         });
     }
 }
-
-

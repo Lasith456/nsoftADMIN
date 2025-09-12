@@ -66,13 +66,24 @@
             </div>
         </div>
         
+        {{-- ** THE FIX IS HERE: This block will now display any errors returned from the controller. ** --}}
+        @if ($errors->any())
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+             <p class="font-bold">Error</p>
+             <ul class="list-disc pl-5 mt-2">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+        @endif
+
         <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <!-- Left Column: PO Selection & Details -->
             <div class="lg:col-span-2 flex flex-col space-y-4">
                  <div>
                     <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">1. Select POs & Details</h3>
                     
-                    <!-- Separate PO Filter Form -->
                     <form action="{{ route('delivery-notes.create') }}" method="GET" class="mb-2 p-2 bg-gray-50 dark:bg-gray-700 rounded-md flex items-center space-x-2 text-sm">
                         <input type="date" name="from_date" value="{{ request('from_date') }}" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md p-1 w-full">
                         <input type="date" name="to_date" value="{{ request('to_date') }}" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md p-1 w-full">
@@ -254,4 +265,3 @@ document.addEventListener('alpine:init', () => {
 });
 </script>
 @endsection
-

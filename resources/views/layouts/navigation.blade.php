@@ -99,6 +99,8 @@
                         <li><a href="{{ route('payments.history.agent') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Agent Payment</a></li>
                         <li><a href="{{ route('payments.history.supplier') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Suppliers Payment</a></li>
                         <li><a href="{{ route('payments.history.customer') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Customer Payments</a></li>
+                        <li><a href="{{ route('payments.createBulk') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Customer Outstanding</a></li>
+
                     </ul>
                 </li>
 
@@ -171,6 +173,15 @@
                         <li><a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'text-white' : 'text-gray-400' }} block rounded-md py-2 pr-2 pl-9 text-sm leading-6 hover:bg-gray-800 hover:text-white">Manage Users</a></li>
                         <li><a href="{{ route('roles.index') }}" class="{{ request()->routeIs('roles.*') ? 'text-white' : 'text-gray-400' }} block rounded-md py-2 pr-2 pl-9 text-sm leading-6 hover:bg-gray-800 hover:text-white">Manage Roles</a></li>
                     </ul>
+                </li>
+                <li>
+                    <a href="{{ route('settings.index') }}" class="{{ request()->routeIs('settings.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }} group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold">
+                        <svg class="h-6 w-6 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.112.077l1.07-.372a1.125 1.125 0 011.218.884l1.281 4.547a1.125 1.125 0 01-.44 1.265l-.845.602a1.125 1.125 0 00-.472 1.359c.04.089.074.182.103.277.294.948.093 2.01-.464 2.752l-.845.602a1.125 1.125 0 01-1.265.44l-1.07-.372a1.125 1.125 0 00-1.112.077c-.073.044-.146.087-.22.127a1.125 1.125 0 00-.645.87l-.213 1.281c-.09.542-.56.94-1.11.94h-2.593c-.55 0-1.02-.398-1.11-.94l-.213-1.281a1.125 1.125 0 00-.645-.87c-.074-.04-.147-.083-.22-.127a1.125 1.125 0 00-1.112-.077l-1.07.372a1.125 1.125 0 01-1.218-.884l-1.281-4.547a1.125 1.125 0 01.44-1.265l.845-.602a1.125 1.125 0 00.472-1.359c-.04-.089-.074-.182-.103-.277-.294-.948-.093-2.01.464-2.752l.845-.602a1.125 1.125 0 011.265-.44l1.07.372a1.125 1.125 0 001.112-.077c.073-.044.146-.087.22.127.324.196.72.257 1.112.077l.213-1.281z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span x-show="!sidebarCollapsed || sidebarHover" class="whitespace-nowrap">Settings</span>
+                    </a>
                 </li>
             </ul>
         </li>

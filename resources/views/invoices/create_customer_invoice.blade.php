@@ -9,7 +9,7 @@
                 <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Generate Customer Invoice</h2>
                 <div class="flex items-center space-x-2">
                     <a href="{{ route('invoices.create') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">Cancel</a>
-                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-blue-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-700" :disabled="!selectedCustomerId">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-blue-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-700" :disabled="!selectedCustomerId || (availableReceiveNotes && availableReceiveNotes.length === 0)">
                         Generate Invoice
                     </button>
                 </div>
@@ -32,8 +32,9 @@
                     <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">1. Select Customer</h3>
                     <select id="customer_id" x-model="selectedCustomerId" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500" required>
                         <option value="">Select a customer with uninvoiced notes...</option>
+                        {{-- ** THE FIX IS HERE: Use array access instead of object access ** --}}
                         @foreach($customersWithInvoices as $customer)
-                            <option value="{{ $customer->id }}">{{ $customer->customer_name }} ({{ $customer->customer_id }})</option>
+                            <option value="{{ $customer['id'] }}">{{ $customer['customer_name'] }} ({{ $customer['customer_id'] }})</option>
                         @endforeach
                     </select>
                 </div>
@@ -42,7 +43,7 @@
                 <div class="lg:col-span-1">
                     <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">2. Select Receive Notes</h3>
                     <div x-show="selectedCustomerId" class="space-y-2 max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-700 p-2 rounded-md" x-cloak>
-                        <template x-if="availableReceiveNotes.length > 0">
+                        <template x-if="availableReceiveNotes && availableReceiveNotes.length > 0">
                             <template x-for="rn in availableReceiveNotes" :key="rn.id">
                                 <label class="flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
                                     <input type="checkbox" name="receive_note_ids[]" :value="rn.id" class="dark:bg-gray-900 rounded focus:ring-indigo-500">
@@ -50,7 +51,7 @@
                                 </label>
                             </template>
                         </template>
-                         <template x-if="!availableReceiveNotes.length">
+                         <template x-if="!availableReceiveNotes || availableReceiveNotes.length === 0">
                             <p class="text-sm text-gray-500 dark:text-gray-400 p-2">No uninvoiced receive notes available for this customer.</p>
                         </template>
                     </div>
@@ -65,7 +66,8 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('customerInvoiceForm', () => ({
-        customers: @json($customersWithInvoices->keyBy('id')),
+        // The controller now sends a plain array/object, so we don't need keyBy()
+        customers: @json($customersWithInvoices->mapWithKeys(fn($item) => [$item['id'] => $item])),
         selectedCustomerId: '',
         
         get availableReceiveNotes() {
@@ -73,7 +75,7 @@ document.addEventListener('alpine:init', () => {
                 return [];
             }
             const customer = this.customers[this.selectedCustomerId];
-            return customer ? customer.receive_notes : [];
+            return customer ? customer.uninvoiced_receive_notes : [];
         }
     }));
 });

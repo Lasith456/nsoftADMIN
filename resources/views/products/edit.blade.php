@@ -1,225 +1,309 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container mx-auto">
-    <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Edit Product</h2>
-            <a href="{{ route('products.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">
-                Back
-            </a>
-        </div>
+<div class="container mx-auto p-2" x-data="productForm({ product: {{ json_encode($product) }}, departments: {{ json_encode($departments) }}, suppliers: {{ json_encode($suppliers) }} })">
+    <!-- Add New Modal -->
+    <div x-show="isModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" @click.away="isModalOpen = false" x-cloak>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4" x-text="modalTitle"></h2>
+            <div x-show="modalMessage" class="p-4 mb-4 text-sm rounded-lg" :class="modalSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'" x-text="modalMessage"></div>
 
-        @if ($errors->any())
-        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
-            <p class="font-bold">Whoops! Something went wrong.</p>
-            <ul class="list-disc pl-5 mt-2">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-        @endif
+            <!-- Department Form -->
+            <form x-show="modalType === 'department'" @submit.prevent="storeDepartment" class="space-y-4">
+                <div>
+                    <label for="new_department_name" class="block text-sm font-medium">Department Name*</label>
+                    <input type="text" id="new_department_name" x-model="newDepartment.name" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3" required>
+                </div>
+                <div class="text-right space-x-2">
+                    <button type="button" @click="isModalOpen = false" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md text-sm font-semibold">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold">Save</button>
+                </div>
+            </form>
 
-        <form action="{{ route('products.update', $product->id) }}" method="POST">
+            <!-- Sub-Department Form -->
+            <form x-show="modalType === 'subdepartment'" @submit.prevent="storeSubDepartment" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium">Parent Department</label>
+                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-200" x-text="mainForm.department_name || 'Please select a department first.'"></p>
+                </div>
+                <div>
+                    <label for="new_subdepartment_name" class="block text-sm font-medium">Sub-Department Name*</label>
+                    <input type="text" id="new_subdepartment_name" x-model="newSubDepartment.name" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3" required>
+                </div>
+                <div class="text-right space-x-2">
+                     <button type="button" @click="isModalOpen = false" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md text-sm font-semibold">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
+        <form id="product-form" action="{{ route('products.update', $product->id) }}" method="POST">
             @csrf
             @method('PUT')
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Name -->
-                <div>
-                    <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name <span class="text-red-500">*</span></label>
-                    <input type="text" name="name" id="name" class="mt-1 block w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-200" value="{{ old('name', $product->name) }}" required>
-                </div>
-                <!-- Appear Name -->
-                <div>
-                    <label for="appear_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Appear Name <span class="text-red-500">*</span></label>
-                    <input type="text" name="appear_name" id="appear_name" class="mt-1 block w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-200" value="{{ old('appear_name', $product->appear_name) }}" required>
-                </div>
-                 <!-- Department -->
-                <div>
-                    <label for="department_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Department <span class="text-red-500">*</span></label>
-                    <input list="departments-list" id="department_name" class="mt-1 block w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-200" value="{{ old('department_name', $product->department->name ?? '') }}" required>
-                    <datalist id="departments-list">
-                        @foreach($departments as $department)
-                            <option value="{{ $department->name }}" data-id="{{ $department->id }}"></option>
-                        @endforeach
-                    </datalist>
-                    <input type="hidden" name="department_id" id="department_id" value="{{ old('department_id', $product->department_id) }}">
-                </div>
-                <!-- Sub-Department -->
-                <div>
-                    <label for="sub_department_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Sub-Department <span class="text-red-500">*</span></label>
-                    <input list="subdepartments-list" id="sub_department_name" class="mt-1 block w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-200" value="{{ old('sub_department_name', $product->subDepartment->name ?? '') }}" required>
-                    <datalist id="subdepartments-list">
-                        {{-- Populated by JavaScript --}}
-                    </datalist>
-                    <input type="hidden" name="sub_department_id" id="sub_department_id" value="{{ old('sub_department_id', $product->sub_department_id) }}">
-                </div>
-                <!-- Supplier -->
-                <div>
-                    <label for="supplier_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Supplier</label>
-                    <input list="suppliers-list" id="supplier_name" class="mt-1 block w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-200" value="{{ old('supplier_name', $product->supplier->supplier_name ?? '') }}">
-                    <datalist id="suppliers-list">
-                        @foreach($suppliers as $supplier)
-                            <option value="{{ $supplier->supplier_name }}" data-id="{{ $supplier->id }}"></option>
-                        @endforeach
-                    </datalist>
-                    <input type="hidden" name="supplier_id" id="supplier_id" value="{{ old('supplier_id', $product->supplier_id) }}">
-                </div>
-                <!-- Units Per Case -->
-                <div>
-                    <label for="units_per_case" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Units Per Case <span class="text-red-500">*</span></label>
-                    <input type="number" name="units_per_case" id="units_per_case" class="mt-1 block w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-200" value="{{ old('units_per_case', $product->units_per_case) }}" required>
-                </div>
-                <!-- Unit of Measure -->
-                <div>
-                    <label for="unit_of_measure" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Unit of Measure <span class="text-red-500">*</span></label>
-                    <input list="units" name="unit_of_measure" id="unit_of_measure" class="mt-1 block w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-200" value="{{ old('unit_of_measure', $product->unit_of_measure) }}" required>
-                    <datalist id="units">
-                        <option value="KG"></option>
-                        <option value="Litre"></option>
-                        <option value="Pieces"></option>
-                        <option value="Pack"></option>
-                        <option value="Box"></option>
-                        <option value="Bottle"></option>
-                    </datalist>
-                </div>
-                <!-- Cost Price -->
-                <div>
-                    <label for="cost_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cost Price <span class="text-red-500">*</span></label>
-                    <input type="number" step="0.01" name="cost_price" id="cost_price" class="mt-1 block w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-200" value="{{ old('cost_price', $product->cost_price) }}" required>
-                </div>
-                <!-- Selling Price -->
-                <div>
-                    <label for="selling_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Selling Price <span class="text-red-500">*</span></label>
-                    <input type="number" step="0.01" name="selling_price" id="selling_price" class="mt-1 block w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-200" value="{{ old('selling_price', $product->selling_price) }}" required>
-                </div>
-                 <!-- Reorder Level -->
-                <div>
-                    <label for="reorder_qty" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reorder Level <span class="text-red-500">*</span></label>
-                    <input type="number" name="reorder_qty" id="reorder_qty" class="mt-1 block w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-gray-900 dark:text-gray-200" value="{{ old('reorder_qty', $product->reorder_qty) }}" required>
-                </div>
-
-                <!-- Toggles -->
-                <div class="lg:col-span-3 flex items-center space-x-6 pt-4">
-                     <div class="flex items-center">
-                        <input type="checkbox" name="is_active" id="is_active" class="h-4 w-4 text-indigo-600 rounded" {{ old('is_active', $product->is_active) ? 'checked' : '' }}>
-                        <label for="is_active" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Is Active</label>
-                    </div>
-                     <div class="flex items-center">
-                        <input type="checkbox" name="is_vat" id="is_vat" class="h-4 w-4 text-indigo-600 rounded" {{ old('is_vat', $product->is_vat) ? 'checked' : '' }}>
-                        <label for="is_vat" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Is VAT</label>
-                    </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" name="is_clear" id="is_clear" class="h-4 w-4 text-indigo-600 rounded" {{ old('is_clear', $product->is_clear) ? 'checked' : '' }}>
-                        <label for="is_clear" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Is Clear</label>
-                    </div>
+            <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
+                <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">Edit Product</h2>
+                <div class="flex items-center space-x-2">
+                    <a href="{{ route('products.index') }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-xs uppercase font-semibold">Back</a>
+                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs uppercase font-semibold">Update Product</button>
                 </div>
             </div>
 
-            <div class="text-right pt-8">
-                <button type="submit" class="inline-flex items-center px-4 py-2 bg-gray-800 border rounded-md font-semibold text-xs text-white uppercase hover:bg-gray-700">
-                    Update Product
-                </button>
+            @if ($errors->any())
+            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+                <ul class="list-disc pl-5 mt-2">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+            </div>
+            @endif
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Name, Appear Name -->
+                <div>
+                    <label for="name" class="block text-sm font-medium">Name*</label>
+                    <input type="text" name="name" id="name" x-model="mainForm.name" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
+                </div>
+                <div>
+                    <label for="appear_name" class="block text-sm font-medium">Appear Name*</label>
+                    <input type="text" name="appear_name" id="appear_name" x-model="mainForm.appear_name" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
+                </div>
+                 <!-- Department -->
+                <div>
+                    <label for="department_name" class="block text-sm font-medium">Department*</label>
+                    <div class="flex items-center space-x-2">
+                        <input list="departments-list" id="department_name" x-model="mainForm.department_name" @change="updateDepartmentId" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3">
+                        <button type="button" @click="openModal('department')" class="mt-1 px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">+</button>
+                    </div>
+                    <datalist id="departments-list">
+                        <template x-for="dept in departments" :key="dept.id">
+                            <option :value="dept.name" :data-id="dept.id"></option>
+                        </template>
+                    </datalist>
+                    <input type="hidden" name="department_id" id="department_id" x-model="mainForm.department_id">
+                </div>
+                <!-- Sub-Department -->
+                <div>
+                    <label for="sub_department_name" class="block text-sm font-medium">Sub-Department*</label>
+                     <div class="flex items-center space-x-2">
+                        <input list="subdepartments-list" id="sub_department_name" x-model="mainForm.sub_department_name" @change="updateSubDepartmentId" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3">
+                        <button type="button" @click="openModal('subdepartment')" class="mt-1 px-3 py-2 bg-gray-200 dark:bg-gray-700 rounded-md">+</button>
+                    </div>
+                    <datalist id="subdepartments-list"></datalist>
+                    <input type="hidden" name="sub_department_id" id="sub_department_id" x-model="mainForm.sub_department_id">
+                </div>
+                <!-- Supplier -->
+                <div>
+                    <label for="supplier_name" class="block text-sm font-medium">Supplier</label>
+                    <input list="suppliers-list" id="supplier_name" x-model="mainForm.supplier_name" @change="updateSupplierId" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3">
+                    <datalist id="suppliers-list">
+                        <template x-for="supp in suppliers" :key="supp.id">
+                            <option :value="supp.supplier_name" :data-id="supp.id"></option>
+                        </template>
+                    </datalist>
+                    <input type="hidden" name="supplier_id" id="supplier_id" x-model="mainForm.supplier_id">
+                </div>
+                <!-- Product Type -->
+                <div>
+                    <label class="block text-sm font-medium">Product Type*</label>
+                    <div class="mt-2 flex items-center space-x-6">
+                        <label class="inline-flex items-center"><input type="radio" name="product_type" value="pack" class="text-indigo-600" x-model="mainForm.product_type"><span class="ml-2 text-sm">Pack</span></label>
+                        <label class="inline-flex items-center"><input type="radio" name="product_type" value="case" class="text-indigo-600" x-model="mainForm.product_type"><span class="ml-2 text-sm">Case</span></label>
+                    </div>
+                </div>
+                <!-- Units Per Case -->
+                <div>
+                    <label for="units_per_case" class="block text-sm font-medium">Units Per Case*</label>
+                    <input type="number" name="units_per_case" id="units_per_case" x-model.number="mainForm.units_per_case" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" :disabled="mainForm.product_type === 'pack'" required>
+                </div>
+                <!-- Unit of Measure -->
+                <div>
+                    <label for="unit_of_measure" class="block text-sm font-medium">Unit of Measure*</label>
+                    <input list="units" name="unit_of_measure" id="unit_of_measure" x-model="mainForm.unit_of_measure" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
+                    <datalist id="units">
+                        <option value="Pieces"></option><option value="KG"></option><option value="Litre"></option><option value="Pack"></option><option value="Box"></option><option value="Bottle"></option>
+                    </datalist>
+                </div>
+                <!-- Other Fields -->
+                <div>
+                    <label for="cost_price" class="block text-sm font-medium">Cost Price*</label>
+                    <input type="number" step="0.01" name="cost_price" id="cost_price" x-model.number="mainForm.cost_price" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
+                </div>
+                <div>
+                    <label for="selling_price" class="block text-sm font-medium">Selling Price*</label>
+                    <input type="number" step="0.01" name="selling_price" id="selling_price" x-model.number="mainForm.selling_price" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
+                </div>
+                <div>
+                    <label for="reorder_qty" class="block text-sm font-medium">Reorder Level*</label>
+                    <input type="number" name="reorder_qty" id="reorder_qty" x-model.number="mainForm.reorder_qty" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
+                </div>
+                <!-- Toggles -->
+                <div class="lg:col-span-3 flex items-center space-x-6 pt-4">
+                     <label class="inline-flex items-center">
+                        <input type="checkbox" name="is_active" class="h-4 w-4 text-indigo-600 rounded" x-model="mainForm.is_active">
+                        <span class="ml-2 text-sm">Is Active</span>
+                    </label>
+                     <label class="inline-flex items-center">
+                        <input type="checkbox" name="is_vat" class="h-4 w-4 text-indigo-600 rounded" x-model="mainForm.is_vat">
+                        <span class="ml-2 text-sm">Is VAT</span>
+                    </label>
+                </div>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const departmentInput = document.getElementById('department_name');
-        const departmentIdInput = document.getElementById('department_id');
-        const subDepartmentInput = document.getElementById('sub_department_name');
-        const subDepartmentIdInput = document.getElementById('sub_department_id');
-        const subDepartmentDatalist = document.getElementById('subdepartments-list');
-        const supplierInput = document.getElementById('supplier_name');
-        const supplierIdInput = document.getElementById('supplier_id');
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('productForm', (initialData) => ({
+            isModalOpen: false,
+            modalType: '',
+            modalTitle: '',
+            modalMessage: '',
+            modalSuccess: false,
+            departments: initialData.departments,
+            suppliers: initialData.suppliers,
+            mainForm: {
+                name: initialData.product.name,
+                appear_name: initialData.product.appear_name,
+                department_id: initialData.product.department_id,
+                department_name: '',
+                sub_department_id: initialData.product.sub_department_id,
+                sub_department_name: '',
+                supplier_id: initialData.product.supplier_id,
+                supplier_name: '',
+                product_type: initialData.product.units_per_case > 1 ? 'case' : 'pack',
+                units_per_case: initialData.product.units_per_case,
+                unit_of_measure: initialData.product.unit_of_measure,
+                cost_price: parseFloat(initialData.product.cost_price),
+                selling_price: parseFloat(initialData.product.selling_price),
+                reorder_qty: initialData.product.reorder_qty,
+                is_active: initialData.product.is_active,
+                is_vat: initialData.product.is_vat
+            },
+            newDepartment: { name: '' },
+            newSubDepartment: { name: '' },
+            
+            init() {
+                this.$watch('mainForm.product_type', (value) => {
+                    if (value === 'pack') this.mainForm.units_per_case = 1;
+                });
 
-        // --- Department Logic ---
-        departmentInput.addEventListener('change', function() {
-            const departmentName = this.value;
-            let departmentId = '';
-            const options = document.getElementById('departments-list').options;
-            for (let i = 0; i < options.length; i++) {
-                if (options[i].value === departmentName) {
-                    departmentId = options[i].dataset.id;
-                    break;
+                if (this.mainForm.department_id) {
+                    const dept = this.departments.find(d => d.id == this.mainForm.department_id);
+                    if (dept) this.mainForm.department_name = dept.name;
+                    this.fetchSubDepartments();
                 }
-            }
-            departmentIdInput.value = departmentId;
-            fetchSubDepartments(departmentId);
-        });
-
-        // --- Sub-Department Logic ---
-        subDepartmentInput.addEventListener('change', function() {
-            const subDepartmentName = this.value;
-            let subDepartmentId = '';
-            const options = subDepartmentDatalist.options;
-            for (let i = 0; i < options.length; i++) {
-                if (options[i].value === subDepartmentName) {
-                    subDepartmentId = options[i].dataset.id;
-                    break;
+                 if (this.mainForm.supplier_id) {
+                    const supp = this.suppliers.find(s => s.id == this.mainForm.supplier_id);
+                    if (supp) this.mainForm.supplier_name = supp.supplier_name;
                 }
-            }
-            subDepartmentIdInput.value = subDepartmentId;
-        });
+            },
 
-        // --- Supplier Logic ---
-        supplierInput.addEventListener('change', function() {
-            const supplierName = this.value;
-            let supplierId = '';
-            const options = document.getElementById('suppliers-list').options;
-            for (let i = 0; i < options.length; i++) {
-                if (options[i].value === supplierName) {
-                    supplierId = options[i].dataset.id;
-                    break;
+            openModal(type) {
+                this.isModalOpen = true;
+                this.modalType = type;
+                this.modalMessage = '';
+                this.modalSuccess = false;
+                if (type === 'department') {
+                    this.modalTitle = 'Add New Department';
+                } else {
+                    if (!this.mainForm.department_id) {
+                        this.modalMessage = 'Please select a parent department first.';
+                        return;
+                    }
+                    this.modalTitle = 'Add New Sub-Department';
                 }
-            }
-            supplierIdInput.value = supplierId;
-        });
-        
-        function fetchSubDepartments(departmentId) {
-            subDepartmentInput.value = '';
-            subDepartmentIdInput.value = '';
-            subDepartmentDatalist.innerHTML = '';
-            if (!departmentId) return;
+            },
 
-            fetch(`{{ route("products.getSubDepartments") }}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ department_id: departmentId })
-            })
-            .then(response => response.json())
-            .then(data => {
-                const currentSubDepartmentId = '{{ $product->sub_department_id }}';
-                data.forEach(function(subDepartment) {
-                    const option = document.createElement('option');
-                    option.value = subDepartment.name;
-                    option.dataset.id = subDepartment.id;
-                    subDepartmentDatalist.appendChild(option);
-                    
-                    // **THE FIX IS HERE**: This part now sets the hidden ID field correctly on load
-                    if (subDepartment.id == currentSubDepartmentId) {
-                        subDepartmentInput.value = subDepartment.name;
-                        subDepartmentIdInput.value = subDepartment.id;
+            updateDepartmentId() {
+                const options = document.getElementById('departments-list').options;
+                const selected = Array.from(options).find(opt => opt.value === this.mainForm.department_name);
+                this.mainForm.department_id = selected ? selected.dataset.id : '';
+                this.mainForm.sub_department_name = ''; // Reset sub-department
+                this.mainForm.sub_department_id = '';
+                this.fetchSubDepartments();
+            },
+            
+            updateSubDepartmentId() {
+                const options = document.getElementById('subdepartments-list').options;
+                const selected = Array.from(options).find(opt => opt.value === this.mainForm.sub_department_name);
+                this.mainForm.sub_department_id = selected ? selected.dataset.id : '';
+            },
+            
+            updateSupplierId() {
+                 const options = document.getElementById('suppliers-list').options;
+                const selected = Array.from(options).find(opt => opt.value === this.mainForm.supplier_name);
+                this.mainForm.supplier_id = selected ? selected.dataset.id : '';
+            },
+
+            fetchSubDepartments() {
+                const datalist = document.getElementById('subdepartments-list');
+                datalist.innerHTML = '';
+                if (!this.mainForm.department_id) return;
+                
+                fetch('{{ route("products.getSubDepartments") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify({ department_id: this.mainForm.department_id })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    data.forEach(sub => {
+                        datalist.innerHTML += `<option value="${sub.name}" data-id="${sub.id}"></option>`;
+                    });
+                     if(this.mainForm.sub_department_id){
+                        const subDept = data.find(sd => sd.id == this.mainForm.sub_department_id);
+                        if(subDept) this.mainForm.sub_department_name = subDept.name;
+                     }
+                });
+            },
+
+            storeDepartment() {
+                fetch('{{ route("departments.api.store") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify(this.newDepartment)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.id) {
+                        this.departments.push(data);
+                        this.mainForm.department_name = data.name;
+                        this.updateDepartmentId(); // Re-trigger logic
+                        this.isModalOpen = false;
+                        this.newDepartment.name = '';
+                    } else {
+                        this.modalMessage = 'Failed to create department. It might already exist.';
+                        this.modalSuccess = false;
                     }
                 });
-            })
-            .catch(error => console.error('Error fetching sub-departments:', error));
-        }
-        
-        // --- Initial Load Logic ---
-        const initialDepartmentId = departmentIdInput.value;
-        if (initialDepartmentId) {
-            fetchSubDepartments(initialDepartmentId);
-        }
+            },
+            
+            storeSubDepartment() {
+                const payload = {
+                    ...this.newSubDepartment,
+                    department_id: this.mainForm.department_id
+                };
+                fetch('{{ route("subdepartments.api.store") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: JSON.stringify(payload)
+                })
+                .then(res => res.json())
+                .then(data => {
+                     if (data.id) {
+                        const datalist = document.getElementById('subdepartments-list');
+                        datalist.innerHTML += `<option value="${data.name}" data-id="${data.id}"></option>`;
+                        this.mainForm.sub_department_name = data.name;
+                        this.mainForm.sub_department_id = data.id;
+                        this.isModalOpen = false;
+                        this.newSubDepartment.name = '';
+                    } else {
+                        this.modalMessage = 'Failed to create sub-department.';
+                        this.modalSuccess = false;
+                    }
+                });
+            }
+        }));
     });
 </script>
 @endsection
-

@@ -37,7 +37,6 @@ class DeliveryNoteController extends Controller
                                 ->whereDoesntHave('deliveryNotes')
                                 ->with('customer');
         
-        // **THE FIX IS HERE**: Now filters by the PO's delivery_date
         if ($request->filled('from_date')) {
             $query->whereDate('delivery_date', '>=', $request->from_date);
         }
@@ -73,7 +72,7 @@ class DeliveryNoteController extends Controller
                 foreach ($po->items as $item) {
                     $productId = $item->product_id;
                     if (!isset($requestedItems[$productId])) {
-                        $requestedItems[$productId] = ['product' => $item->product, 'name' => $item->product_name, 'total_quantity' => 0];
+                        $requestedItems[$productId] = ['product_name' => $item->product_name, 'total_quantity' => 0];
                     }
                     $requestedItems[$productId]['total_quantity'] += $item->quantity;
                 }
@@ -82,17 +81,17 @@ class DeliveryNoteController extends Controller
             $deliveryNote = DeliveryNote::create([
                 'vehicle_id' => $request->vehicle_id,
                 'delivery_date' => $request->delivery_date,
-                'status' => 'processing', // Default status
+                'status' => 'processing',
             ]);
 
             $deliveryNote->purchaseOrders()->attach($po_ids);
 
             foreach ($requestedItems as $productId => $itemData) {
-                $product = $itemData['product'];
+                $product = Product::lockForUpdate()->find($productId);
                 $quantityNeeded = $itemData['total_quantity'];
                 
-                $fromStock = min($product->total_stock, $quantityNeeded);
-                $shortage = $quantityNeeded - $fromStock;
+                $fromClearStock = min($product->clear_stock_quantity, $quantityNeeded);
+                $shortage = $quantityNeeded - $fromClearStock;
                 $agentId = null;
                 $fromAgent = 0;
 
@@ -101,27 +100,21 @@ class DeliveryNoteController extends Controller
                         $agentId = $request->agent_selections[$productId];
                         $fromAgent = $shortage;
                     } else {
-                        throw new \Exception("Stock shortage for {$product->name}, but no agent was assigned.");
+                        throw new \Exception("A stock shortage for {$product->name} requires an agent to be assigned.");
                     }
                 }
                 
-                $fromClearStock = min($product->clear_stock_quantity, $fromStock);
-                $fromNonClearStock = $fromStock - $fromClearStock;
-
                 $deliveryNote->items()->create([
                     'product_id' => $productId,
-                    'product_name' => $itemData['name'],
+                    'product_name' => $itemData['product_name'],
                     'quantity_requested' => $quantityNeeded,
-                    'quantity_from_stock' => $fromStock,
+                    'quantity_from_stock' => $fromClearStock,
                     'agent_id' => $agentId,
                     'quantity_from_agent' => $fromAgent,
                 ]);
 
                 if ($fromClearStock > 0) {
                     $product->decrement('clear_stock_quantity', $fromClearStock);
-                }
-                if($fromNonClearStock > 0){
-                     $product->decrement('non_clear_stock_quantity', $fromNonClearStock);
                 }
             }
 
@@ -131,11 +124,19 @@ class DeliveryNoteController extends Controller
             return redirect()->route('delivery-notes.show', $deliveryNote->id)->with('success', 'Delivery Note created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withInput()->withErrors(['error' => $e->getMessage()]);
+            
+            // ** THE FIX IS HERE: Provide a more informative error message for stock-related issues. **
+            if (str_contains($e->getMessage(), 'requires an agent to be assigned')) {
+                $errorMessage = "Could not create the delivery note. Stock levels may have changed since the page was loaded. Please review the shortages and try again. Details: " . $e->getMessage();
+                return back()->withInput()->withErrors(['error' => $errorMessage]);
+            }
+            
+            // For all other types of errors.
+            return back()->withInput()->withErrors(['error' => 'An unexpected error occurred while creating the delivery note: ' . $e->getMessage()]);
         }
     }
     
-        public function checkStock(Request $request)
+    public function checkStock(Request $request)
     {
         $po_ids = $request->input('po_ids', []);
         if (empty($po_ids)) {
@@ -164,6 +165,8 @@ class DeliveryNoteController extends Controller
                 }])
                 ->get()
                 ->map(function($agent) {
+                    // This assumes a product is uniquely associated with an agent for pricing.
+                    // If an agent can have multiple prices for the same product, this needs adjustment.
                     $agent->price_per_case = $agent->products->first()->pivot->price_per_case;
                     return $agent;
                 })
@@ -208,21 +211,23 @@ class DeliveryNoteController extends Controller
 
         return redirect()->route('delivery-notes.manage')->with('success', 'Delivery Note status updated successfully.');
     }
+
     public function destroy(DeliveryNote $deliveryNote)
     {
         DB::beginTransaction();
         try {
+            // Restore stock for each item in the delivery note
             foreach ($deliveryNote->items as $item) {
                 if ($item->quantity_from_stock > 0) {
                     $product = Product::find($item->product_id);
                     if ($product) {
-                        // For simplicity, this example returns stock to the 'clear' stock.
-                        // A more complex system might track which stock type it came from.
+                        // Revert the stock deduction
                         $product->increment('clear_stock_quantity', $item->quantity_from_stock);
                     }
                 }
             }
 
+            // Revert the status of associated purchase orders
             foreach($deliveryNote->purchaseOrders as $po) {
                 $po->update(['status' => 'pending']);
             }
@@ -236,5 +241,5 @@ class DeliveryNoteController extends Controller
             return back()->withErrors(['error' => 'Failed to delete Delivery Note: ' . $e->getMessage()]);
         }
     }
-
 }
+

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-
+use Illuminate\Support\Facades\DB;
 class ReceiveNote extends Model
 {
     use HasFactory;
@@ -40,27 +40,24 @@ class ReceiveNote extends Model
     {
         return $this->hasMany(ReceiveNoteItem::class);
     }
-    protected static function boot()
+  protected static function boot()
     {
         parent::boot();
 
-        // This event is triggered automatically when a new receive note is being created.
         static::creating(function ($receiveNote) {
-            // Find the latest receive note to determine the next ID.
-            $latestReceiveNote = static::latest('id')->first();
+            // Lock the table to prevent race conditions where two processes might get the same last ID.
+            $latestReceiveNote = static::lockForUpdate()->latest('id')->first();
+            $nextNumber = 1;
 
-            if (!$latestReceiveNote) {
-                // If the table is empty, start with number 1.
-                $number = 1;
-            } else {
-                // Get the number from the last receive_note_id (e.g., from "RN-0009"), and increment it.
-                $lastNumber = (int) substr($latestReceiveNote->receive_note_id, 6);
-                $number = $lastNumber + 1;
+            if ($latestReceiveNote) {
+                // Find the highest numeric part of any existing receive_note_id.
+                // This is reliable even if records are deleted out of order.
+                $lastIdNumber = static::lockForUpdate()->max(DB::raw("CAST(SUBSTRING(receive_note_id, 4) AS UNSIGNED)"));
+                $nextNumber = $lastIdNumber + 1;
             }
-
-            // Format the number with 4 leading zeros (e.g., 1 becomes "0001")
-            // and assign it to the new receive note's receive_note_id.
-            $receiveNote->receive_note_id = 'RN-' . str_pad($number, 4, "0", STR_PAD_LEFT);
+            
+            // Format and assign the new, unique ID.
+            $receiveNote->receive_note_id = 'RN-' . str_pad($nextNumber, 4, "0", STR_PAD_LEFT);
         });
     }
 }

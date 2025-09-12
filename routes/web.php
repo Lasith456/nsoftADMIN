@@ -20,6 +20,8 @@ use App\Http\Controllers\StockManagementController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SettingsController;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -93,6 +95,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/payments/history/customer', [PaymentController::class, 'customerHistory'])->name('payments.history.customer');
     Route::get('/payments/history/agent', [PaymentController::class, 'agentHistory'])->name('payments.history.agent');
     Route::get('/payments/history/supplier', [PaymentController::class, 'supplierHistory'])->name('payments.history.supplier');
+    Route::get('/customers/{customer}/unpaid-invoices', [CustomerController::class, 'getUnpaidInvoices'])->name('customers.unpaid-invoices');
+    Route::get('/payments/create-bulk', [PaymentController::class, 'createBulk'])->name('payments.createBulk');
+    Route::post('/payments/store-bulk', [PaymentController::class, 'storeBulk'])->name('payments.storeBulk');
 
     // Report Routes
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
@@ -105,6 +110,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reports/purchase-orders', [ReportController::class, 'purchaseOrderReport'])->name('reports.purchase_orders');
     Route::get('/reports/agents', [ReportController::class, 'agentReport'])->name('reports.agents');
     Route::get('/reports/order-flow', [ReportController::class, 'orderFlowReport'])->name('reports.order_flow');
-
+    // Settings Routes
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('/', [SettingsController::class, 'index'])->name('index');
+        Route::put('/update-vat', [SettingsController::class, 'updateVat'])->name('updateVat');
+        Route::post('/store-bank', [SettingsController::class, 'storeBank'])->name('storeBank');
+        Route::put('/banks/{bank}/toggle-status', [SettingsController::class, 'toggleBankStatus'])->name('banks.toggleStatus');
+    });
 });
 

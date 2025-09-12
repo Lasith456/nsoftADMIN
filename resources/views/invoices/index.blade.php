@@ -47,6 +47,7 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Invoice ID</th>
+                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Type</th>
                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Billed To</th>
                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Date</th>
                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Total Amount</th>
@@ -58,6 +59,12 @@
                 @forelse ($invoices as $invoice)
                <tr>
                     <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-black">{{ $invoice->invoice_id }}</td>
+                    <td class="px-4 py-2 whitespace-nowrap text-sm">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            {{ $invoice->is_vat_invoice ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' }}">
+                            {{ $invoice->is_vat_invoice ? 'VAT' : 'Non-VAT' }}
+                        </span>
+                    </td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-black">
                         @if($invoice->invoiceable)
                             @php
@@ -88,14 +95,14 @@
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm7-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                             </a>
                             <a href="{{ route('invoices.show', $invoice->id) }}" class="text-blue-600 hover:text-blue-800" title="Show Details">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542 7z"></path></svg>
                             </a>
                         </div>
                     </td>
                 </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-4 py-2 whitespace-nowrap text-sm text-center text-gray-500">
+                        <td colspan="7" class="px-4 py-2 whitespace-nowrap text-sm text-center text-gray-500">
                             No invoices found.
                         </td>
                     </tr>

@@ -20,7 +20,17 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400">contact@nsoft.com | +94 11 234 5678</p>
             </div>
             <div class="text-right">
-                <h4 class="text-xl font-semibold text-gray-700 dark:text-gray-300">INVOICE</h4>
+                <h4 class="text-xl font-semibold text-gray-700 dark:text-gray-300">
+                    @if(isset($invoice->is_vat_invoice))
+                        @if($invoice->is_vat_invoice)
+                            TAX INVOICE
+                        @else
+                            NON-TAX INVOICE
+                        @endif
+                    @else
+                        INVOICE
+                    @endif
+                </h4>
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ $invoice->invoice_id }}</p>
             </div>
         </div>
@@ -126,4 +136,3 @@
     }
 </style>
 @endsection
-

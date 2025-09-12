@@ -23,6 +23,7 @@ class Invoice extends Model
         'amount_paid',
         'status',
         'notes',
+        'is_vat_invoice'
     ];
 
 protected function casts(): array
@@ -34,6 +35,7 @@ protected function casts(): array
             'vat_amount' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'amount_paid' => 'decimal:2',
+            'is_vat_invoice' => 'boolean',
         ];
     }
 
