@@ -1,0 +1,110 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\SubDepartmentController;
+use App\Http\Controllers\AgentController;
+use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\GrnController;
+use App\Http\Controllers\DeliveryNoteController;
+use App\Http\Controllers\ReceiveNoteController;
+use App\Http\Controllers\StockManagementController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ReportController;
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/', function () {
+    if (Auth::check()) {
+        return redirect()->route('home');
+    }
+    return redirect()->route('login');
+});
+
+Auth::routes();
+
+Route::get('/home', [HomeController::class, 'index'])->name('home');
+
+Route::middleware(['auth'])->group(function () {
+    // Resourceful Routes for CRUD operations
+    Route::resource('users', UserController::class);
+    Route::resource('roles', RoleController::class);
+    Route::resource('products', ProductController::class);
+    Route::resource('customers', CustomerController::class);
+    Route::resource('suppliers', SupplierController::class);
+    Route::resource('vehicles', VehicleController::class);
+    Route::resource('agents', AgentController::class);
+    Route::resource('departments', DepartmentController::class);
+    Route::resource('subdepartments', SubDepartmentController::class);
+    Route::resource('purchase-orders', PurchaseOrderController::class);
+    Route::resource('grns', GrnController::class);
+    Route::resource('delivery-notes', DeliveryNoteController::class);
+    Route::resource('receive-notes', ReceiveNoteController::class);
+    Route::resource('invoices', InvoiceController::class);
+
+    // Dynamic Form Routes
+    Route::post('/products/getSubDepartments', [ProductController::class, 'getSubDepartments'])->name('products.getSubDepartments');
+    Route::get('/purchase-orders/get-agents-for-product', [PurchaseOrderController::class, 'getAgentsForProduct'])->name('purchase-orders.getAgentsForProduct');
+    Route::post('/delivery-notes/check-stock', [DeliveryNoteController::class, 'checkStock'])->name('delivery-notes.checkStock');
+    Route::post('/receive-notes/get-items', [ReceiveNoteController::class, 'getItemsForDeliveryNote'])->name('receive-notes.getItems');
+
+    // GRN Status Management
+    Route::get('grn-manage', [GrnController::class, 'manage'])->name('grns.manage');
+    Route::post('grns/{grn}/confirm', [GrnController::class, 'complete'])->name('grns.complete');
+    Route::post('grns/{grn}/cancel', [GrnController::class, 'cancel'])->name('grns.cancel');
+    
+    // Delivery Note Status Management
+    Route::get('delivery-notes-manage', [DeliveryNoteController::class, 'manage'])->name('delivery-notes.manage');
+    Route::post('delivery-notes/{deliveryNote}/update-status', [DeliveryNoteController::class, 'updateStatus'])->name('delivery-notes.updateStatus');
+    Route::post('/departments/api-store', [DepartmentController::class, 'apiStore'])->name('departments.api.store');
+    Route::post('/subdepartments/api-store', [SubDepartmentController::class, 'apiStore'])->name('subdepartments.api.store');
+
+    // Stock Management Routes
+    Route::get('/stock-management', [StockManagementController::class, 'index'])->name('stock-management.index');
+    Route::post('/stock-management/convert', [StockManagementController::class, 'apiConvert'])->name('stock-management.api.convert');
+    Route::post('/stock-management/wastage', [StockManagementController::class, 'apiWastage'])->name('stock-management.api.wastage');
+
+    // Invoice Creation Routes
+    Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('invoices.create');
+    Route::get('/invoices/create/agent', [InvoiceController::class, 'createAgentInvoice'])->name('invoices.createAgent');
+    Route::post('/invoices/store/agent', [InvoiceController::class, 'storeAgentInvoice'])->name('invoices.storeAgent');
+    Route::get('/invoices/store/customer', [InvoiceController::class, 'createCustomerInvoice'])->name('invoices.createCustomer');
+    Route::post('/invoices/create/customer', [InvoiceController::class, 'storeCustomerInvoice'])->name('invoices.storeCustomer');
+    Route::get('/invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print'); 
+    Route::get('/invoices/create/supplier', [InvoiceController::class, 'createSupplierInvoice'])->name('invoices.createSupplier');
+    Route::post('/invoices/store/supplier', [InvoiceController::class, 'storeSupplierInvoice'])->name('invoices.storeSupplier');
+    Route::get('/invoices/create/from-rn/{receiveNote}', [InvoiceController::class, 'createFromReceiveNote'])->name('invoices.createFromRN');
+    Route::post('/invoices/store/from-rn/{receiveNote}', [InvoiceController::class, 'storeFromReceiveNote'])->name('invoices.storeFromRN');
+     // Payment Routes
+    Route::get('/payments/create/{invoice}', [PaymentController::class, 'create'])->name('payments.create');
+    Route::post('/payments/store/{invoice}', [PaymentController::class, 'store'])->name('payments.store');
+    Route::get('/payments/history/customer', [PaymentController::class, 'customerHistory'])->name('payments.history.customer');
+    Route::get('/payments/history/agent', [PaymentController::class, 'agentHistory'])->name('payments.history.agent');
+    Route::get('/payments/history/supplier', [PaymentController::class, 'supplierHistory'])->name('payments.history.supplier');
+
+    // Report Routes
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/sales', [ReportController::class, 'salesReport'])->name('reports.sales');
+    Route::get('/reports/customers', [ReportController::class, 'customerReport'])->name('reports.customers');
+    Route::get('/reports/stock-levels', [ReportController::class, 'stockLevelReport'])->name('reports.stock_levels');
+    Route::get('/reports/suppliers', [ReportController::class, 'supplierReport'])->name('reports.suppliers');
+    Route::get('/reports/delivery-notes', [ReportController::class, 'deliveryNoteReport'])->name('reports.delivery_notes');
+    Route::get('/reports/receive-notes', [ReportController::class, 'receiveNoteReport'])->name('reports.receive_notes');
+    Route::get('/reports/purchase-orders', [ReportController::class, 'purchaseOrderReport'])->name('reports.purchase_orders');
+    Route::get('/reports/agents', [ReportController::class, 'agentReport'])->name('reports.agents');
+    Route::get('/reports/order-flow', [ReportController::class, 'orderFlowReport'])->name('reports.order_flow');
+
+});
+

@@ -1,0 +1,138 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
+use App\Models\Customer;
+use App\Models\Product;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Str;
+
+class PurchaseOrderController extends Controller
+{
+    /**
+     * Set up the permissions for the controller.
+     */
+    public function __construct()
+    {
+        $this->middleware('permission:purchase-order-list|purchase-order-create|purchase-order-edit|purchase-order-delete', ['only' => ['index','show']]);
+        $this->middleware('permission:purchase-order-create', ['only' => ['create','store']]);
+        $this->middleware('permission:purchase-order-edit', ['only' => ['edit','update']]);
+        $this->middleware('permission:purchase-order-delete', ['only' => ['destroy']]);
+    }
+
+    public function index(Request $request): View
+    {
+        $query = PurchaseOrder::with('customer');
+
+        // Handle the search functionality
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            $query->where('po_id', 'LIKE', "%{$search}%")
+                  ->orWhereHas('customer', function ($q) use ($search) {
+                      $q->where('customer_name', 'LIKE', "%{$search}%");
+                  });
+        }
+
+        $purchaseOrders = $query->latest()->paginate(10);
+        return view('purchase_orders.index', compact('purchaseOrders'));
+    }
+
+    public function create(): View
+    {
+        $customers = Customer::where('is_active', true)->orderBy('customer_name')->get();
+        $products = Product::where('is_active', true)->orderBy('name')->get();
+        return view('purchase_orders.create', compact('customers', 'products'));
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'delivery_date' => 'required|date',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Create the main Purchase Order record
+            $po = PurchaseOrder::create([
+                'customer_id' => $request->customer_id,
+                'delivery_date' => $request->delivery_date,
+                'status' => 'pending', // Default status
+            ]);
+
+            // Create the PO items
+            foreach ($request->items as $itemData) {
+                $product = Product::find($itemData['product_id']);
+                PurchaseOrderItem::create([
+                    'purchase_order_id' => $po->id,
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'quantity' => $itemData['quantity'],
+                ]);
+            }
+
+            DB::commit();
+
+            return redirect()->route('purchase-orders.index')->with('success', 'Purchase Order created successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()->withErrors(['error' => 'An error occurred while creating the PO.']);
+        }
+    }
+
+    public function show(PurchaseOrder $purchaseOrder): View
+    {
+        $purchaseOrder->load(['customer', 'items.product']);
+        return view('purchase_orders.show', compact('purchaseOrder'));
+    }
+
+    public function edit(PurchaseOrder $purchaseOrder): View
+    {
+        $purchaseOrder->load('items');
+        $customers = Customer::where('is_active', true)->orderBy('customer_name')->get();
+        $products = Product::where('is_active', true)->orderBy('name')->get();
+        return view('purchase_orders.edit', compact('purchaseOrder', 'customers', 'products'));
+    }
+
+    public function update(Request $request, PurchaseOrder $purchaseOrder): RedirectResponse
+    {
+        // Validation now includes the status field
+        $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'delivery_date' => 'required|date',
+            'status' => 'required|string|in:pending,processing,delivered,cancelled',
+            'items' => 'required|array|min:1',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Update call now includes the status
+            $purchaseOrder->update($request->only(['customer_id', 'delivery_date', 'status']));
+
+            // The rest of the logic for items remains the same if they are not editable on this form.
+            // If you were to make items editable, that logic would go here.
+
+            DB::commit();
+            return redirect()->route('purchase-orders.index')->with('success', 'Purchase Order updated successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()->withErrors(['error' => 'An error occurred while updating the PO.']);
+        }
+    }
+
+    public function destroy(PurchaseOrder $purchaseOrder): RedirectResponse
+    {
+        $purchaseOrder->delete(); // Items will be cascade deleted
+        return redirect()->route('purchase-orders.index')->with('success', 'Purchase Order deleted successfully.');
+    }
+}
+
