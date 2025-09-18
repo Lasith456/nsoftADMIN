@@ -104,6 +104,8 @@
                 <div class="md:col-span-3 flex items-center pt-2">
                     <input type="checkbox" name="is_active" id="is_active" class="h-4 w-4 text-blue-600 border-gray-300 rounded" {{ old('is_active', $customer->is_active) ? 'checked' : '' }}>
                     <label for="is_active" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Is Active</label>
+                    <input type="checkbox" name="separate_department_invoice" id="separate_department_invoice" class="h-4 w-4 ml-5 text-blue-600 border-gray-300 rounded" {{ old('separate_department_invoice', $customer->separate_department_invoice) ? 'checked' : '' }}>
+                    <label for="separate_department_invoice" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Separate Department Invoice</label>
                 </div>
             </div>
         </form>

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Product extends Model
 {
@@ -20,6 +21,7 @@ class Product extends Model
         'is_active',
         'is_vat',
         'is_clear',
+        'separate_department_invoice', // NEW FIELD ADDED
         'units_per_case',
         'unit_of_measure',
         'cost_price',
@@ -35,6 +37,7 @@ class Product extends Model
             'is_active' => 'boolean',
             'is_vat' => 'boolean',
             'is_clear' => 'boolean',
+            'separate_department_invoice' => 'boolean', // NEW CAST ADDED
             'cost_price' => 'decimal:2',
             'selling_price' => 'decimal:2',
         ];
@@ -62,7 +65,8 @@ class Product extends Model
     {
         return $this->belongsTo(Supplier::class);
     }
-       protected static function boot()
+
+    protected static function boot()
     {
         parent::boot();
 
@@ -85,6 +89,7 @@ class Product extends Model
             $product->product_id = 'PROD-' . str_pad($number, 4, "0", STR_PAD_LEFT);
         });
     }
+
     public function agents(): BelongsToMany
     {
         return $this->belongsToMany(Agent::class, 'agent_product_pivot')
@@ -92,4 +97,3 @@ class Product extends Model
                     ->withTimestamps();
     }
 }
-

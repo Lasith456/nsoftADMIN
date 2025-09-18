@@ -65,6 +65,7 @@ class ProductController extends Controller
         $input['is_active'] = $request->has('is_active');
         $input['is_vat'] = $request->has('is_vat');
         $input['is_clear'] = $request->has('is_clear');
+        $input['separate_department_invoice'] = $request->has('separate_department_invoice'); // NEW FIELD
         $input['discount'] = $request->filled('discount') ? $request->discount : 0.00;
 
         Product::create($input);
@@ -105,6 +106,7 @@ class ProductController extends Controller
         $input['is_active'] = $request->has('is_active');
         $input['is_vat'] = $request->has('is_vat');
         $input['is_clear'] = $request->has('is_clear');
+        $input['separate_department_invoice'] = $request->has('separate_department_invoice'); // NEW FIELD
         $input['discount'] = $request->filled('discount') ? $request->discount : 0.00;
 
         $product->update($input);
@@ -126,4 +128,3 @@ class ProductController extends Controller
         return response()->json($subDepartments);
     }
 }
-
