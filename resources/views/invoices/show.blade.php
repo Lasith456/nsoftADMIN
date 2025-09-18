@@ -13,7 +13,7 @@
                         <a href="{{ route('payments.create', $invoice->id) }}" class="px-4 py-2 bg-green-600 text-white rounded-md text-xs uppercase font-semibold">Record Payment</a>
                     @endif
                 @endcan
-                <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</button>
+                <a href="{{ route('invoices.print', $invoice->id) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</a>
             </div>
         </div>
 
@@ -26,12 +26,8 @@
             </div>
             <div class="text-right">
                 <h4 class="text-xl font-semibold text-gray-700 dark:text-gray-300">
-                    @if(isset($invoice->is_vat_invoice))
-                        @if($invoice->is_vat_invoice)
-                            TAX INVOICE
-                        @else
-                            NON-TAX INVOICE
-                        @endif
+                    @if($invoice->is_vat_invoice)
+                        TAX INVOICE
                     @else
                         INVOICE
                     @endif
@@ -104,7 +100,6 @@
                                 $description = $item->description;
                                 $output = '';
 
-                                // Pattern 1: "Product Name (from GRN: GRN-1234)" or "(from RN: RN-1234)"
                                 if (preg_match('/^(.*) \(from (GRN|RN): (.*?)\)$/', $description, $matches)) {
                                     [$original, $productName, $sourceType, $sourceIdString] = $matches;
                                     $productName = trim($productName);
@@ -112,13 +107,13 @@
                                     $product = \App\Models\Product::where('name', $productName)->first();
                                     $productLink = $product ? "<a href='" . route('products.show', $product->id) . "' class='text-blue-500 hover:underline'>{$productName}</a>" : e($productName);
 
-                                    $sourceLink = e("(from {$sourceType}: {$sourceIdString})"); // Default text
+                                    $sourceLink = e("(from {$sourceType}: {$sourceIdString})");
                                     if ($sourceType === 'GRN') {
                                         $sourceModel = \App\Models\Grn::where('grn_id', $sourceIdString)->first();
                                         if ($sourceModel) {
                                             $sourceLink = "(from <a href='" . route('grns.show', $sourceModel->id) . "' class='text-blue-500 hover:underline'>GRN: {$sourceIdString}</a>)";
                                         }
-                                    } else { // RN
+                                    } else {
                                         $sourceModel = \App\Models\ReceiveNote::where('receive_note_id', $sourceIdString)->first();
                                         if ($sourceModel) {
                                             $sourceLink = "(from <a href='" . route('receive-notes.show', $sourceModel->id) . "' class='text-blue-500 hover:underline'>RN: {$sourceIdString}</a>)";
@@ -126,7 +121,6 @@
                                     }
                                     $output = "{$productLink} {$sourceLink}";
                                 }
-                                // Pattern 2: "Fulfilled Shortage: Qty x Product Name for DN-..."
                                 elseif (preg_match('/^Fulfilled Shortage: (\d+) x (.*?) for (DN-.*?)$/', $description, $matches)) {
                                     [$original, $qty, $productName, $sourceIdString] = $matches;
                                     $productName = trim($productName);
@@ -141,7 +135,6 @@
                                     
                                     $output = "Fulfilled Shortage: {$qty} x {$productLink} for {$sourceLink}";
                                 }
-                                // Fallback: Just a product name
                                 else {
                                     $product = \App\Models\Product::where('name', $description)->first();
                                     $output = $product ? "<a href='" . route('products.show', $product->id) . "' class='text-blue-500 hover:underline'>" . e($description) . "</a>" : e($description);
@@ -159,13 +152,19 @@
             </table>
         </div>
         
-        {{-- Totals Section --}}
+        {{-- ** THE FIX IS HERE: Updated Totals Section ** --}}
         <div class="flex justify-end mb-8">
-            <div class="w-full max-w-xs space-y-2">
-                <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+            <div class="w-full max-w-sm space-y-2">
+                <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                     <span>Subtotal</span>
-                    <span>{{ number_format($invoice->total_amount, 2) }}</span>
+                    <span>{{ number_format($invoice->sub_total, 2) }}</span>
                 </div>
+                @if($invoice->is_vat_invoice)
+                <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                    <span>VAT ({{ number_format($invoice->vat_percentage, 2) }}%)</span>
+                    <span>{{ number_format($invoice->vat_amount, 2) }}</span>
+                </div>
+                @endif
                 <div class="flex justify-between text-lg font-bold text-gray-900 dark:text-gray-200">
                     <span>Grand Total</span>
                     <span>LKR {{ number_format($invoice->total_amount, 2) }}</span>
@@ -181,6 +180,8 @@
             </div>
         </div>
 
+        {{-- Payment History --}}
+        @if($invoice->payments->isNotEmpty())
         <div class="mt-8 pt-6 border-t dark:border-gray-700">
             <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-200 mb-4">Payment History</h3>
             <div class="overflow-x-auto">
@@ -194,22 +195,19 @@
                         </tr>
                     </thead>
                     <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        @forelse ($invoice->payments as $payment)
+                        @foreach ($invoice->payments as $payment)
                         <tr>
                             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $payment->payment_date->format('Y-m-d') }}</td>
                             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ number_format($payment->amount, 2) }}</td>
                             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $payment->payment_method }}</td>
                             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $payment->reference_number ?? 'N/A' }}</td>
                         </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="px-4 py-2 text-center text-sm text-gray-500 dark:text-gray-400">No payments have been recorded for this invoice.</td>
-                            </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
             </div>
         </div>
+        @endif
 
         {{-- Footer & Signatures --}}
         <div class="border-t dark:border-gray-700 pt-6 mt-6 text-xs text-gray-500 dark:text-gray-400">
@@ -255,3 +253,4 @@
     }
 </style>
 @endsection
+

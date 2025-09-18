@@ -8,7 +8,7 @@
             <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
                 <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Record Bulk Customer Payment</h2>
                 <div class="flex items-center space-x-2">
-                    <a href="{{ route('payments.history.customer') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">Cancel</a>
+                    <a href="{{ url()->previous() }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">Cancel</a>
                     <button type="submit" class="inline-flex items-center px-4 py-2 bg-green-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-green-700" :disabled="!isFormValid()">
                         Record Payment
                     </button>
@@ -33,14 +33,18 @@
                     <select name="customer_id" x-model="selectedCustomerId" @change="fetchInvoices" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500" required>
                         <option value="">Select a customer...</option>
                         @foreach($customers as $customer)
-                            <option value="{{ $customer->id }}">{{ $customer->customer_name }} ({{ $customer->customer_id }})</option>
+                            {{-- MODIFICATION START --}}
+                            <option value="{{ $customer->id }}" {{ $selectedCustomerId == $customer->id ? 'selected' : '' }}>
+                            {{-- MODIFICATION END --}}
+                                {{ $customer->customer_name }} ({{ $customer->customer_id }})
+                            </option>
                         @endforeach
                     </select>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Date</label>
-                        <input type="date" name="payment_date" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600" required>
+                        <input type="date" name="payment_date" value="{{ date('Y-m-d') }}" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600" required>
                     </div>
                      <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
@@ -70,7 +74,7 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount to Pay</label>
-                        <input type="number" name="amount" x-model.number="amountPaid" placeholder="0.00" class="mt-1 block w-full dark:bg-gray-900 text-lg rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600" required>
+                        <input type="number" step="0.01" name="amount" x-model.number="amountPaid" placeholder="0.00" class="mt-1 block w-full dark:bg-gray-900 text-lg rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600" required>
                     </div>
                     <div class="pt-6 text-sm">
                         <div class="flex justify-between">
@@ -116,11 +120,17 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('bulkPaymentForm', () => ({
-        selectedCustomerId: '',
+        selectedCustomerId: '{{ $selectedCustomerId ?? '' }}',
         invoices: [],
         isLoading: false,
         selectedInvoiceIds: [],
         amountPaid: '',
+
+        init() {
+            if (this.selectedCustomerId) {
+                this.fetchInvoices();
+            }
+        },
 
         fetchInvoices() {
             this.invoices = [];

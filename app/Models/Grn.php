@@ -21,6 +21,7 @@ class Grn extends Model
         'total_discount',
         'net_amount',
         'remark',
+        'invoice_id',
     ];
 
     protected function casts(): array
@@ -48,6 +49,11 @@ class Grn extends Model
     {
         return $this->hasMany(GrnItem::class);
     }
+        public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class);
+    }
+
     protected static function boot()
     {
         parent::boot();

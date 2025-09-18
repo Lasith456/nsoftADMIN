@@ -66,7 +66,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('grn-manage', [GrnController::class, 'manage'])->name('grns.manage');
     Route::post('grns/{grn}/confirm', [GrnController::class, 'complete'])->name('grns.complete');
     Route::post('grns/{grn}/cancel', [GrnController::class, 'cancel'])->name('grns.cancel');
-    
+    Route::post('grns/{grn}/generate-invoice', [GrnController::class, 'generateInvoice'])->name('grns.generateInvoice');
+
     // Delivery Note Status Management
     Route::get('delivery-notes-manage', [DeliveryNoteController::class, 'manage'])->name('delivery-notes.manage');
     Route::post('delivery-notes/{deliveryNote}/update-status', [DeliveryNoteController::class, 'updateStatus'])->name('delivery-notes.updateStatus');
@@ -96,10 +97,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/payments/history/agent', [PaymentController::class, 'agentHistory'])->name('payments.history.agent');
     Route::get('/payments/history/supplier', [PaymentController::class, 'supplierHistory'])->name('payments.history.supplier');
     Route::get('/customers/{customer}/unpaid-invoices', [CustomerController::class, 'getUnpaidInvoices'])->name('customers.unpaid-invoices');
-    Route::get('/payments/create-bulk', [PaymentController::class, 'createBulk'])->name('payments.createBulk');
+    Route::get('/payments/create-bulk/{customer}', [PaymentController::class, 'createBulk'])->name('payments.createBulk.customer');    
     Route::post('/payments/store-bulk', [PaymentController::class, 'storeBulk'])->name('payments.storeBulk');
+    Route::get('/payments/customerOutstanding', [PaymentController::class, 'customerOutstanding'])->name('payments.customerOutstanding');
+    Route::get('/payments/create-bulk', [PaymentController::class, 'createBulk'])->name('payments.createBulk');
 
-    // Report Routes
+    // Report Routes 
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/sales', [ReportController::class, 'salesReport'])->name('reports.sales');
     Route::get('/reports/customers', [ReportController::class, 'customerReport'])->name('reports.customers');

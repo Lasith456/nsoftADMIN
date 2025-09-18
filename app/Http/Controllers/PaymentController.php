@@ -71,6 +71,25 @@ class PaymentController extends Controller
         $invoices = $query->latest()->paginate(15);
         return view('payments.customer_history', compact('invoices'));
     }
+    public function customerOutstanding(Request $request): View
+    {
+        $customers = Customer::with('invoices')
+            ->whereHas('invoices', function ($query) {
+                $query->whereIn('status', ['unpaid', 'partially-paid']);
+            })
+            ->get()
+            ->map(function ($customer) {
+                $customer->outstanding_balance = $customer->invoices->sum(function ($invoice) {
+                    return $invoice->total_amount - $invoice->amount_paid;
+                });
+                return $customer;
+            })
+            ->filter(function ($customer) {
+                return $customer->outstanding_balance > 0;
+            });
+
+        return view('payments.customerOutstanding', compact('customers'));
+    }
 
     public function agentHistory(Request $request): View
     {
@@ -85,15 +104,18 @@ class PaymentController extends Controller
         $invoices = $query->latest()->paginate(15);
         return view('payments.supplier_history', compact('invoices'));
     }
-    public function createBulk(): View
-    {
-        $customers = Customer::whereHas('invoices', function ($query) {
-            $query->whereIn('status', ['unpaid', 'partially-paid']);
-        })->orderBy('customer_name')->get();
-
-        return view('payments.create_bulk', compact('customers'));
-    }
-
+public function createBulk(Request $request, Customer $customer = null): View
+{
+    $allCustomers = Customer::whereHas('invoices', function ($query) {
+        $query->whereIn('status', ['unpaid', 'partially-paid']);
+    })->orderBy('customer_name')->get();
+    
+    $selectedCustomerId = $customer?->id;
+    return view('payments.create_bulk', [
+        'customers' => $allCustomers,
+        'selectedCustomerId' => $selectedCustomerId,
+    ]);
+}
     /**
      * Store a new bulk payment and distribute it across selected invoices.
      */

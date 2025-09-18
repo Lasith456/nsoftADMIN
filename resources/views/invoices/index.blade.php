@@ -31,10 +31,33 @@
         </div>
     @endif
 
+    {{-- Tabbed Navigation --}}
+    <div class="mb-4 border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+            <a href="{{ route('invoices.index', ['type' => 'all']) }}" 
+               class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm {{ $type === 'all' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                All
+            </a>
+            <a href="{{ route('invoices.index', ['type' => 'customer']) }}"
+               class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm {{ $type === 'customer' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                Customer
+            </a>
+            <a href="{{ route('invoices.index', ['type' => 'supplier']) }}"
+               class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm {{ $type === 'supplier' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                Supplier(GRN)
+            </a>
+            <a href="{{ route('invoices.index', ['type' => 'agent']) }}"
+               class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm {{ $type === 'agent' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+                Agent
+            </a>
+        </nav>
+    </div>
+
     {{-- Search Form --}}
     <form x-data x-ref="searchForm" action="{{ route('invoices.index') }}" method="GET" class="mb-4">
         <div class="flex justify-end">
             <div class="flex items-center">
+                <input type="hidden" name="type" value="{{ $type }}">
                 <label for="search" class="mr-2 text-sm text-black">Search:</label>
                 <input type="search" name="search" id="search" class="border border-gray-300 rounded-md p-2 text-sm text-black" value="{{ request('search') }}" @input.debounce.300ms="$refs.searchForm.submit()" placeholder="Invoice ID, Name...">
             </div>
@@ -57,7 +80,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 @forelse ($invoices as $invoice)
-               <tr>
+                <tr>
                     <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-black">{{ $invoice->invoice_id }}</td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm">
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -103,7 +126,7 @@
                 @empty
                     <tr>
                         <td colspan="7" class="px-4 py-2 whitespace-nowrap text-sm text-center text-gray-500">
-                            No invoices found.
+                            No invoices found for this category.
                         </td>
                     </tr>
                 @endforelse

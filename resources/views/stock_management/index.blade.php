@@ -27,7 +27,7 @@
                         <p>{{ $errors->first('error_convert') }}</p>
                     </div>
                 @endif
-                <form action="{{ route('stock-management.convert') }}" method="POST" class="space-y-4">
+                <form action="{{ route('stock-management.api.convert') }}" method="POST" class="space-y-4">
                     @csrf
                     <div>
                         <label for="product_name_convert" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Product</label>
@@ -53,7 +53,7 @@
                         <p>{{ $errors->first('error_wastage') }}</p>
                     </div>
                 @endif
-                <form action="{{ route('stock-management.wastage') }}" method="POST" class="space-y-4">
+                <form action="{{ route('stock-management.api.wastage') }}" method="POST" class="space-y-4">
                     @csrf
                     <div>
                         <label for="product_name_wastage" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Product</label>

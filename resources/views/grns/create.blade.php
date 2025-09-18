@@ -86,8 +86,9 @@
                             <label class="block text-sm font-medium">Product*</label>
                             <input list="products-list" x-model="currentItem.product_name" @change="productChangedByName" class="mt-1 block w-full dark:bg-gray-900 border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 text-sm">
                             <datalist id="products-list">
+                                {{-- ** THE FIX IS HERE: Add is_clear to the data attributes ** --}}
                                 @foreach($products as $product)
-                                <option value="{{ $product->name }}" data-id="{{ $product->id }}"></option>
+                                <option value="{{ $product->name }}" data-id="{{ $product->id }}" data-is-clear="{{ $product->is_clear ? 'true' : 'false' }}"></option>
                                 @endforeach
                             </datalist>
                         </div>
@@ -163,7 +164,6 @@
                                             <td class="px-2 py-1 whitespace-nowrap text-sm" x-text="`${item.quantity} ${item.unit_type}(s)`"></td>
                                             <td class="px-2 py-1 whitespace-nowrap text-sm" x-text="item.cost_price.toFixed(2)"></td>
                                             <td class="px-2 py-1 whitespace-nowrap text-sm" x-text="item.discount.toFixed(2)"></td>
-                                            {{-- MODIFIED: Updated the total calculation to factor in units_per_case --}}
                                             <td class="px-2 py-1 whitespace-nowrap text-sm" x-text="((item.cost_price * (item.unit_type === 'Case' ? item.quantity * item.units_per_case : item.quantity)) - item.discount).toFixed(2)"></td>
                                             <td class="px-2 py-1 whitespace-nowrap text-sm"><button type="button" @click="removeItem(index)" class="text-red-500">&times;</button></td>
                                         </tr>
@@ -183,7 +183,6 @@
                     <input type="hidden" :name="`items[${index}][product_id]`" :value="item.product_id">
                     <input type="hidden" :name="`items[${index}][unit_type]`" :value="item.unit_type">
                     <input type="hidden" :name="`items[${index}][stock_type]`" :value="item.stock_type">
-                    {{-- MODIFIED: Send the correct final quantity to the backend --}}
                     <input type="hidden" :name="`items[${index}][quantity]`" :value="item.unit_type === 'Case' ? item.quantity * item.units_per_case : item.quantity">
                     <input type="hidden" :name="`items[${index}][cost_price]`" :value="item.cost_price">
                     <input type="hidden" :name="`items[${index}][selling_price]`" :value="item.selling_price">
@@ -199,7 +198,7 @@ document.addEventListener('alpine:init', () => {
         products: @json($products),
         items: [],
         additionalCharges: 0,
-        discountAsPercentage: false, // NEW: State for the toggle
+        discountAsPercentage: false,
         currentItem: {
             product_id: '',
             product_name: '',
@@ -208,8 +207,8 @@ document.addEventListener('alpine:init', () => {
             quantity: 1,
             cost_price: 0,
             selling_price: 0,
-            discount_amount: 0, // NEW: Discount as a fixed amount
-            discount_percentage: 0, // NEW: Discount as a percentage
+            discount_amount: 0,
+            discount_percentage: 0,
             units_per_case: 1,
         },
 
@@ -238,9 +237,12 @@ document.addEventListener('alpine:init', () => {
                 this.currentItem.cost_price = parseFloat(product.cost_price);
                 this.currentItem.selling_price = parseFloat(product.selling_price);
                 this.currentItem.units_per_case = product.units_per_case || 1;
+                // ** THE FIX IS HERE: Set the default stock type based on the product's is_clear flag **
+                this.currentItem.stock_type = product.is_clear ? 'clear' : 'non-clear';
             } else {
                 this.currentItem.product_id = '';
                 this.currentItem.units_per_case = 1;
+                this.currentItem.stock_type = 'clear'; // Default back to clear if product not found
             }
         },
 
@@ -250,7 +252,6 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            // NEW: Calculate final discount amount based on toggle state
             let discount = 0;
             if (this.discountAsPercentage) {
                 const effectiveQuantity = this.currentItem.unit_type === 'Case' ? this.currentItem.quantity * this.currentItem.units_per_case : this.currentItem.quantity;
@@ -265,7 +266,7 @@ document.addEventListener('alpine:init', () => {
                 ...this.currentItem,
                 name: product.name,
                 product_code: product.product_id,
-                discount: discount // Store the calculated amount
+                discount: discount
             });
             this.resetCurrentItem();
         },

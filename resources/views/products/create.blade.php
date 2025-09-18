@@ -138,6 +138,7 @@
                 <div class="lg:col-span-3 flex items-center space-x-6 pt-4">
                      <label class="inline-flex items-center"><input type="checkbox" name="is_active" class="h-4 w-4 text-indigo-600 rounded" checked><span class="ml-2 text-sm">Is Active</span></label>
                      <label class="inline-flex items-center"><input type="checkbox" name="is_vat" class="h-4 w-4 text-indigo-600 rounded"><span class="ml-2 text-sm">Is VAT</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" name="is_clear" class="h-4 w-4 text-indigo-600 rounded"><span class="ml-2 text-sm">Always Clear Stock</span></label>
                 </div>
             </div>
         </form>

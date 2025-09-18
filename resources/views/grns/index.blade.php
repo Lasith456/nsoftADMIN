@@ -26,10 +26,15 @@
         </div>
     </div>
 
-    {{-- Success Message --}}
+    {{-- Success & Error Messages --}}
     @if ($message = Session::get('success'))
         <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
             <p>{{ $message }}</p>
+        </div>
+    @endif
+     @if ($errors->any())
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+            <ul class="list-disc pl-5 mt-2">@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
         </div>
     @endif
 
@@ -74,12 +79,11 @@
                     <td class="px-4 py-2 whitespace-nowrap text-sm">
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                             @switch($grn->status)
-                                @case('completed') bg-green-100 text-green-800 @break
                                 @case('pending') bg-yellow-100 text-yellow-800 @break
-                                @case('cancelled') bg-red-100 text-red-800 @break
-                                {{-- You can add cases for 'Confirmed' and 'Invoiced' here if you want them to have specific colors --}}
                                 @case('confirmed') bg-green-100 text-green-800 @break
                                 @case('invoiced') bg-blue-100 text-blue-800 @break
+                                @case('cancelled') bg-red-100 text-red-800 @break
+                                @default bg-gray-100 text-gray-800
                             @endswitch
                         ">
                             {{ ucfirst($grn->status) }}
@@ -88,9 +92,30 @@
                     <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
                         <div class="flex justify-end items-center space-x-4">
                             <a href="{{ route('grns.show', $grn->id) }}" class="text-blue-600 hover:text-blue-800" title="Show">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542 7z"></path></svg>
                             </a>
                             
+                            {{-- Conditional buttons for invoicing --}}
+                            @if ($grn->status == 'confirmed' && !$grn->invoice_id)
+                                @can('invoice-create')
+                                    <form action="{{ route('grns.generateInvoice', $grn->id) }}" method="POST" class="inline">
+                                        @csrf
+                                        <button type="submit" class="text-green-600 hover:text-green-800" title="Generate Invoice">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                        </button>
+                                    </form>
+                                @endcan
+                            @elseif ($grn->invoice_id)
+                                @can('invoice-show')
+                                    <a href="{{ route('invoices.show', $grn->invoice_id) }}" class="text-indigo-600 hover:text-indigo-800" title="View Invoice">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                    </a>
+                                    <a href="{{ route('invoices.print', $grn->invoice_id) }}" class="text-purple-600 hover:text-purple-800" title="Print Invoice">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm7-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                    </a>
+                                @endcan
+                            @endif
+
                             @if ($grn->status == 'pending')
                                 @can('grn-manage')
                                     <form action="{{ route('grns.complete', $grn->id) }}" method="POST" class="inline">
@@ -113,8 +138,7 @@
                             @endif
 
                             @can('grn-delete')
-                                {{-- Hide delete button if status is 'Confirmed' or 'Invoiced' --}}
-                                @if(!in_array($grn->status, ['confirmed', 'invoiced','cancelled']))
+                                @if(!in_array($grn->status, ['invoiced','cancelled']))
                                     <form action="{{ route('grns.destroy', $grn->id) }}" method="POST" class="inline">
                                         @csrf
                                         @method('DELETE')
@@ -144,3 +168,4 @@
     </div>
 </div>
 @endsection
+

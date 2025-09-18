@@ -21,12 +21,8 @@
             </div>
             <div class="text-right">
                 <h4 class="text-xl font-semibold text-gray-700 dark:text-gray-300">
-                    @if(isset($invoice->is_vat_invoice))
-                        @if($invoice->is_vat_invoice)
-                            TAX INVOICE
-                        @else
-                            NON-TAX INVOICE
-                        @endif
+                    @if($invoice->is_vat_invoice)
+                        TAX INVOICE
                     @else
                         INVOICE
                     @endif
@@ -52,6 +48,8 @@
             <div class="text-right">
                 <strong class="font-medium text-gray-500 dark:text-gray-400">Date of Issue:</strong>
                 <p class="text-gray-900 dark:text-gray-200">{{ $invoice->created_at->format('F j, Y') }}</p>
+                 <strong class="font-medium text-gray-500 dark:text-gray-400 mt-2">Due Date:</strong>
+                <p class="text-gray-900 dark:text-gray-200">{{ $invoice->due_date->format('F j, Y') }}</p>
             </div>
         </div>
 
@@ -79,17 +77,24 @@
             </table>
         </div>
         
-        {{-- Totals Section (Simplified for Print) --}}
+        {{-- ** THE FIX IS HERE: Updated Totals Section for Print View ** --}}
         <div class="flex justify-end mb-8">
-            <div class="w-full max-w-xs space-y-2">
-                <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+            <div class="w-full max-w-sm space-y-2">
+                <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                     <span>Subtotal</span>
-                    <span>{{ number_format($invoice->total_amount, 2) }}</span>
+                    <span>{{ number_format($invoice->sub_total, 2) }}</span>
                 </div>
+                @if($invoice->is_vat_invoice)
+                <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                    <span>VAT ({{ number_format($invoice->vat_percentage, 2) }}%)</span>
+                    <span>{{ number_format($invoice->vat_amount, 2) }}</span>
+                </div>
+                @endif
                 <div class="flex justify-between text-lg font-bold text-gray-900 dark:text-gray-200">
                     <span>Grand Total</span>
                     <span>LKR {{ number_format($invoice->total_amount, 2) }}</span>
                 </div>
+                {{-- Simplified for print view - omitting paid/due amounts --}}
             </div>
         </div>
 
@@ -136,3 +141,4 @@
     }
 </style>
 @endsection
+

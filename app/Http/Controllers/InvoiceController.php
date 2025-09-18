@@ -28,25 +28,42 @@ class InvoiceController extends Controller
 
     public function index(Request $request): View
     {
+        $type = $request->query('type', 'all');
         $query = Invoice::with('invoiceable');
+
+        // ** THE FIX IS HERE: Filter by the selected invoice type **
+        switch ($type) {
+            case 'customer':
+                $query->where('invoiceable_type', Customer::class);
+                break;
+            case 'supplier':
+                $query->where('invoiceable_type', Supplier::class);
+                break;
+            case 'agent':
+                $query->where('invoiceable_type', Agent::class);
+                break;
+        }
 
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
-            $query->where('invoice_id', 'LIKE', "%{$search}%")
-                ->orWhereHasMorph('invoiceable', [Customer::class, Supplier::class, Agent::class], function ($q, $type) use ($search) {
-                    $nameColumn = match ($type) {
-                        Customer::class => 'customer_name',
-                        Supplier::class => 'supplier_name',
-                        Agent::class => 'name',
-                    };
-                    $q->where($nameColumn, 'LIKE', "%{$search}%");
-                });
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_id', 'LIKE', "%{$search}%")
+                  ->orWhereHasMorph('invoiceable', [Customer::class, Supplier::class, Agent::class], function ($subQuery, $modelType) use ($search) {
+                      $nameColumn = match ($modelType) {
+                          Customer::class => 'customer_name',
+                          Supplier::class => 'supplier_name',
+                          Agent::class => 'name',
+                      };
+                      $subQuery->where($nameColumn, 'LIKE', "%{$search}%");
+                  });
+            });
         }
 
         $invoices = $query->latest()->paginate(15);
-        return view('invoices.index', compact('invoices'));
+        
+        // Pass the current type to the view to highlight the active tab
+        return view('invoices.index', compact('invoices', 'type'));
     }
-
     public function show(Invoice $invoice): View
     {
         $invoice->load(['items', 'payments', 'invoiceable']);
@@ -166,12 +183,17 @@ class InvoiceController extends Controller
                     ];
                 }
             }
-
+            
+            // ** THE FIX IS HERE: Add the missing fields to the create() call **
             $invoice = $supplier->invoices()->create([
                 'invoice_id' => 'INV-SUPP-' . strtoupper(Str::random(6)),
                 'due_date' => now()->addDays(30),
+                'sub_total' => $totalAmount,
+                'vat_percentage' => 0,
+                'vat_amount' => 0,
                 'total_amount' => $totalAmount,
                 'status' => 'unpaid',
+                'is_vat_invoice' => false,
             ]);
 
             $invoice->items()->createMany($invoiceItemsData);
@@ -367,12 +389,17 @@ class InvoiceController extends Controller
                     'total' => $total,
                 ];
             }
-
+            
+            // ** THE FIX IS HERE: Add the missing fields to the agent invoice as well **
             $invoice = $agent->invoices()->create([
                 'invoice_id' => 'INV-AGENT-' . strtoupper(Str::random(6)),
                 'due_date' => now()->addDays(30),
+                'sub_total' => $totalAmount,
+                'vat_percentage' => 0,
+                'vat_amount' => 0,
                 'total_amount' => $totalAmount,
                 'status' => 'unpaid',
+                'is_vat_invoice' => false,
             ]);
 
             $invoice->items()->createMany($invoiceItemsData);

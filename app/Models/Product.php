@@ -19,6 +19,7 @@ class Product extends Model
         'supplier_id', 
         'is_active',
         'is_vat',
+        'is_clear',
         'units_per_case',
         'unit_of_measure',
         'cost_price',
@@ -33,6 +34,7 @@ class Product extends Model
         return [
             'is_active' => 'boolean',
             'is_vat' => 'boolean',
+            'is_clear' => 'boolean',
             'cost_price' => 'decimal:2',
             'selling_price' => 'decimal:2',
         ];

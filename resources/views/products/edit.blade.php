@@ -145,6 +145,10 @@
                         <input type="checkbox" name="is_vat" class="h-4 w-4 text-indigo-600 rounded" x-model="mainForm.is_vat">
                         <span class="ml-2 text-sm">Is VAT</span>
                     </label>
+                     <label class="inline-flex items-center">
+                        <input type="checkbox" name="is_clear" class="h-4 w-4 text-indigo-600 rounded" x-model="mainForm.is_clear">
+                        <span class="ml-2 text-sm">Is Clear</span>
+                    </label>
                 </div>
             </div>
         </form>
@@ -177,7 +181,8 @@
                 selling_price: parseFloat(initialData.product.selling_price),
                 reorder_qty: initialData.product.reorder_qty,
                 is_active: initialData.product.is_active,
-                is_vat: initialData.product.is_vat
+                is_vat: initialData.product.is_vat,
+                is_clear: initialData.product.is_clear
             },
             newDepartment: { name: '' },
             newSubDepartment: { name: '' },
@@ -307,3 +312,4 @@
     });
 </script>
 @endsection
+

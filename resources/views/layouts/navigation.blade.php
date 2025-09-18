@@ -99,7 +99,7 @@
                         <li><a href="{{ route('payments.history.agent') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Agent Payment</a></li>
                         <li><a href="{{ route('payments.history.supplier') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Suppliers Payment</a></li>
                         <li><a href="{{ route('payments.history.customer') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Customer Payments</a></li>
-                        <li><a href="{{ route('payments.createBulk') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Customer Outstanding</a></li>
+                        <li><a href="{{ route('payments.customerOutstanding') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Customer Outstanding</a></li>
 
                     </ul>
                 </li>
@@ -129,6 +129,8 @@
                     <ul x-show="open" class="mt-1 px-2 space-y-1">
                         <li><a href="{{ route('grns.create') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Add GRN</a></li>
                         <li><a href="{{ route('grns.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">All GRN</a></li>
+                        <li><a href="{{ route('stock-management.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Wastage</a></li>
+
                     </ul>
                 </li>
                 

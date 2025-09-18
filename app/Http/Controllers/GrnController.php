@@ -6,6 +6,7 @@ use App\Models\Grn;
 use App\Models\GrnItem;
 use App\Models\Supplier;
 use App\Models\Product;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -19,12 +20,12 @@ class GrnController extends Controller
         $this->middleware('permission:grn-list|grn-create|grn-delete|grn-manage', ['only' => ['index','show', 'manage']]);
         $this->middleware('permission:grn-create', ['only' => ['create','store']]);
         $this->middleware('permission:grn-delete', ['only' => ['destroy']]);
-        $this->middleware('permission:grn-manage', ['only' => ['manage', 'confirm', 'cancel']]);
+        $this->middleware('permission:grn-manage', ['only' => ['manage', 'complete', 'cancel', 'generateInvoice']]);
     }
 
     public function index(Request $request): View
     {
-        $query = Grn::with('supplier');
+        $query = Grn::with(['supplier', 'invoice']);
 
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
@@ -133,9 +134,53 @@ class GrnController extends Controller
         return view('grns.manage', compact('suppliers', 'grns'));
     }
 
-    /**
-     * Mark a GRN as confirmed and update stock.
-     */
+    public function generateInvoice(Grn $grn): RedirectResponse
+    {
+        if ($grn->status !== 'confirmed' || $grn->invoice_id) {
+            return back()->withErrors(['error' => 'An invoice cannot be generated for this GRN. It might not be confirmed or may already be invoiced.']);
+        }
+
+        DB::beginTransaction();
+        try {
+            $supplier = $grn->supplier;
+            $totalAmount = $grn->net_amount;
+            $invoiceItemsData = [];
+
+            foreach ($grn->items as $item) {
+                $invoiceItemsData[] = [
+                    'description' => $item->product->name . " (from GRN: {$grn->grn_id})",
+                    'quantity' => $item->quantity_received,
+                    'unit_price' => $item->cost_price,
+                    'total' => ($item->cost_price * $item->quantity_received) - $item->discount,
+                ];
+            }
+
+            $invoice = $supplier->invoices()->create([
+                'invoice_id' => 'INV-SUPP-' . strtoupper(Str::random(6)),
+                'due_date' => now()->addDays(30),
+                'sub_total' => $totalAmount,
+                'vat_percentage' => 0,
+                'vat_amount' => 0,
+                'total_amount' => $totalAmount,
+                'status' => 'unpaid',
+                'is_vat_invoice' => false,
+            ]);
+
+            $invoice->items()->createMany($invoiceItemsData);
+
+            $grn->update([
+                'status' => 'invoiced',
+                'invoice_id' => $invoice->id
+            ]);
+
+            DB::commit();
+            return redirect()->route('invoices.show', $invoice->id)->with('success', 'Supplier invoice generated successfully from GRN ' . $grn->grn_id);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()->withErrors(['error' => 'An error occurred while generating the invoice: ' . $e->getMessage()]);
+        }
+    }
+
     public function complete(Grn $grn): RedirectResponse
     {
         if ($grn->status !== 'pending') {
@@ -166,9 +211,6 @@ class GrnController extends Controller
         }
     }
 
-    /**
-     * Mark a GRN as cancelled.
-     */
     public function cancel(Grn $grn): RedirectResponse
     {
         if ($grn->status !== 'pending') {
