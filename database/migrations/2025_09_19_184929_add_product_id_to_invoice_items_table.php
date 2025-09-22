@@ -11,8 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('products', function (Blueprint $table) {
-            $table->boolean('separate_department_invoice')->default(false)->after('is_clear');
+        Schema::table('invoice_items', function (Blueprint $table) {
+            $table->unsignedBigInteger('product_id')->nullable()->after('invoice_id');
+            $table->foreign('product_id')->references('id')->on('products')->onDelete('set null');
         });
     }
 
@@ -21,8 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('products', function (Blueprint $table) {
-            $table->dropColumn('separate_department_invoice');
+        Schema::table('invoice_items', function (Blueprint $table) {
+            //
         });
     }
 };

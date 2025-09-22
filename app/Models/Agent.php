@@ -82,5 +82,6 @@ class Agent extends Model
             $agent->agent_id = 'AGENT-' . str_pad($number, 4, "0", STR_PAD_LEFT);
         });
     }
+    
 }
 

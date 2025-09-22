@@ -120,5 +120,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/store-bank', [SettingsController::class, 'storeBank'])->name('storeBank');
         Route::put('/banks/{bank}/toggle-status', [SettingsController::class, 'toggleBankStatus'])->name('banks.toggleStatus');
     });
+    Route::get('/invoices/{invoice}/showopt2', [App\Http\Controllers\InvoiceController::class, 'showOpt2'])
+    ->name('invoices.showopt2');
+
 });
 

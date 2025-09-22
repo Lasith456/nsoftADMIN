@@ -25,19 +25,29 @@ class ProductController extends Controller
     {
         $query = Product::with(['department', 'subDepartment', 'supplier']);
 
+        // 🔍 Search filter
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'LIKE', "%{$search}%")
-                  ->orWhere('product_id', 'LIKE', "%{$search}%")
-                  ->orWhere('appear_name', 'LIKE', "%{$search}%");
-            });
+                ->orWhere('product_id', 'LIKE', "%{$search}%")
+                ->orWhere('appear_name', 'LIKE', "%{$search}%");
+            }); 
+        }
+
+        // 🏷 Department filter
+        if ($request->has('department_id') && $request->department_id != '') {
+            $query->where('department_id', $request->department_id);
         }
 
         $products = $query->latest()->paginate(10);
-        
-        return view('products.index', compact('products'));
+
+        // Send department list for dropdown
+        $departments = Department::orderBy('name')->get();
+
+        return view('products.index', compact('products', 'departments'));
     }
+
 
     public function create(): View
     {

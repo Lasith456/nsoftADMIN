@@ -7,6 +7,7 @@ use App\Models\GrnItem;
 use App\Models\Supplier;
 use App\Models\Product;
 use App\Models\Invoice;
+use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -50,7 +51,9 @@ class GrnController extends Controller
     {
         $suppliers = Supplier::where('is_active', true)->orderBy('supplier_name')->get();
         $products = Product::where('is_active', true)->orderBy('name')->get();
-        return view('grns.create', compact('suppliers', 'products'));
+        $departments = Department::orderBy('name')->get();
+
+        return view('grns.create', compact('suppliers', 'products', 'departments'));
     }
 
     public function store(Request $request): RedirectResponse

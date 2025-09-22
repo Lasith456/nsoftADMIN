@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Agent;
 use App\Models\Product;
+use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -38,7 +39,9 @@ class AgentController extends Controller
     public function create(): View
     {
         $products = Product::where('is_active', true)->orderBy('name')->get();
-        return view('agents.create', compact('products'));
+        $departments = Department::orderBy('name')->get();
+
+        return view('agents.create', compact('products', 'departments'));
     }
 
   public function store(Request $request): RedirectResponse

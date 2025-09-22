@@ -21,7 +21,6 @@ class Product extends Model
         'is_active',
         'is_vat',
         'is_clear',
-        'separate_department_invoice', // NEW FIELD ADDED
         'units_per_case',
         'unit_of_measure',
         'cost_price',
@@ -37,7 +36,6 @@ class Product extends Model
             'is_active' => 'boolean',
             'is_vat' => 'boolean',
             'is_clear' => 'boolean',
-            'separate_department_invoice' => 'boolean', // NEW CAST ADDED
             'cost_price' => 'decimal:2',
             'selling_price' => 'decimal:2',
         ];

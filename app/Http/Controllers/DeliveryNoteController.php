@@ -8,6 +8,7 @@ use App\Models\PurchaseOrderItem;
 use App\Models\Product;
 use App\Models\Vehicle;
 use App\Models\Agent;
+use App\Models\Department;
 use App\Models\DeliveryNoteItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,116 +48,122 @@ class DeliveryNoteController extends Controller
         $purchaseOrders = $query->latest()->get();
         $vehicles = Vehicle::where('is_active', true)->orderBy('vehicle_no')->get();
         $products = Product::where('is_active', true)->orderBy('name')->get();
+        $departments = Department::orderBy('name')->get();
 
-        return view('delivery_notes.create', compact('purchaseOrders', 'vehicles', 'products'));
+        return view('delivery_notes.create', compact('purchaseOrders', 'vehicles', 'products', 'departments'));
     }
 
-    public function store(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'purchase_order_ids' => 'required|array|min:1',
-            'purchase_order_ids.*' => 'exists:purchase_orders,id',
-            'vehicle_id' => 'required|exists:vehicles,id',
-            'delivery_date' => 'required|date',
-            'agent_selections' => 'nullable|array',
-            'agent_selections.*' => 'nullable|exists:agents,id',
+public function store(Request $request): RedirectResponse
+{
+    $request->validate([
+        'purchase_order_ids' => 'required|array|min:1',
+        'purchase_order_ids.*' => 'exists:purchase_orders,id',
+        'vehicle_id' => 'required|exists:vehicles,id',
+        'delivery_date' => 'required|date',
+        'driver_name' => 'nullable|string|max:255',
+        'driver_mobile' => 'nullable|string|max:255',
+        'agent_selections' => 'nullable|array',
+        'agent_selections.*' => 'nullable|exists:agents,id',
+    ]);
+
+    DB::beginTransaction();
+    try {
+        $po_ids = $request->purchase_order_ids;
+        $vehicle = Vehicle::findOrFail($request->vehicle_id);
+
+        // ✅ use override if given, else fallback to vehicle defaults
+        $driverName = $request->driver_name ?: $vehicle->driver_name;
+        $driverMobile = $request->driver_mobile ?: $vehicle->driver_mobile;
+
+        $deliveryNote = DeliveryNote::create([
+            'vehicle_id'    => $vehicle->id,
+            'delivery_date' => $request->delivery_date,
+            'status'        => 'processing',
+            'driver_name'   => $driverName,
+            'driver_mobile' => $driverMobile,
         ]);
 
-        DB::beginTransaction();
-        try {
-            $po_ids = $request->purchase_order_ids;
-            $purchaseOrders = PurchaseOrder::with('items.product')->whereIn('id', $po_ids)->get();
-            
-            $requestedItems = [];
-            foreach ($purchaseOrders as $po) {
-                foreach ($po->items as $item) {
-                    $productId = $item->product_id;
-                    if (!isset($requestedItems[$productId])) {
-                        $requestedItems[$productId] = ['product_name' => $item->product_name, 'total_quantity' => 0];
-                    }
-                    $requestedItems[$productId]['total_quantity'] += $item->quantity;
+        $deliveryNote->purchaseOrders()->attach($po_ids);
+
+        // handle stock + items same as before...
+        $purchaseOrders = PurchaseOrder::with('items.product')->whereIn('id', $po_ids)->get();
+        $requestedItems = [];
+        foreach ($purchaseOrders as $po) {
+            foreach ($po->items as $item) {
+                $productId = $item->product_id;
+                if (!isset($requestedItems[$productId])) {
+                    $requestedItems[$productId] = ['product_name' => $item->product_name, 'total_quantity' => 0];
+                }
+                $requestedItems[$productId]['total_quantity'] += $item->quantity;
+            }
+        }
+
+        foreach ($requestedItems as $productId => $itemData) {
+            $product = Product::lockForUpdate()->find($productId);
+            $quantityNeeded = $itemData['total_quantity'];
+            $fromClearStock = min($product->clear_stock_quantity, $quantityNeeded);
+            $shortage = $quantityNeeded - $fromClearStock;
+            $agentId = null;
+            $fromAgent = 0;
+
+            if ($shortage > 0) {
+                if (isset($request->agent_selections[$productId]) && $request->agent_selections[$productId] != '') {
+                    $agentId = $request->agent_selections[$productId];
+                    $fromAgent = $shortage;
+                } else {
+                    throw new \Exception("A stock shortage for {$product->name} requires an agent to be assigned.");
                 }
             }
-            
-            $deliveryNote = DeliveryNote::create([
-                'vehicle_id' => $request->vehicle_id,
-                'delivery_date' => $request->delivery_date,
-                'status' => 'processing',
+
+            $deliveryNote->items()->create([
+                'product_id' => $productId,
+                'product_name' => $itemData['product_name'],
+                'quantity_requested' => $quantityNeeded,
+                'quantity_from_stock' => $fromClearStock,
+                'agent_id' => $agentId,
+                'quantity_from_agent' => $fromAgent,
             ]);
 
-            $deliveryNote->purchaseOrders()->attach($po_ids);
-
-            foreach ($requestedItems as $productId => $itemData) {
-                $product = Product::lockForUpdate()->find($productId);
-                $quantityNeeded = $itemData['total_quantity'];
-                
-                $fromClearStock = min($product->clear_stock_quantity, $quantityNeeded);
-                $shortage = $quantityNeeded - $fromClearStock;
-                $agentId = null;
-                $fromAgent = 0;
-
-                if ($shortage > 0) {
-                    if (isset($request->agent_selections[$productId]) && $request->agent_selections[$productId] != '') {
-                        $agentId = $request->agent_selections[$productId];
-                        $fromAgent = $shortage;
-                    } else {
-                        throw new \Exception("A stock shortage for {$product->name} requires an agent to be assigned.");
-                    }
-                }
-                
-                $deliveryNote->items()->create([
-                    'product_id' => $productId,
-                    'product_name' => $itemData['product_name'],
-                    'quantity_requested' => $quantityNeeded,
-                    'quantity_from_stock' => $fromClearStock,
-                    'agent_id' => $agentId,
-                    'quantity_from_agent' => $fromAgent,
-                ]);
-
-                if ($fromClearStock > 0) {
-                    $product->decrement('clear_stock_quantity', $fromClearStock);
-                }
+            if ($fromClearStock > 0) {
+                $product->decrement('clear_stock_quantity', $fromClearStock);
             }
-
-            PurchaseOrder::whereIn('id', $po_ids)->update(['status' => 'processing']);
-
-            DB::commit();
-            return redirect()->route('delivery-notes.show', $deliveryNote->id)->with('success', 'Delivery Note created successfully.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            // ** THE FIX IS HERE: Provide a more informative error message for stock-related issues. **
-            if (str_contains($e->getMessage(), 'requires an agent to be assigned')) {
-                $errorMessage = "Could not create the delivery note. Stock levels may have changed since the page was loaded. Please review the shortages and try again. Details: " . $e->getMessage();
-                return back()->withInput()->withErrors(['error' => $errorMessage]);
-            }
-            
-            // For all other types of errors.
-            return back()->withInput()->withErrors(['error' => 'An unexpected error occurred while creating the delivery note: ' . $e->getMessage()]);
         }
+
+        PurchaseOrder::whereIn('id', $po_ids)->update(['status' => 'processing']);
+
+        DB::commit();
+        return redirect()->route('delivery-notes.show', $deliveryNote->id)
+                         ->with('success', 'Delivery Note created successfully.');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withInput()->withErrors([
+            'error' => 'An error occurred: ' . $e->getMessage()
+        ]);
     }
-    
-    public function checkStock(Request $request)
-    {
-        $po_ids = $request->input('po_ids', []);
-        if (empty($po_ids)) {
-            return response()->json(['items' => []]);
-        }
+}
 
-        $items = PurchaseOrderItem::whereIn('purchase_order_id', $po_ids)
-            ->with('product')
-            ->select('product_id', DB::raw('SUM(quantity) as total_quantity'))
-            ->groupBy('product_id')
-            ->get();
-        
-        $response = [];
-        foreach ($items as $item) {
-            $product = $item->product;
-            $clearStockShortage = max(0, $item->total_quantity - $product->clear_stock_quantity);
-            $agents = [];
-            
-            if ($clearStockShortage > 0 && $product->non_clear_stock_quantity < $clearStockShortage) {
-                $agents = Agent::whereHas('products', function ($query) use ($product) {
+    
+public function checkStock(Request $request)
+{
+    $po_ids = $request->input('po_ids', []);
+    if (empty($po_ids)) {
+        return response()->json(['items' => []]);
+    }
+
+    $items = PurchaseOrderItem::whereIn('purchase_order_id', $po_ids)
+        ->with('product')
+        ->select('product_id', DB::raw('SUM(quantity) as total_quantity'))
+        ->groupBy('product_id')
+        ->get();
+    
+    $response = [];
+    foreach ($items as $item) {
+        $product = $item->product;
+        $clearStockShortage = max(0, $item->total_quantity - $product->clear_stock_quantity);
+        $agents = collect();
+
+        if ($clearStockShortage > 0 && $product->non_clear_stock_quantity < $clearStockShortage) {
+            $agents = Agent::whereHas('products', function ($query) use ($product) {
                     $query->where('products.id', $product->id);
                 })
                 ->where('is_active', true)
@@ -165,27 +172,29 @@ class DeliveryNoteController extends Controller
                 }])
                 ->get()
                 ->map(function($agent) {
-                    // This assumes a product is uniquely associated with an agent for pricing.
-                    // If an agent can have multiple prices for the same product, this needs adjustment.
-                    $agent->price_per_case = $agent->products->first()->pivot->price_per_case;
+                    if ($agent->products->isNotEmpty()) {
+                        $agent->price_per_case = $agent->products->first()->pivot->price_per_case;
+                    } else {
+                        $agent->price_per_case = null;
+                    }
                     return $agent;
                 })
                 ->sortBy('price_per_case');
-            }
-
-            $response[] = [
-                'product_id' => $product->id,
-                'product_name' => $product->name,
-                'requested' => $item->total_quantity,
-                'clear_stock' => $product->clear_stock_quantity,
-                'non_clear_stock' => $product->non_clear_stock_quantity,
-                'clear_stock_shortage' => $clearStockShortage,
-                'agents' => $agents->values()->all(),
-            ];
         }
 
-        return response()->json(['items' => $response]);
+        $response[] = [
+            'product_id' => $product->id,
+            'product_name' => $product->name,
+            'requested' => $item->total_quantity,
+            'clear_stock' => $product->clear_stock_quantity,
+            'non_clear_stock' => $product->non_clear_stock_quantity,
+            'clear_stock_shortage' => $clearStockShortage,
+            'agents' => $agents->values()->all(),
+        ];
     }
+
+    return response()->json(['items' => $response]);
+}
 
     public function show(DeliveryNote $deliveryNote)
     {

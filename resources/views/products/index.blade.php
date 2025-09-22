@@ -32,15 +32,36 @@
         </div>
     @endif
 
-    {{-- Search Form with Alpine.js for debounced search --}}
-    <form x-data x-ref="searchForm" action="{{ route('products.index') }}" method="GET" class="mb-4">
-        <div class="flex justify-end">
+    {{-- Filter Form --}}
+    <form x-data x-ref="filterForm" action="{{ route('products.index') }}" method="GET" class="mb-4">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-3">
+            
+            {{-- Search --}}
             <div class="flex items-center">
                 <label for="search" class="mr-2 text-sm text-black">Search:</label>
-                <input type="search" name="search" id="search" class="border border-gray-300 rounded-md p-2 text-sm text-black" value="{{ request('search') }}" @input.debounce.600ms="$refs.searchForm.submit()">
+                <input type="search" name="search" id="search"
+                    class="border border-gray-300 rounded-md p-2 text-sm text-black"
+                    value="{{ request('search') }}"
+                    @input.debounce.600ms="$refs.filterForm.submit()">
+            </div>
+
+            {{-- Department Filter --}}
+            <div class="flex items-center">
+                <label for="department_id" class="mr-2 text-sm text-black">Department:</label>
+                <select name="department_id" id="department_id"
+                        class="border border-gray-300 rounded-md p-2 text-sm text-black"
+                        onchange="this.form.submit()">
+                    <option value="">All</option>
+                    @foreach($departments as $dept)
+                        <option value="{{ $dept->id }}" {{ request('department_id') == $dept->id ? 'selected' : '' }}>
+                            {{ $dept->name }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
         </div>
     </form>
+
 
     {{-- Products Table --}}
     <div class="overflow-x-auto">

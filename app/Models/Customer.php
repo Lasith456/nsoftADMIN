@@ -18,6 +18,7 @@ class Customer extends Model
         'company_name',
         'display_name',
         'nic',
+        'separate_department_invoice', // NEW FIELD ADDED
         'primary_address',
         'customer_mobile',
         'customer_phone',
@@ -34,6 +35,8 @@ class Customer extends Model
         return [
             'is_active' => 'boolean',
             'credit_limit' => 'decimal:2',
+            'separate_department_invoice' => 'boolean',
+
         ];
     }
 

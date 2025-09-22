@@ -49,20 +49,47 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {{-- Item Entry Form --}}
                     <div class="lg:col-span-1 space-y-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                        <h4 class="font-semibold text-gray-800 dark:text-gray-200">New Item</h4>
+
+                        <!-- Department Selection -->
+                        <div>
+                            <label class="block text-sm font-medium">Department</label>
+                            <input list="departments-list" 
+                                   id="department_name"
+                                   x-model="departmentName"
+                                   @change="departmentChangedByName"
+                                   placeholder="Type to search department..."
+                                   class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-200 py-2 px-3">
+
+                            <datalist id="departments-list">
+                                @foreach($departments as $dept)
+                                    <option value="{{ $dept->name }}" data-id="{{ $dept->id }}"></option>
+                                @endforeach
+                            </datalist>
+
+                            <p x-show="departmentError" class="text-red-600 text-xs mt-1" x-text="departmentError"></p>
+                        </div>
+
+                        <!-- Product Selection -->
                         <div>
                             <label class="block text-sm font-medium">Product</label>
-                            <input list="products-list" x-model="currentItem.product_name" @change="productChangedByName" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-200 py-2 px-3">
-                             <datalist id="products-list">
-                                 @foreach($products as $product)
-                                    <option value="{{ $product->name }}" data-id="{{ $product->id }}"></option>
-                                 @endforeach
+                            <input list="products-list" 
+                                   x-model="currentItem.product_name" 
+                                   @change="productChangedByName" 
+                                   :disabled="!selectedDepartment"
+                                   placeholder="Select department first"
+                                   class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-200 py-2 px-3">
+                            <datalist id="products-list">
+                                <template x-for="product in filteredProducts" :key="product.id">
+                                    <option :value="product.name" :data-id="product.id"></option>
+                                </template>
                             </datalist>
                         </div>
+
                         <div>
                             <label class="block text-sm font-medium">Quantity</label>
                             <input type="number" x-model.number="quantity" min="1" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-200 py-2 px-3">
                         </div>
+
                         <button type="button" @click="addItem" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">Add Item</button>
                     </div>
 
@@ -111,12 +138,20 @@
         Alpine.data('simplifiedPoForm', () => ({
             items: [],
             products: @json($products),
+            selectedDepartment: '',
+            departmentName: '',
+            departmentError: '',
             currentItem: {
                 product_id: '',
                 product_name: ''
             },
             quantity: 1,
             
+            get filteredProducts() {
+                if (!this.selectedDepartment) return [];
+                return this.products.filter(p => p.department_id == this.selectedDepartment);
+            },
+
             init() {
                 const customerInput = document.getElementById('customer_name');
                 const customerIdInput = document.getElementById('customer_id');
@@ -134,14 +169,32 @@
                 });
             },
 
+            departmentChangedByName() {
+                const options = document.getElementById('departments-list').options;
+                let deptId = '';
+                for (let i = 0; i < options.length; i++) {
+                    if (options[i].value === this.departmentName) {
+                        deptId = options[i].dataset.id;
+                        break;
+                    }
+                }
+                if (deptId) {
+                    this.selectedDepartment = deptId;
+                    this.departmentError = '';
+                } else {
+                    this.selectedDepartment = '';
+                    this.departmentError = 'Department not found';
+                }
+            },
+
             productChangedByName() {
-                const product = this.products.find(p => p.name === this.currentItem.product_name);
+                const product = this.filteredProducts.find(p => p.name === this.currentItem.product_name);
                 this.currentItem.product_id = product ? product.id : '';
             },
 
             addItem() {
                 if (!this.currentItem.product_id || this.quantity <= 0) return;
-                const product = this.products.find(p => p.id == this.currentItem.product_id);
+                const product = this.filteredProducts.find(p => p.id == this.currentItem.product_id);
                 if (!product) return;
 
                 const existingItem = this.items.find(i => i.product_id == this.currentItem.product_id);
@@ -165,4 +218,3 @@
     });
 </script>
 @endsection
-

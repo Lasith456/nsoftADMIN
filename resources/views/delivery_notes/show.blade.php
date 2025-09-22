@@ -38,6 +38,8 @@
                         N/A
                     @endif
                 </p>
+                <p><strong>Vehicle:</strong> {{ $deliveryNote->vehicle->vehicle_no }}</p>
+                <p><strong>Driver:</strong> {{ $deliveryNote->driver_name }} ({{ $deliveryNote->driver_mobile }})</p>
             </div>
             <div>
                 <strong class="font-medium text-gray-900 dark:text-gray-200 text-sm">Delivery Date:</strong>

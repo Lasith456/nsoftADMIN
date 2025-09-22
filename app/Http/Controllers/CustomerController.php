@@ -50,35 +50,57 @@ class CustomerController extends Controller
     {
         return view('customers.create');
     }
+public function store(Request $request): RedirectResponse
+{
+    $request->validate([
+        'title' => 'required|string|max:255',
+        'customer_name' => 'required|string|max:255',
+        'display_name' => 'required|string|max:255',
+        'nic' => 'nullable|string|max:255|unique:customers,nic',
+        'primary_address' => 'required|string',
+        'customer_mobile' => 'required|string|max:20',
+        'customer_email' => 'nullable|email|max:255',
+        'credit_limit' => 'nullable|numeric|min:0',
+    ]);
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'customer_name' => 'required|string|max:255',
-            'display_name' => 'required|string|max:255',
-            'nic' => 'nullable|string|max:255|unique:customers,nic',
-            'primary_address' => 'required|string',
-            'customer_mobile' => 'required|string|max:20',
-            'customer_email' => 'nullable|email|max:255',
-            'credit_limit' => 'nullable|numeric|min:0',
-        ]);
+    $input = $request->all();
 
-        $input = $request->all();
-        $input['is_active'] = $request->has('is_active');
-        
-        // Set default value for credit_limit if empty or not present
-        $input['credit_limit'] = $request->filled('credit_limit') ? $request->credit_limit : 0.00;
+    $input['is_active'] = $request->has('is_active');
+    $input['separate_department_invoice'] = $request->has('separate_department_invoice') ? 1 : 0;
 
+    $input['credit_limit'] = $request->filled('credit_limit') ? $request->credit_limit : 0.00;
 
-        Customer::create($input);
+    Customer::create($input);
 
-        return redirect()->route('customers.index')
-                         ->with('success','Customer created successfully.');
-    }
+    return redirect()->route('customers.index')
+                     ->with('success','Customer created successfully.');
+}
+
+public function update(Request $request, Customer $customer): RedirectResponse
+{
+    $request->validate([
+        'title' => 'required|string|max:255',
+        'customer_name' => 'required|string|max:255',
+        'display_name' => 'required|string|max:255',
+        'nic' => 'nullable|string|max:255|unique:customers,nic,' . $customer->id,
+        'primary_address' => 'required|string',
+        'customer_mobile' => 'required|string|max:20',
+        'customer_email' => 'nullable|email|max:255',
+        'credit_limit' => 'nullable|numeric|min:0',
+    ]);
+
+    $input = $request->all();
+
+    $input['is_active'] = $request->has('is_active');
+    $input['separate_department_invoice'] = $request->has('separate_department_invoice') ? 1 : 0;
+
+    $input['credit_limit'] = $request->filled('credit_limit') ? $request->credit_limit : 0.00;
+
+    $customer->update($input);
+
+    return redirect()->route('customers.index')
+                     ->with('success','Customer updated successfully.');
+}
 
     /**
      * Display the specified resource.
@@ -96,33 +118,7 @@ class CustomerController extends Controller
         return view('customers.edit', compact('customer'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Customer $customer): RedirectResponse
-    {
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'customer_name' => 'required|string|max:255',
-            'display_name' => 'required|string|max:255',
-            'nic' => 'nullable|string|max:255|unique:customers,nic,' . $customer->id,
-            'primary_address' => 'required|string',
-            'customer_mobile' => 'required|string|max:20',
-            'customer_email' => 'nullable|email|max:255',
-            'credit_limit' => 'nullable|numeric|min:0',
-        ]);
 
-        $input = $request->all();
-        $input['is_active'] = $request->has('is_active');
-
-        // Set default value for credit_limit if empty or not present
-        $input['credit_limit'] = $request->filled('credit_limit') ? $request->credit_limit : 0.00;
-
-        $customer->update($input);
-
-        return redirect()->route('customers.index')
-                         ->with('success','Customer updated successfully.');
-    }
 
     /**
      * Remove the specified resource from storage.

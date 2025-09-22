@@ -47,7 +47,9 @@ class PurchaseOrderController extends Controller
     {
         $customers = Customer::where('is_active', true)->orderBy('customer_name')->get();
         $products = Product::where('is_active', true)->orderBy('name')->get();
-        return view('purchase_orders.create', compact('customers', 'products'));
+        $departments = \App\Models\Department::orderBy('name')->get();
+
+        return view('purchase_orders.create', compact('customers', 'products', 'departments'));
     }
 
     public function store(Request $request): RedirectResponse

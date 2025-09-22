@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\WastageLog;
+use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -20,8 +21,9 @@ class StockManagementController extends Controller
         $products = Product::where('is_active', true)
                            ->orderBy('name')
                            ->get();
+        $departments = Department::orderBy('name')->get();
                            
-        return view('stock_management.index', compact('products'));
+        return view('stock_management.index', compact('products', 'departments' ));
     }
 
     /**

@@ -2,228 +2,114 @@
 
 @section('content')
 <div class="container mx-auto">
-    <div id="invoice-details" class="bg-white dark:bg-gray-800 shadow-lg rounded-lg max-w-4xl mx-auto p-8">
+    <div id="invoice-details" class="bg-white shadow-lg rounded-lg max-w-5xl mx-auto p-10 border border-gray-400">
+
         {{-- Header & Buttons --}}
         <div class="flex justify-between items-center mb-6 print:hidden">
-            <h2 class="text-3xl font-bold text-gray-800 dark:text-gray-200">Invoice Details</h2>
+            <h2 class="text-3xl font-bold text-gray-800">Invoice Details</h2>
             <div class="flex items-center space-x-2">
-                <a href="{{ route('invoices.index') }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-xs uppercase font-semibold">Back to List</a>
+                <a href="{{ route('invoices.index') }}" 
+                   class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md text-xs uppercase font-semibold">Back to List</a>
                 @can('payment-create')
                     @if($invoice->total_amount - $invoice->amount_paid > 0)
-                        <a href="{{ route('payments.create', $invoice->id) }}" class="px-4 py-2 bg-green-600 text-white rounded-md text-xs uppercase font-semibold">Record Payment</a>
+                        <a href="{{ route('payments.create', $invoice->id) }}" 
+                           class="px-4 py-2 bg-green-600 text-white rounded-md text-xs uppercase font-semibold">Record Payment</a>
                     @endif
                 @endcan
-                <a href="{{ route('invoices.print', $invoice->id) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</a>
+                <a href="{{ route('invoices.print', $invoice->id) }}" 
+                   class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</a>
             </div>
         </div>
 
-        {{-- Company Letterhead --}}
-        <div class="flex justify-between items-start border-b dark:border-gray-700 pb-4 mb-4">
-            <div>
-                <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-200">NSoft Pvt Ltd.</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400">123 Main Street, Colombo, Sri Lanka</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">contact@nsoft.com | +94 11 234 5678</p>
-            </div>
-            <div class="text-right">
-                <h4 class="text-xl font-semibold text-gray-700 dark:text-gray-300">
-                    @if($invoice->is_vat_invoice)
-                        TAX INVOICE
-                    @else
-                        INVOICE
-                    @endif
-                </h4>
-                <p class="text-sm text-gray-500 dark:text-gray-400">{{ $invoice->invoice_id }}</p>
-            </div>
+        {{-- Company Header --}}
+        <div class="text-center border-b border-gray-700 pb-4 mb-4">
+            <h2 class="text-2xl font-extrabold uppercase">H.G.P.M. (PVT) Ltd.</h2>
+            <p class="text-sm">No: 412/B, Galle Road, Pamburana, Matara.</p>
+            <p class="text-sm">Tel: 041 2229231, 041 2224121 | Fax: 041 2224122 | Email: hgpm.ltd@sltnet.lk</p>
         </div>
 
-        {{-- Invoice Details --}}
-        <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+        {{-- Invoice Meta --}}
+        <div class="flex justify-between text-sm mb-4">
             <div>
-                <strong class="font-medium text-gray-500 dark:text-gray-400">Billed To:</strong>
-                @if($invoice->invoiceable)
-                    @php
-                        $name = '';
-                        $address = '';
-                        $email = '';
-                        if ($invoice->invoiceable_type === 'App\Models\Customer') {
-                            $name = $invoice->invoiceable->customer_name;
-                            $address = $invoice->invoiceable->primary_address;
-                            $email = $invoice->invoiceable->customer_email;
-                        } elseif ($invoice->invoiceable_type === 'App\Models\Supplier') {
-                            $name = $invoice->invoiceable->supplier_name;
-                            $address = $invoice->invoiceable->primary_address;
-                            $email = $invoice->invoiceable->email;
-                        } elseif ($invoice->invoiceable_type === 'App\Models\Agent') {
-                            $name = $invoice->invoiceable->name;
-                            $address = $invoice->invoiceable->address;
-                            $email = $invoice->invoiceable->email;
-                        }
-                    @endphp
-                    <p class="text-gray-900 dark:text-gray-200 font-semibold">{{ $name }}</p>
-                    <p class="text-gray-600 dark:text-gray-400">{{ $address }}</p>
-                    <p class="text-gray-600 dark:text-gray-400">{{ $email }}</p>
-                @else
-                    <p class="text-gray-900 dark:text-gray-200">N/A</p>
+                <p><strong>Unit Bill No:</strong> {{ $invoice->invoice_id }}</p>
+                @if($invoice->invoiceable_type === 'App\Models\Customer')
+                    <p><strong>Unit:</strong> {{ $invoice->invoiceable->customer_name }}</p>
+                    <p>{{ $invoice->invoiceable->primary_address ?? '' }}</p>
+                @elseif($invoice->invoiceable_type === 'App\Models\Supplier')
+                    <p><strong>Supplier:</strong> {{ $invoice->invoiceable->supplier_name }}</p>
+                    <p>{{ $invoice->invoiceable->primary_address ?? '' }}</p>
+                @elseif($invoice->invoiceable_type === 'App\Models\Agent')
+                    <p><strong>Agent:</strong> {{ $invoice->invoiceable->name }}</p>
+                    <p>{{ $invoice->invoiceable->address ?? '' }}</p>
                 @endif
             </div>
             <div class="text-right">
-                <strong class="font-medium text-gray-500 dark:text-gray-400">Date of Issue:</strong>
-                <p class="text-gray-900 dark:text-gray-200">{{ $invoice->created_at->format('F j, Y') }}</p>
-                <strong class="font-medium text-gray-500 dark:text-gray-400 mt-2">Due Date:</strong>
-                <p class="text-gray-900 dark:text-gray-200">{{ $invoice->due_date->format('F j, Y') }}</p>
-
-                @if ($invoice->invoiceable_type === 'App\Models\Customer' && isset($outstandingBalance))
-                    <div class="mt-4">
-                        <strong class="font-medium text-gray-500 dark:text-gray-400">Total Outstanding Balance:</strong>
-                        <p class="text-gray-900 dark:text-gray-200 font-bold text-lg">LKR {{ number_format($outstandingBalance, 2) }}</p>
-                    </div>
-                @endif
+                <p><strong>VAT Registration No:</strong> 11416467-7000</p>
+                <p><strong>Date of Issue:</strong> {{ optional($invoice->created_at)->format('d/m/Y') }}</p>
+                <p><strong>Due Date:</strong> {{ $invoice->due_date ? \Carbon\Carbon::parse($invoice->due_date)->format('d/m/Y') : 'N/A' }}</p>
             </div>
         </div>
 
         {{-- Items Table --}}
-        <div class="overflow-x-auto mb-6">
-            <table class="w-full min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
+        <table class="w-full border border-gray-700 text-sm">
+            <thead class="bg-gray-200">
+                <tr>
+                    <th class="border px-2 py-1 text-left">Commodity & Quantity</th>
+                    <th class="border px-2 py-1 text-right">Rate</th>
+                    <th class="border px-2 py-1 text-center">Unit</th>
+                    <th class="border px-2 py-1 text-right">Amount (Rs.)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @php $currentDept = null; @endphp
+                @foreach($invoice->items as $item)
+                    @if($item->product && $item->product->department && $currentDept !== $item->product->department->name)
+                        {{-- Department Header Row --}}
+                        <tr class="bg-gray-100 font-bold uppercase">
+                            <td colspan="4" class="border px-2 py-1">
+                                SUPPLY OF {{ $item->product->department->name }}
+                            </td>
+                        </tr>
+                        @php $currentDept = $item->product->department->name; @endphp
+                    @endif
                     <tr>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Description</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Qty</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Unit Price</th>
-                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Total</th>
+                        <td class="border px-2 py-1">{{ $item->description ?? $item->product->name }}</td>
+                        <td class="border px-2 py-1 text-right">{{ number_format($item->unit_price, 2) }}</td>
+                        <td class="border px-2 py-1 text-center">{{ $item->product->unit ?? 'PCS' }}</td>
+                        <td class="border px-2 py-1 text-right">{{ number_format($item->total, 2) }}</td>
                     </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    @foreach($invoice->items as $item)
-                    <tr>
-                        <td class="px-4 py-2 whitespace-normal text-sm font-medium text-gray-900 dark:text-gray-200 align-top">
-                            @php
-                                $description = $item->description;
-                                $output = '';
+                @endforeach
+            </tbody>
+        </table>
 
-                                if (preg_match('/^(.*) \(from (GRN|RN): (.*?)\)$/', $description, $matches)) {
-                                    [$original, $productName, $sourceType, $sourceIdString] = $matches;
-                                    $productName = trim($productName);
-
-                                    $product = \App\Models\Product::where('name', $productName)->first();
-                                    $productLink = $product ? "<a href='" . route('products.show', $product->id) . "' class='text-blue-500 hover:underline'>{$productName}</a>" : e($productName);
-
-                                    $sourceLink = e("(from {$sourceType}: {$sourceIdString})");
-                                    if ($sourceType === 'GRN') {
-                                        $sourceModel = \App\Models\Grn::where('grn_id', $sourceIdString)->first();
-                                        if ($sourceModel) {
-                                            $sourceLink = "(from <a href='" . route('grns.show', $sourceModel->id) . "' class='text-blue-500 hover:underline'>GRN: {$sourceIdString}</a>)";
-                                        }
-                                    } else {
-                                        $sourceModel = \App\Models\ReceiveNote::where('receive_note_id', $sourceIdString)->first();
-                                        if ($sourceModel) {
-                                            $sourceLink = "(from <a href='" . route('receive-notes.show', $sourceModel->id) . "' class='text-blue-500 hover:underline'>RN: {$sourceIdString}</a>)";
-                                        }
-                                    }
-                                    $output = "{$productLink} {$sourceLink}";
-                                }
-                                elseif (preg_match('/^Fulfilled Shortage: (\d+) x (.*?) for (DN-.*?)$/', $description, $matches)) {
-                                    [$original, $qty, $productName, $sourceIdString] = $matches;
-                                    $productName = trim($productName);
-                                    
-                                    $product = \App\Models\Product::where('name', $productName)->first();
-                                    $productLink = $product ? "<a href='" . route('products.show', $product->id) . "' class='text-blue-500 hover:underline'>{$productName}</a>" : e($productName);
-
-                                    $actualDeliveryNoteId = preg_replace('/^DN-/', '', $sourceIdString, 1);
-                                    
-                                    $sourceModel = \App\Models\DeliveryNote::where('delivery_note_id', $actualDeliveryNoteId)->first();
-                                    $sourceLink = $sourceModel ? "<a href='" . route('delivery-notes.show', $sourceModel->id) . "' class='text-blue-500 hover:underline'>{$sourceIdString}</a>" : e($sourceIdString);
-                                    
-                                    $output = "Fulfilled Shortage: {$qty} x {$productLink} for {$sourceLink}";
-                                }
-                                else {
-                                    $product = \App\Models\Product::where('name', $description)->first();
-                                    $output = $product ? "<a href='" . route('products.show', $product->id) . "' class='text-blue-500 hover:underline'>" . e($description) . "</a>" : e($description);
-                                }
-
-                                echo $output;
-                            @endphp
-                        </td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 align-top">{{ $item->quantity }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 align-top">{{ number_format($item->unit_price, 2) }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right align-top">{{ number_format($item->total, 2) }}</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-        
-        {{-- ** THE FIX IS HERE: Updated Totals Section ** --}}
-        <div class="flex justify-end mb-8">
-            <div class="w-full max-w-sm space-y-2">
-                <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                    <span>Subtotal</span>
-                    <span>{{ number_format($invoice->sub_total, 2) }}</span>
-                </div>
-                @if($invoice->is_vat_invoice)
-                <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                    <span>VAT ({{ number_format($invoice->vat_percentage, 2) }}%)</span>
-                    <span>{{ number_format($invoice->vat_amount, 2) }}</span>
-                </div>
-                @endif
-                <div class="flex justify-between text-lg font-bold text-gray-900 dark:text-gray-200">
-                    <span>Grand Total</span>
-                    <span>LKR {{ number_format($invoice->total_amount, 2) }}</span>
-                </div>
-                 <div class="flex justify-between text-sm text-green-600">
-                    <span>Amount Paid</span>
-                    <span>-{{ number_format($invoice->amount_paid, 2) }}</span>
-                </div>
-                <div class="flex justify-between font-bold text-xl text-red-600 border-t pt-2 mt-2">
-                    <span>Balance Due</span>
-                    <span>LKR {{ number_format($invoice->total_amount - $invoice->amount_paid, 2) }}</span>
-                </div>
+        {{-- Totals --}}
+        <div class="flex justify-end mt-6">
+            <div class="text-right space-y-1">
+                <p><strong>Grand Total:</strong> Rs. {{ number_format($invoice->total_amount, 2) }}</p>
+                <p class="italic text-sm">
+                    Amount in Words: {{ \App\Helpers\NumberToWords::convert($invoice->total_amount) }}
+                </p>
             </div>
         </div>
 
-        {{-- Payment History --}}
-        @if($invoice->payments->isNotEmpty())
-        <div class="mt-8 pt-6 border-t dark:border-gray-700">
-            <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-200 mb-4">Payment History</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-700">
-                        <tr>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Amount</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Method</th>
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Reference</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        @foreach ($invoice->payments as $payment)
-                        <tr>
-                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $payment->payment_date->format('Y-m-d') }}</td>
-                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ number_format($payment->amount, 2) }}</td>
-                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $payment->payment_method }}</td>
-                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $payment->reference_number ?? 'N/A' }}</td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+        {{-- Certification --}}
+        <div class="mt-10 text-sm">
+            <p>Certificate that no bill has been tendered previously in respect of the articles now charged in.</p>
         </div>
-        @endif
 
-        {{-- Footer & Signatures --}}
-        <div class="border-t dark:border-gray-700 pt-6 mt-6 text-xs text-gray-500 dark:text-gray-400">
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <p class="font-semibold">Notes:</p>
-                    <p>Thank you for your business. Please make payments within 30 days.</p>
-                </div>
-                <div class="grid grid-cols-2 gap-4 mt-16">
-                    <div class="border-t border-gray-400 text-center pt-2">
-                        <p>Authorized Signature</p>
-                    </div>
-                     <div class="border-t border-gray-400 text-center pt-2">
-                        <p>Customer Signature</p>
-                    </div>
-                </div>
+        {{-- Signature Block --}}
+        <div class="grid grid-cols-2 gap-10 mt-16 text-sm">
+            <div>
+                <p>Signature of Contractor:</p>
+                <div class="mt-12 border-t border-gray-600 w-64"></div>
+                <p class="mt-2">Name of Contractor:</p>
+                <p>Address:</p>
+            </div>
+            <div class="text-right">
+                <p>Director</p>
+                <p class="font-bold">H.G.P.M. (PVT) Ltd.</p>
+                <div class="mt-12 border-t border-gray-600 w-64 ml-auto"></div>
+                <p class="mt-2">Date: {{ now()->format('d/m/Y') }}</p>
             </div>
         </div>
     </div>
@@ -231,26 +117,14 @@
 
 <style>
     @media print {
-        body * {
-            visibility: hidden;
-        }
-        #invoice-details, #invoice-details * {
-            visibility: visible;
-        }
+        body * { visibility: hidden; }
+        #invoice-details, #invoice-details * { visibility: visible; }
         #invoice-details {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            margin: 0;
-            padding: 0;
-            border: none;
-            box-shadow: none;
+            position: absolute; left: 0; top: 0;
+            width: 100%; margin: 0; padding: 0;
+            border: none; box-shadow: none;
         }
-        .print\:hidden {
-            display: none !important;
-        }
+        .print\:hidden { display: none !important; }
     }
 </style>
 @endsection
-

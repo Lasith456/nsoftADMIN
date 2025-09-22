@@ -30,7 +30,7 @@
                 <!-- Left Column: Customer Selection -->
                 <div class="lg:col-span-1">
                     <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">1. Select Customer</h3>
-                    <select id="customer_id" x-model="selectedCustomerId" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500" required>
+                    <select id="customer_id" name="customer_id" x-model="selectedCustomerId" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500" required>
                         <option value="">Select a customer with uninvoiced notes...</option>
                         {{-- ** THE FIX IS HERE: Use array access instead of object access ** --}}
                         @foreach($customersWithInvoices as $customer)
@@ -50,6 +50,7 @@
                                     <span class="ml-3 text-sm text-gray-800 dark:text-gray-200" x-text="`${rn.receive_note_id} - Received on: ${new Date(rn.received_date).toLocaleDateString()}`"></span>
                                 </label>
                             </template>
+                            
                         </template>
                          <template x-if="!availableReceiveNotes || availableReceiveNotes.length === 0">
                             <p class="text-sm text-gray-500 dark:text-gray-400 p-2">No uninvoiced receive notes available for this customer.</p>

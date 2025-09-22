@@ -31,26 +31,56 @@
             <div class="space-y-6">
                 <!-- Agent Information -->
                 <div>
-                    <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-200 border-b dark:border-gray-700 pb-2 mb-4">Agent Information</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-200 border-b dark:border-gray-700 pb-2 mb-4">
+                        Agent Information
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <!-- Agent Name -->
                         <div>
-                            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Agent Name <span class="text-red-500">*</span></label>
-                            <input type="text" name="name" id="name" class="mt-1 block w-full px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-md shadow-sm" value="{{ old('name') }}" required>
+                            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Agent Name <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="name" id="name"
+                                class="mt-2 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
+                                        bg-white dark:bg-gray-900 rounded-md shadow-sm"
+                                value="{{ old('name') }}" required>
                         </div>
+
+                        <!-- Contact No -->
                         <div>
-                            <label for="contact_no" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Contact No <span class="text-red-500">*</span></label>
-                            <input type="text" name="contact_no" id="contact_no" class="mt-1 block w-full px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-md shadow-sm" value="{{ old('contact_no') }}" required>
+                            <label for="contact_no" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Contact No <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="contact_no" id="contact_no"
+                                class="mt-2 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
+                                        bg-white dark:bg-gray-900 rounded-md shadow-sm"
+                                value="{{ old('contact_no') }}" required>
                         </div>
+
+                        <!-- Email -->
                         <div>
-                            <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
-                            <input type="email" name="email" id="email" class="mt-1 block w-full px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-md shadow-sm" value="{{ old('email') }}">
+                            <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Email
+                            </label>
+                            <input type="email" name="email" id="email"
+                                class="mt-2 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
+                                        bg-white dark:bg-gray-900 rounded-md shadow-sm"
+                                value="{{ old('email') }}">
                         </div>
-                        <div class="md:col-span-3">
-                            <label for="address" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Address <span class="text-red-500">*</span></label>
-                            <textarea name="address" id="address" rows="2" class="mt-1 block w-full px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-md shadow-sm" required>{{ old('address') }}</textarea>
+
+                        <!-- Address -->
+                        <div class="md:col-span-1">
+                            <label for="address" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Address <span class="text-red-500">*</span>
+                            </label>
+                            <textarea name="address" id="address" rows="1"
+                                    class="mt-2 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 
+                                            bg-white dark:bg-gray-900 rounded-md shadow-sm resize-none"
+                                    required>{{ old('address') }}</textarea>
                         </div>
                     </div>
                 </div>
+
 
                 <!-- Product & Pricing -->
                 <div>
@@ -58,27 +88,57 @@
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div class="lg:col-span-1 space-y-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                             <h4 class="font-semibold text-gray-800 dark:text-gray-200">Add Product</h4>
+
+                            <!-- Department Select -->
+                            <div>
+                                <label class="block text-sm font-medium">Department*</label>
+                                <input list="departments-list"
+                                       x-model="departmentName"
+                                       @change="departmentChangedByName"
+                                       placeholder="Type to search department..."
+                                       class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3">
+                                <datalist id="departments-list">
+                                    @foreach($departments as $dept)
+                                        <option value="{{ $dept->name }}" data-id="{{ $dept->id }}"></option>
+                                    @endforeach
+                                </datalist>
+                                <input type="hidden" name="department_id" id="department_id" :value="selectedDepartment">
+                                <p x-show="departmentError" class="text-red-600 text-xs mt-1" x-text="departmentError"></p>
+                            </div>
+
+                            <!-- Product Input (filtered by department) -->
                             <div>
                                 <label class="block text-sm font-medium">Product*</label>
-                                <select x-model="currentItem.product_id" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3">
-                                    <option value="">Select Product</option>
-                                    @foreach($products as $product)
-                                    <option value="{{ $product->id }}">{{ $product->name }}</option>
-                                    @endforeach
-                                </select>
+                                <input list="products-list"
+                                       x-model="currentItem.product_name"
+                                       @change="productChangedByName"
+                                       :disabled="!selectedDepartment"
+                                       placeholder="Select department first"
+                                       class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3">
+                                <datalist id="products-list">
+                                    <template x-for="product in filteredProducts" :key="product.id">
+                                        <option :value="product.name" :data-id="product.id"></option>
+                                    </template>
+                                </datalist>
                             </div>
+
+                            <!-- Price -->
                             <div>
                                 <label class="block text-sm font-medium">Price Per Case*</label>
                                 <input type="number" step="0.01" x-model.number="currentItem.price_per_case" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3">
                             </div>
+
                             <button type="button" @click="addProduct" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">Add Product</button>
                         </div>
+
+                        <!-- Products Table -->
                         <div class="lg:col-span-2">
                              <div class="overflow-x-auto">
                                 <table class="w-full min-w-full divide-y divide-gray-300 dark:divide-gray-700">
                                     <thead class="bg-gray-100 dark:bg-gray-700">
                                         <tr>
-                                            <th class="py-2 pl-4 pr-3 text-left text-sm font-semibold">Product</th>
+                                            <th class="py-2 pl-4 pr-3 text-left text-sm font-semibold">Department</th>
+                                            <th class="px-3 py-2 text-left text-sm font-semibold">Product</th>
                                             <th class="px-3 py-2 text-right text-sm font-semibold">Price Per Case</th>
                                             <th></th>
                                         </tr>
@@ -86,7 +146,8 @@
                                     <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                                         <template x-for="(product, index) in assignedProducts" :key="index">
                                             <tr>
-                                                <td class="py-2 pl-4 pr-3 text-sm font-medium" x-text="product.name"></td>
+                                                <td class="py-2 pl-4 pr-3 text-sm font-medium" x-text="product.department_name"></td>
+                                                <td class="px-3 py-2 text-sm" x-text="product.name"></td>
                                                 <td class="px-3 py-2 text-sm text-right" x-text="product.price_per_case.toFixed(2)"></td>
                                                 <td class="py-2 pl-3 pr-4 text-right text-sm font-medium">
                                                     <button type="button" @click="removeProduct(index)" class="text-red-600 hover:text-red-900">&times;</button>
@@ -94,7 +155,7 @@
                                             </tr>
                                         </template>
                                         <tr x-show="assignedProducts.length === 0">
-                                            <td colspan="3" class="text-center py-4 text-sm text-gray-500">No products assigned.</td>
+                                            <td colspan="4" class="text-center py-4 text-sm text-gray-500">No products assigned.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -126,6 +187,7 @@
             <!-- Hidden Inputs for Submission -->
             <template x-for="(product, index) in assignedProducts" :key="index">
                 <div>
+                    <input type="hidden" :name="`products[${index}][department_id]`" :value="product.department_id">
                     <input type="hidden" :name="`products[${index}][product_id]`" :value="product.id">
                     <input type="hidden" :name="`products[${index}][price_per_case]`" :value="product.price_per_case">
                 </div>
@@ -138,26 +200,64 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('agentForm', () => ({
         products: @json($products),
         assignedProducts: [],
-        currentItem: { product_id: '', price_per_case: 0 },
-        
+        departmentName: '',
+        selectedDepartment: '',
+        departmentError: '',
+        currentItem: { product_id: '', product_name: '', price_per_case: 0 },
+
+        get filteredProducts() {
+            if (!this.selectedDepartment) return [];
+            return this.products.filter(p => p.department_id == this.selectedDepartment);
+        },
+
+        departmentChangedByName() {
+            const options = document.getElementById('departments-list').options;
+            let deptId = '';
+            let deptName = '';
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].value === this.departmentName) {
+                    deptId = options[i].dataset.id;
+                    deptName = options[i].value;
+                    break;
+                }
+            }
+            if (deptId) {
+                this.selectedDepartment = deptId;
+                this.departmentError = '';
+            } else {
+                this.selectedDepartment = '';
+                this.departmentError = 'Department not found';
+            }
+        },
+
+        productChangedByName() {
+            const product = this.filteredProducts.find(p => p.name === this.currentItem.product_name);
+            this.currentItem.product_id = product ? product.id : '';
+        },
+
         addProduct() {
-            if (!this.currentItem.product_id || this.currentItem.price_per_case <= 0) {
-                alert('Please select a product and enter a valid price.');
+            if (!this.selectedDepartment || !this.currentItem.product_id || this.currentItem.price_per_case <= 0) {
+                alert('Please select department, product, and enter valid price.');
                 return;
             }
-            const product = this.products.find(p => p.id == this.currentItem.product_id);
+
+            const product = this.filteredProducts.find(p => p.id == this.currentItem.product_id);
             if (!product || this.assignedProducts.some(p => p.id === product.id)) {
                 alert('This product has already been added.');
                 return;
             }
-            
+
             this.assignedProducts.push({
                 id: product.id,
                 name: product.name,
+                department_id: this.selectedDepartment,
+                department_name: this.departmentName,
                 price_per_case: this.currentItem.price_per_case
             });
-            this.currentItem = { product_id: '', price_per_case: 0 };
+
+            this.currentItem = { product_id: '', product_name: '', price_per_case: 0 };
         },
+
         removeProduct(index) {
             this.assignedProducts.splice(index, 1);
         }
@@ -165,4 +265,3 @@ document.addEventListener('alpine:init', () => {
 });
 </script>
 @endsection
-

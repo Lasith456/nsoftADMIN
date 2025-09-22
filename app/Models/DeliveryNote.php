@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\DB; // ** Ensure this line is present **
+use Illuminate\Support\Facades\DB; 
 
 class DeliveryNote extends Model
 {
@@ -17,6 +17,8 @@ class DeliveryNote extends Model
         'vehicle_id',
         'delivery_date',
         'status',
+        'driver_name',
+        'driver_mobile'
     ];
 
     protected function casts(): array
