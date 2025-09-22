@@ -21,6 +21,9 @@ class GrnItem extends Model
         'selling_price',
         'discount',
         'serial',
+        'serial',
+        'is_free_issue',   
+        'free_issue_qty',    
     ];
 
     protected function casts(): array

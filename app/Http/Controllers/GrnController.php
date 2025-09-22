@@ -65,18 +65,38 @@ class GrnController extends Controller
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.unit_type' => 'required|string|in:Unit,Case',
             'items.*.stock_type' => 'required|string|in:clear,non-clear',
-            'items.*.quantity' => 'required|integer|min:1',
+            // 👇 allow 0 (previously min:1)
+            'items.*.quantity' => 'required|integer|min:0',
             'items.*.cost_price' => 'required|numeric|min:0',
             'items.*.selling_price' => 'required|numeric|min:0',
+            'items.*.discount' => 'nullable|numeric|min:0',
+            'items.*.is_free_issue' => 'nullable|boolean',
+            'items.*.free_issue_qty' => 'nullable|integer|min:0',
         ]);
 
         DB::beginTransaction();
         try {
             $totalAmount = 0;
             $totalDiscount = 0;
+
             foreach ($request->items as $itemData) {
-                $totalAmount += $itemData['cost_price'] * $itemData['quantity'];
-                $totalDiscount += $itemData['discount'] ?? 0;
+                $product = Product::find($itemData['product_id']);
+                $product->update([
+                    'cost_price' => $itemData['cost_price'],
+                    'selling_price' => $itemData['selling_price'],
+                ]);
+
+                $isFree = !empty($itemData['is_free_issue']) && (int)$itemData['is_free_issue'] === 1;
+                $qty = (int)($itemData['quantity'] ?? 0);
+                $cost = (float)($itemData['cost_price'] ?? 0);
+                $discount = (float)($itemData['discount'] ?? 0);
+
+                // Exclude free issues entirely from totals.
+                // Also avoid adding discount when qty is 0 to keep totals consistent.
+                if (!$isFree && $qty > 0) {
+                    $totalAmount += $cost * $qty;
+                    $totalDiscount += $discount;
+                }
             }
 
             $grn = Grn::create([
@@ -91,12 +111,15 @@ class GrnController extends Controller
 
             foreach ($request->items as $itemData) {
                 $product = Product::find($itemData['product_id']);
+
                 GrnItem::create([
                     'grn_id' => $grn->id,
                     'product_id' => $itemData['product_id'],
                     'unit_type' => $itemData['unit_type'],
                     'stock_type' => $itemData['stock_type'],
                     'quantity_received' => $itemData['quantity'],
+                    'free_issue_qty' => $itemData['free_issue_qty'] ?? 0,
+                    'is_free_issue' => $itemData['is_free_issue'] ?? false,
                     'units_per_case' => $product->units_per_case,
                     'cost_price' => $itemData['cost_price'],
                     'selling_price' => $itemData['selling_price'],
@@ -117,7 +140,7 @@ class GrnController extends Controller
         $grn->load(['supplier', 'items.product']);
         return view('grns.show', compact('grn'));
     }
-    
+
     public function manage(Request $request): View
     {
         $suppliers = Supplier::orderBy('supplier_name')->get();
@@ -196,15 +219,20 @@ class GrnController extends Controller
                 $product = Product::find($item->product_id);
                 if ($product) {
                     $unitsPerCase = ($item->unit_type === 'Case') ? $item->units_per_case : 1;
-                    $totalUnitsReceived = $item->quantity_received * $unitsPerCase;
+
+                    // Add both normal qty and free issue qty (both may be 0, never negative)
+                    $totalUnitsReceived = max(0, (int)$item->quantity_received) * $unitsPerCase;
+                    $totalUnitsReceived += ($item->is_free_issue ? max(0, (int)$item->free_issue_qty) * $unitsPerCase : 0);
 
                     if ($item->stock_type === 'clear') {
-                        $product->increment('clear_stock_quantity', $totalUnitsReceived);
+                        $product->clear_stock_quantity = max(0, $product->clear_stock_quantity + $totalUnitsReceived);
                     } else {
-                        $product->increment('non_clear_stock_quantity', $totalUnitsReceived);
+                        $product->non_clear_stock_quantity = max(0, $product->non_clear_stock_quantity + $totalUnitsReceived);
                     }
+                    $product->save();
                 }
             }
+
             $grn->update(['status' => 'confirmed']);
             DB::commit();
             return redirect()->route('grns.index')->with('success', 'GRN has been confirmed and stock updated.');
@@ -232,13 +260,16 @@ class GrnController extends Controller
                     $product = Product::find($item->product_id);
                     if ($product) {
                         $unitsPerCase = ($item->unit_type === 'Case') ? $item->units_per_case : 1;
-                        $totalUnitsToDecrement = $item->quantity_received * $unitsPerCase;
-                        
+
+                        $totalUnitsToDecrement = max(0, (int)$item->quantity_received) * $unitsPerCase;
+                        $totalUnitsToDecrement += ($item->is_free_issue ? max(0, (int)$item->free_issue_qty) * $unitsPerCase : 0);
+
                         if ($item->stock_type === 'clear') {
-                            $product->decrement('clear_stock_quantity', $totalUnitsToDecrement);
+                            $product->clear_stock_quantity = max(0, $product->clear_stock_quantity - $totalUnitsToDecrement);
                         } else {
-                            $product->decrement('non_clear_stock_quantity', $totalUnitsToDecrement);
+                            $product->non_clear_stock_quantity = max(0, $product->non_clear_stock_quantity - $totalUnitsToDecrement);
                         }
+                        $product->save();
                     }
                 }
             }
@@ -251,4 +282,3 @@ class GrnController extends Controller
         }
     }
 }
-
