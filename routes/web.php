@@ -21,7 +21,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
-
+use App\Http\Controllers\CompanyController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -55,6 +55,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('delivery-notes', DeliveryNoteController::class);
     Route::resource('receive-notes', ReceiveNoteController::class);
     Route::resource('invoices', InvoiceController::class);
+    Route::resource('companies', CompanyController::class);
 
     // Dynamic Form Routes
     Route::post('/products/getSubDepartments', [ProductController::class, 'getSubDepartments'])->name('products.getSubDepartments');
@@ -122,6 +123,9 @@ Route::middleware(['auth'])->group(function () {
     });
     Route::get('/invoices/{invoice}/showopt2', [App\Http\Controllers\InvoiceController::class, 'showOpt2'])
     ->name('invoices.showopt2');
+
+    Route::post('/purchase-orders/auto-create', [PurchaseOrderController::class, 'autoCreateFromDiscrepancy'])->name('purchase-orders.autoCreate');
+    Route::post('/companies/store', [App\Http\Controllers\CompanyController::class, 'store'])->name('companies.api.store');
 
 });
 

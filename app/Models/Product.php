@@ -24,6 +24,7 @@ class Product extends Model
         'units_per_case',
         'unit_of_measure',
         'cost_price',
+         'company_id', 
         'selling_price',
         'reorder_qty',
         'clear_stock_quantity',      
@@ -93,5 +94,9 @@ class Product extends Model
         return $this->belongsToMany(Agent::class, 'agent_product_pivot')
                     ->withPivot('price_per_case')
                     ->withTimestamps();
+    }
+     public function company(): BelongsTo   
+    {
+        return $this->belongsTo(Company::class);
     }
 }

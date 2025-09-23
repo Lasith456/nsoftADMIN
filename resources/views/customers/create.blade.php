@@ -6,8 +6,11 @@
         <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
             <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">Add New Customer</h2>
             <div class="flex items-center space-x-2">
-                <a class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-xs uppercase font-semibold" href="{{ route('customers.index') }}">
+                <a class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-xs uppercase font-semibold" href="{{ url()->previous() }}">
                     Back
+                </a>
+                <a href="{{ route('customers.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase hover:bg-gray-300 dark:hover:bg-gray-600">
+                    Back to List
                 </a>
                 <button type="submit" form="customer-form" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-300 text-xs uppercase font-semibold">
                     Save Customer
@@ -32,7 +35,7 @@
                 <!-- Title, Customer Name, Display Name -->
                 <div>
                     <label for="title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Title <span class="text-red-500">*</span></label>
-                    <select name="title" id="title" class="mt-1 block w-full px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm" required>
+                    <select name="title" id="title" class="mt-1 block w-full px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-md shadow-sm text-sm" required>
                         <option value="" disabled {{ old('title') ? '' : 'selected' }}>Select a title</option>
                         <option value="Mr" {{ old('title') == 'Mr' ? 'selected' : '' }}>Mr</option>
                         <option value="Miss" {{ old('title') == 'Miss' ? 'selected' : '' }}>Miss</option>
@@ -50,11 +53,20 @@
                     <input type="text" name="display_name" id="display_name" class="mt-1 block w-full px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-md shadow-sm" placeholder="Display Name" value="{{ old('display_name') }}" required>
                 </div>
 
-                <!-- Company, NIC, Mobile -->
+                <!-- Company Dropdown -->
                 <div>
-                    <label for="company_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Company Name</label>
-                    <input type="text" name="company_name" id="company_name" class="mt-1 block w-full px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-md shadow-sm" placeholder="Company Name" value="{{ old('company_name') }}">
+                    <label for="company_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Company <span class="text-red-500">*</span></label>
+                    <select name="company_id" id="company_id" class="mt-1 block w-full px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-md shadow-sm text-sm">
+                        <option value="" {{ old('company_id') ? '' : 'selected' }}>-- Select Company --</option>
+                        @foreach($companies as $company)
+                            <option value="{{ $company->id }}" {{ old('company_id') == $company->id ? 'selected' : '' }}>
+                                {{ $company->company_name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
+
+                <!-- NIC, Mobile -->
                 <div>
                     <label for="nic" class="block text-sm font-medium text-gray-700 dark:text-gray-300">NIC</label>
                     <input type="text" name="nic" id="nic" class="mt-1 block w-full px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-md shadow-sm" placeholder="National Identity Card No." value="{{ old('nic') }}">
@@ -100,17 +112,14 @@
 
                 <!-- Is Active Toggle -->
                 <div class="md:col-span-3 flex items-center pt-2">
-                    <input type="checkbox" name="is_active" id="is_active" class="h-4 w-4 text-blue-600 border-gray-300 rounded" checked>
+                    <input type="checkbox" name="is_active" id="is_active" class="h-4 w-4 text-blue-600 border-gray-300 rounded" {{ old('is_active', true) ? 'checked' : '' }}>
                     <label for="is_active" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Is Active</label>
 
-                    <input type="checkbox" name="separate_department_invoice" id="separate_department_invoice" class="h-4 w-4 ml-5 text-blue-600 border-gray-300 rounded" checked>
+                    <input type="checkbox" name="separate_department_invoice" id="separate_department_invoice" class="h-4 w-4 ml-5 text-blue-600 border-gray-300 rounded" {{ old('separate_department_invoice', true) ? 'checked' : '' }}>
                     <label for="separate_department_invoice" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Separate Department Invoice</label>
                 </div>
             </div>
-            
-            {{-- The old submit button position is removed from here --}}
         </form>
     </div>
 </div>
 @endsection
-

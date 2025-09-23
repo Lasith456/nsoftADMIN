@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -26,31 +27,35 @@ class CustomerController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = Customer::query();
+        $query = Customer::with('company'); // eager load company
 
-        // Handle the search functionality
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('customer_name', 'LIKE', "%{$search}%")
-                  ->orWhere('customer_id', 'LIKE', "%{$search}%")
-                  ->orWhere('company_name', 'LIKE', "%{$search}%")
-                  ->orWhere('customer_mobile', 'LIKE', "%{$search}%");
+                ->orWhere('customer_id', 'LIKE', "%{$search}%")
+                ->orWhereHas('company', function($cq) use ($search) {
+                    $cq->where('company_name', 'LIKE', "%{$search}%");
+                })
+                ->orWhere('customer_mobile', 'LIKE', "%{$search}%");
             });
         }
 
         $customers = $query->latest()->paginate(10);
-        
+
         return view('customers.index', compact('customers'));
     }
+
     /**
      * Show the form for creating a new resource.
      */
-    public function create(): View
+       public function create(): View
     {
-        return view('customers.create');
+        $companies = Company::all();
+        return view('customers.create', compact('companies'));
     }
-public function store(Request $request): RedirectResponse
+
+    public function store(Request $request): RedirectResponse
 {
     $request->validate([
         'title' => 'required|string|max:255',
@@ -61,11 +66,14 @@ public function store(Request $request): RedirectResponse
         'customer_mobile' => 'required|string|max:20',
         'customer_email' => 'nullable|email|max:255',
         'credit_limit' => 'nullable|numeric|min:0',
+        'primary_address' => 'required|string',
+        'company_id' => 'required|exists:companies,id',
     ]);
 
     $input = $request->all();
 
     $input['is_active'] = $request->has('is_active');
+    $input['company_id'] = $request->company_id;
     $input['separate_department_invoice'] = $request->has('separate_department_invoice') ? 1 : 0;
 
     $input['credit_limit'] = $request->filled('credit_limit') ? $request->credit_limit : 0.00;
@@ -87,11 +95,13 @@ public function update(Request $request, Customer $customer): RedirectResponse
         'customer_mobile' => 'required|string|max:20',
         'customer_email' => 'nullable|email|max:255',
         'credit_limit' => 'nullable|numeric|min:0',
+        'company_id' => 'required|exists:companies,id',
     ]);
 
     $input = $request->all();
 
     $input['is_active'] = $request->has('is_active');
+    $input['company_id'] = $request->company_id;
     $input['separate_department_invoice'] = $request->has('separate_department_invoice') ? 1 : 0;
 
     $input['credit_limit'] = $request->filled('credit_limit') ? $request->credit_limit : 0.00;
@@ -115,7 +125,8 @@ public function update(Request $request, Customer $customer): RedirectResponse
      */
     public function edit(Customer $customer): View
     {
-        return view('customers.edit', compact('customer'));
+        $companies = Company::all();
+        return view('customers.edit', compact('customer', 'companies'));
     }
 
 

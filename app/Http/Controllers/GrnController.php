@@ -80,11 +80,12 @@ class GrnController extends Controller
             $totalDiscount = 0;
 
             foreach ($request->items as $itemData) {
-                $product = Product::find($itemData['product_id']);
-                $product->update([
-                    'cost_price' => $itemData['cost_price'],
-                    'selling_price' => $itemData['selling_price'],
-                ]);
+                // Hided this GRN cost/selling price update to product
+                // $product = Product::find($itemData['product_id']);
+                // $product->update([
+                //     'cost_price' => $itemData['cost_price'],
+                //     'selling_price' => $itemData['selling_price'],
+                // ]);
 
                 $isFree = !empty($itemData['is_free_issue']) && (int)$itemData['is_free_issue'] === 1;
                 $qty = (int)($itemData['quantity'] ?? 0);

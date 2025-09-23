@@ -5,81 +5,151 @@
     <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
         <form id="customer-invoice-form" action="{{ route('invoices.storeCustomer') }}" method="POST">
             @csrf
+
             <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
                 <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Generate Customer Invoice</h2>
                 <div class="flex items-center space-x-2">
-                    <a href="{{ route('invoices.create') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">Cancel</a>
-                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-blue-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-700" :disabled="!selectedCustomerId || (availableReceiveNotes && availableReceiveNotes.length === 0)">
+                    <a href="{{ route('invoices.create') }}" 
+                       class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            class="inline-flex items-center px-4 py-2 bg-blue-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-700"
+                            :disabled="!selectedCustomerId || selectedReceiveNotes.length === 0">
                         Generate Invoice
                     </button>
                 </div>
             </div>
 
+            {{-- Discrepancy Error --}}
+            @if(session('html_error'))
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 space-y-2" role="alert">
+                    {!! session('html_error') !!}
+                </div>
+            @endif
+
+            {{-- Standard Errors --}}
             @if ($errors->any())
-            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
-                <p class="font-bold">Error</p>
-                <ul class="list-disc pl-5 mt-2">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+                    <p class="font-bold">Error</p>
+                    <ul class="list-disc pl-5 mt-2">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
             @endif
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Left Column: Customer Selection -->
-                <div class="lg:col-span-1">
-                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">1. Select Customer</h3>
-                    <select id="customer_id" name="customer_id" x-model="selectedCustomerId" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500" required>
-                        <option value="">Select a customer with uninvoiced notes...</option>
-                        {{-- ** THE FIX IS HERE: Use array access instead of object access ** --}}
-                        @foreach($customersWithInvoices as $customer)
-                            <option value="{{ $customer['id'] }}">{{ $customer['customer_name'] }} ({{ $customer['customer_id'] }})</option>
-                        @endforeach
-                    </select>
+                <!-- Customer Search -->
+                <div>
+                    <h3 class="text-lg font-bold mb-2 text-gray-800 dark:text-gray-200">1. Select Customer</h3>
+                    <input type="text" placeholder="Search customer name..." 
+                           class="mt-1 block w-full border rounded-md dark:bg-gray-900 py-2 px-3"
+                           x-model="customerSearch" @input="filterCustomers">
+                    <ul class="border rounded-md mt-2 max-h-40 overflow-y-auto bg-white dark:bg-gray-800" 
+                        x-show="filteredCustomers.length > 0">
+                        <template x-for="cust in filteredCustomers" :key="cust.id">
+                            <li @click="selectCustomer(cust)"
+                                class="px-3 py-2 hover:bg-indigo-100 dark:hover:bg-gray-700 cursor-pointer"
+                                x-text="`${cust.customer_name} (${cust.customer_id})`"></li>
+                        </template>
+                    </ul>
+                    <input type="hidden" name="customer_id" :value="selectedCustomerId">
                 </div>
 
-                <!-- Right Column: Receive Note Selection -->
-                <div class="lg:col-span-1">
-                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">2. Select Receive Notes</h3>
-                    <div x-show="selectedCustomerId" class="space-y-2 max-h-60 overflow-y-auto border border-gray-300 dark:border-gray-700 p-2 rounded-md" x-cloak>
-                        <template x-if="availableReceiveNotes && availableReceiveNotes.length > 0">
-                            <template x-for="rn in availableReceiveNotes" :key="rn.id">
-                                <label class="flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
-                                    <input type="checkbox" name="receive_note_ids[]" :value="rn.id" class="dark:bg-gray-900 rounded focus:ring-indigo-500">
-                                    <span class="ml-3 text-sm text-gray-800 dark:text-gray-200" x-text="`${rn.receive_note_id} - Received on: ${new Date(rn.received_date).toLocaleDateString()}`"></span>
+                <!-- Receive Notes -->
+                <div>
+                    <h3 class="text-lg font-bold mb-2 text-gray-800 dark:text-gray-200">2. Select Receive Notes</h3>
+
+                    <!-- Date Filter -->
+                    <div class="flex space-x-2 mb-2">
+                        <input type="date" x-model="dateFrom" class="border rounded p-1 text-sm">
+                        <input type="date" x-model="dateTo" class="border rounded p-1 text-sm">
+                        <button type="button" class="px-3 py-1 bg-gray-200 rounded text-xs" @click="applyDateFilter">Filter</button>
+                    </div>
+
+                    <!-- Select All -->
+                    <div class="flex items-center mb-2" x-show="filteredReceiveNotes.length > 0">
+                        <input type="checkbox" id="selectAll" @change="toggleSelectAll($event)" class="mr-2">
+                        <label for="selectAll" class="text-sm">Select All Receive Notes</label>
+                    </div>
+
+                    <!-- Notes List -->
+                    <div x-show="selectedCustomerId" class="space-y-2 max-h-60 overflow-y-auto border rounded-md p-2" x-cloak>
+                        <template x-if="filteredReceiveNotes.length > 0">
+                            <template x-for="rn in filteredReceiveNotes" :key="rn.id">
+                                <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
+                                    <input type="checkbox" :value="rn.id" x-model="selectedReceiveNotes">
+                                    <span class="ml-3 text-sm" 
+                                          x-text="`${rn.receive_note_id} - ${new Date(rn.received_date).toLocaleDateString()}`"></span>
                                 </label>
                             </template>
-                            
                         </template>
-                         <template x-if="!availableReceiveNotes || availableReceiveNotes.length === 0">
-                            <p class="text-sm text-gray-500 dark:text-gray-400 p-2">No uninvoiced receive notes available for this customer.</p>
+                        <template x-if="filteredReceiveNotes.length === 0">
+                            <p class="text-sm text-gray-500 p-2">No receive notes found in this period.</p>
                         </template>
-                    </div>
-                     <div x-show="!selectedCustomerId" class="text-sm text-gray-500 dark:text-gray-400 p-2 border border-dashed rounded-md text-center">
-                        Please select a customer to see available receive notes.
                     </div>
                 </div>
             </div>
+
+            <!-- ✅ Hidden sync field -->
+            <template x-for="id in selectedReceiveNotes" :key="id">
+                <input type="hidden" name="receive_note_ids[]" :value="id">
+            </template>
         </form>
     </div>
 </div>
+
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('customerInvoiceForm', () => ({
-        // The controller now sends a plain array/object, so we don't need keyBy()
-        customers: @json($customersWithInvoices->mapWithKeys(fn($item) => [$item['id'] => $item])),
-        selectedCustomerId: '',
-        
+        customers: @json($customersWithInvoices),
+        filteredCustomers: [],
+        customerSearch: '',
+        selectedCustomerId: null,
+        selectedCustomer: null,
+        selectedReceiveNotes: [],
+        dateFrom: '',
+        dateTo: '',
+
         get availableReceiveNotes() {
-            if (!this.selectedCustomerId) {
-                return [];
+            return this.selectedCustomer ? this.selectedCustomer.uninvoiced_receive_notes : [];
+        },
+        get filteredReceiveNotes() {
+            if (!this.dateFrom && !this.dateTo) return this.availableReceiveNotes;
+            return this.availableReceiveNotes.filter(rn => {
+                let date = new Date(rn.received_date);
+                let from = this.dateFrom ? new Date(this.dateFrom) : null;
+                let to = this.dateTo ? new Date(this.dateTo) : null;
+                return (!from || date >= from) && (!to || date <= to);
+            });
+        },
+        filterCustomers() {
+            let search = this.customerSearch.toLowerCase();
+            this.filteredCustomers = this.customers.filter(c => 
+                c.customer_name.toLowerCase().includes(search) || 
+                c.customer_id.toLowerCase().includes(search)
+            );
+        },
+        selectCustomer(cust) {
+            this.selectedCustomer = cust;
+            this.selectedCustomerId = cust.id;
+            this.filteredCustomers = [];
+            this.customerSearch = `${cust.customer_name} (${cust.customer_id})`;
+            this.selectedReceiveNotes = [];
+        },
+        toggleSelectAll(event) {
+            if (event.target.checked) {
+                this.selectedReceiveNotes = this.filteredReceiveNotes.map(rn => rn.id);
+            } else {
+                this.selectedReceiveNotes = [];
             }
-            const customer = this.customers[this.selectedCustomerId];
-            return customer ? customer.uninvoiced_receive_notes : [];
+        },
+        applyDateFilter() {
+            this.selectedReceiveNotes = [];
         }
     }));
 });
 </script>
 @endsection
-

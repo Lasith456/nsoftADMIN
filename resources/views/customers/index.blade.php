@@ -59,7 +59,9 @@
                <tr>
                     <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-black">{{ $customer->customer_id }}</td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $customer->customer_name }}</td>
-                    <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $customer->company_name ?? 'N/A' }}</td>
+                    <td class="px-4 py-2 whitespace-nowrap text-sm text-black">
+                        {{ $customer->company?->company_name ?? 'N/A' }}
+                    </td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $customer->customer_mobile }}</td>
                     <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
                         <form action="{{ route('customers.destroy',$customer->id) }}" method="POST" class="flex justify-end items-center space-x-4">
@@ -69,6 +71,15 @@
                             @can('customer-edit')
                                 <a href="{{ route('customers.edit',$customer->id) }}" class="text-green-600 hover:text-green-800" title="Edit">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z"></path></svg>
+                                </a>
+                            @endcan
+                            @can('purchase-order-create')
+                                <a href="{{ route('purchase-orders.create', ['customer_id' => $customer->id]) }}" 
+                                class="text-indigo-600 hover:text-indigo-800" title="Add PO">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                            d="M12 4v16m8-8H4"/>
+                                    </svg>
                                 </a>
                             @endcan
                             @csrf

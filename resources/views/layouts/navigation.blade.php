@@ -22,7 +22,19 @@
                         <li><a href="{{ route('customers.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">All Customers</a></li>
                     </ul>
                 </li>
-
+                <li x-data="{ open: {{ request()->routeIs('companies.*') ? 'true' : 'false' }} }">
+                    <button @click="open = !open" class="{{ request()->routeIs('companies.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }} group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold w-full text-left relative">
+                       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                        </svg>
+                        <span x-show="!sidebarCollapsed || sidebarHover" class="whitespace-nowrap">Companies</span>
+                        <svg x-show="!sidebarCollapsed || sidebarHover" class="ml-auto h-5 w-5 shrink-0 transition-transform duration-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" :class="{'rotate-90': open}"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+                    </button>
+                     <ul x-show="open" class="mt-1 px-2 space-y-1">
+                        <li><a href="{{ route('companies.create') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Add Companies</a></li>
+                        <li><a href="{{ route('companies.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">All Companies</a></li>
+                    </ul>
+                </li>
                 <li x-data="{ open: {{ request()->routeIs('products.*') ? 'true' : 'false' }} }">
                     <button @click="open = !open" class="{{ request()->routeIs('products.*') ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800' }} group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold w-full text-left relative">
                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">

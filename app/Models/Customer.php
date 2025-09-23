@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany; // Add this line
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Customer extends Model
 {
@@ -28,6 +29,8 @@ class Customer extends Model
         'credit_limit',
         'remark',
         'is_active',
+        'company_id',
+
     ];
 
     protected function casts(): array
@@ -69,7 +72,10 @@ class Customer extends Model
     {
         return $this->morphMany(Invoice::class, 'invoiceable');
     }
-
+    public function company(): BelongsTo
+        {
+            return $this->belongsTo(Company::class);
+        }
     protected static function boot()
     {
         parent::boot();

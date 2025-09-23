@@ -43,14 +43,19 @@ class PurchaseOrderController extends Controller
         return view('purchase_orders.index', compact('purchaseOrders'));
     }
 
-    public function create(): View
-    {
-        $customers = Customer::where('is_active', true)->orderBy('customer_name')->get();
-        $products = Product::where('is_active', true)->orderBy('name')->get();
-        $departments = \App\Models\Department::orderBy('name')->get();
+public function create(Request $request): View
+{
+    $customers   = Customer::where('is_active', true)->orderBy('customer_name')->get();
+    $products    = Product::where('is_active', true)->orderBy('name')->get();
+    $departments = \App\Models\Department::orderBy('name')->get();
 
-        return view('purchase_orders.create', compact('customers', 'products', 'departments'));
-    }
+    // Prefill from discrepancy link
+    $prefillCustomerId = $request->query('customer_id');
+    $shortages = $request->query('shortages', []);
+
+    return view('purchase_orders.create', compact('customers', 'products', 'departments', 'prefillCustomerId', 'shortages'));
+}
+
 
     public function store(Request $request): RedirectResponse
     {
@@ -148,5 +153,42 @@ class PurchaseOrderController extends Controller
         $purchaseOrder->delete(); // Items will be cascade deleted
         return redirect()->route('purchase-orders.index')->with('success', 'Purchase Order deleted successfully.');
     }
+    public function autoCreateFromDiscrepancy(Request $request): RedirectResponse
+{
+    $request->validate([
+        'customer_id' => 'required|exists:customers,id',
+        'shortages'   => 'required|array|min:1',
+        'shortages.*.product_id' => 'required|exists:products,id',
+        'shortages.*.qty'        => 'required|integer',
+    ]);
+
+    DB::beginTransaction();
+    try {
+        $po = PurchaseOrder::create([
+            'customer_id'   => $request->customer_id,
+            'delivery_date' => now()->addDays(7), // default 7 days later
+            'status'        => 'pending',
+        ]);
+
+        foreach ($request->shortages as $item) {
+            $product = Product::findOrFail($item['product_id']);
+            PurchaseOrderItem::create([
+                'purchase_order_id' => $po->id,
+                'product_id'        => $product->id,
+                'product_name'      => $product->name,
+                'quantity'          => abs($item['qty']), // shortage is negative → use positive qty
+                'is_vat'            => $product->is_vat,
+            ]);
+        }
+
+        DB::commit();
+        return redirect()->route('purchase-orders.show', $po->id)
+            ->with('success', 'Purchase Order created automatically from discrepancy.');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withErrors(['error' => $e->getMessage()]);
+    }
+}
+
 }
 
