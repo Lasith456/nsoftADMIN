@@ -119,7 +119,7 @@
                 @foreach($grouped as $dept => $rows)
                     <tr>
                         <td style="padding:1.5mm 0 0.5mm 0; font-weight:700; text-transform:uppercase;">
-                            SUPPLY OF {{ $dept }}
+                            SUPPLY OF {{ str_replace('Department: ', '', $invoice->notes) }}
                         </td>
                         <td></td><td></td>
                     </tr>

@@ -59,7 +59,7 @@
                         {{-- Department Header --}}
                         <tr class="bg-gray-100 font-bold uppercase">
                             <td colspan="4" class="border px-2 py-1">
-                                SUPPLY OF {{ $item->product->department->name }}
+                                SUPPLY OF {{ str_replace('Department: ', '', $invoice->notes) }}
                             </td>
                         </tr>
                         @php $currentDept = $item->product->department->name; @endphp

@@ -103,5 +103,10 @@ class Product extends Model
         {
             return $this->hasMany(CompanyProductPrice::class);
         }
+public function companyDepartments()
+{
+    return $this->hasMany(CompanyDepartmentName::class, 'department_id', 'department_id');
+}
+
 
 }
