@@ -21,20 +21,24 @@ class AgentController extends Controller
         $this->middleware('permission:agent-delete', ['only' => ['destroy']]);
     }
 
-    public function index(Request $request): View
-    {
-        $query = Agent::query();
+            public function index(Request $request): View
+            {
+                $query = Agent::with('products'); 
 
-        if ($request->has('search') && $request->search != '') {
-            $search = $request->search;
-            $query->where('name', 'LIKE', "%{$search}%")
-                  ->orWhere('agent_id', 'LIKE', "%{$search}%")
-                  ->orWhere('contact_no', 'LIKE', "%{$search}%");
-        }
+                if ($request->filled('search')) {
+                    $search = $request->search;
+                    $query->where(function ($q) use ($search) {
+                        $q->where('name', 'LIKE', "%{$search}%")
+                        ->orWhere('agent_id', 'LIKE', "%{$search}%")
+                        ->orWhere('contact_no', 'LIKE', "%{$search}%");
+                    });
+                }
 
-        $agents = $query->latest()->paginate(10);
-        return view('agents.index', compact('agents'));
-    }
+                $agents = $query->latest()->paginate(10);
+
+                return view('agents.index', compact('agents'));
+            }
+
 
     public function create(): View
     {
@@ -87,12 +91,29 @@ class AgentController extends Controller
         return view('agents.show', compact('agent'));
     }
 
-    public function edit(Agent $agent): View
-    {
-        $agent->load('products');
-        $products = Product::where('is_active', true)->orderBy('name')->get();
-        return view('agents.edit', compact('agent', 'products'));
-    }
+public function edit(Agent $agent): View
+{
+    // Load products with department relation for proper mapping
+    $agent->load('products.department');
+
+    $products = Product::where('is_active', true)->orderBy('name')->get();
+    $departments = Department::orderBy('name')->get();
+
+    // Map assigned products for Alpine
+    $assignedProducts = $agent->products->map(function ($p) {
+        return [
+            'id' => $p->id,
+            'name' => $p->name,
+            'department_id' => $p->department_id,
+            'department_name' => $p->department->name ?? '',
+            'price_per_case' => $p->pivot->price_per_case,
+        ];
+    })->values(); // reset keys
+
+    return view('agents.edit', compact('agent', 'products', 'departments', 'assignedProducts'));
+}
+
+
 
   public function update(Request $request, Agent $agent): RedirectResponse
     {

@@ -112,7 +112,8 @@
                 <!-- Units Per Case -->
                 <div>
                     <label for="units_per_case" class="block text-sm font-medium">Units Per Case*</label>
-                    <input type="number" name="units_per_case" id="units_per_case" x-model.number="mainForm.units_per_case" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" :disabled="mainForm.product_type === 'pack'" required>
+                    <input type="number" name="units_per_case" id="units_per_case" x-model.number="mainForm.units_per_case" :disabled="mainForm.product_type === 'pack'" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
+                    <input type="hidden" name="units_per_case" :value="mainForm.units_per_case">
                 </div>
                 <!-- Unit of Measure -->
                 <div>

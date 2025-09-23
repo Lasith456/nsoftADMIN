@@ -48,32 +48,45 @@
                     </div>
                 </div>
             </div>
-
-             <!-- Product & Pricing Information -->
+            <!-- Product & Pricing Information -->
             <div>
-                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2 mb-4">Product & Pricing</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                     <div>
-                        <strong class="font-medium text-gray-900 dark:text-gray-200">Assigned Product:</strong>
-                        <p class="text-gray-600 dark:text-gray-400">
-                            @if ($agent->product)
-                                <a href="{{ route('products.show', $agent->product->id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">
-                                    {{ $agent->product->name }}
-                                </a>
-                            @else
-                                N/A
-                            @endif
-                        </p>
+                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2 mb-4">
+                    Products & Pricing
+                </h3>
+
+                @if($agent->products->count() > 0)
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">Department</th>
+                                    <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700 dark:text-gray-200">Product</th>
+                                    <th class="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-200">Price Per Case</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                                @foreach($agent->products as $product)
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm text-gray-800 dark:text-gray-200">
+                                            {{ $product->department->name ?? 'N/A' }}
+                                        </td>
+                                        <td class="px-4 py-2 text-sm">
+                                            <a href="{{ route('products.show', $product->id) }}" 
+                                            class="text-blue-600 dark:text-blue-400 hover:underline">
+                                                {{ $product->name }}
+                                            </a>
+                                        </td>
+                                        <td class="px-4 py-2 text-sm text-right text-gray-800 dark:text-gray-200">
+                                            {{ number_format((float) $product->pivot->price_per_case, 2) }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
-                    <div>
-                        <strong class="font-medium text-gray-900 dark:text-gray-200">Price Per Case:</strong>
-                        <p class="text-gray-600 dark:text-gray-400">{{ number_format($agent->price_per_case, 2) }}</p>
-                    </div>
-                    <div>
-                        <strong class="font-medium text-gray-900 dark:text-gray-200">Unit of Measure:</strong>
-                        <p class="text-gray-600 dark:text-gray-400">{{ $agent->unit_of_measure }}</p>
-                    </div>
-                </div>
+                @else
+                    <p class="text-gray-600 dark:text-gray-400">No products assigned.</p>
+                @endif
             </div>
 
             <!-- Credit & Status Information -->

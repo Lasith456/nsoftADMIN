@@ -60,7 +60,20 @@
                <tr>
                     <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-black">{{ $agent->agent_id }}</td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $agent->name }}</td>
-                    <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $agent->product->name ?? 'N/A' }}</td>
+                    <td class="px-4 py-2 whitespace-nowrap text-sm text-black">
+                        @if($agent->products->count() > 0)
+                            <ul class="list-disc list-inside">
+                                @foreach($agent->products as $product)
+                                    <li>
+                                        {{ $product->name }}
+                                        <span class="text-gray-500 text-xs">({{ number_format((float) $product->pivot->price_per_case, 2) }})</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @else
+                            N/A
+                        @endif
+                    </td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $agent->contact_no }}</td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm">
                         @if($agent->is_active)
