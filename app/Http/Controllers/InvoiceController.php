@@ -533,6 +533,8 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
 
     DB::transaction(function () use ($groups, $customer, $vatRate, $receiveNotes, &$createdInvoiceIds) {
         foreach ($groups as $deptKey => $lines) {
+                    $isVatInvoice = $lines->contains(fn($l) => $l['is_vat']);
+
             $invoice = new Invoice([
                 'invoice_id'     => 'INV-CUST-' . strtoupper(Str::random(6)),
                 'status'         => 'unpaid',
@@ -545,6 +547,8 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
                 'total_amount'   => 0,
                 'amount_paid'    => 0,
                 'due_date'       => now()->addDays(30),
+                'is_vat_invoice' => $isVatInvoice,   // 👈 SAVE VAT FLAG
+
             ]);
             $invoice->invoiceable()->associate($customer);
             $invoice->save();

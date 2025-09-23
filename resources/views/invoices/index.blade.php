@@ -82,12 +82,13 @@
                 @forelse ($invoices as $invoice)
                 <tr>
                     <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-black">{{ $invoice->invoice_id }}</td>
-                    <td class="px-4 py-2 whitespace-nowrap text-sm">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            {{ $invoice->is_vat_invoice ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' }}">
-                            {{ $invoice->is_vat_invoice ? 'VAT' : 'Non-VAT' }}
-                        </span>
-                    </td>
+        <td class="px-4 py-2 whitespace-nowrap text-sm">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                {{ $invoice->is_vat_invoice ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' }}">
+                {{ $invoice->is_vat_invoice ? 'VAT' : 'Non-VAT' }}
+            </span>
+        </td>
+
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-black">
                         @if($invoice->invoiceable)
                             @php
