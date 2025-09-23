@@ -76,7 +76,7 @@
                     <tr>
                         <td class="border px-2 py-1">{{ $item->description ?? $item->product->name }}</td>
                         <td class="border px-2 py-1 text-right">{{ number_format($item->unit_price, 2) }}</td>
-                        <td class="border px-2 py-1 text-center">{{ $item->product->unit ?? 'PCS' }}</td>
+                        <td class="border px-2 py-1 text-center">{{ $item->product->unit_of_measure ?? 'PCS' }}</td>
                         <td class="border px-2 py-1 text-right">{{ number_format($item->vat_amount, 2) }}</td> {{-- NEW --}}
                         <td class="border px-2 py-1 text-right">{{ number_format($item->total, 2) }}</td>
                     </tr>
