@@ -12,7 +12,7 @@
                 <a href="{{ url()->previous() }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 border border-transparent rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase tracking-widest hover:bg-gray-300 dark:hover:bg-gray-600">
                     Back
                 </a>
-                  <a href="{{ route('products.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase hover:bg-gray-300 dark:hover:bg-gray-600">
+                <a href="{{ route('products.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase hover:bg-gray-300 dark:hover:bg-gray-600">
                     Back to List
                 </a>
                 <button onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs uppercase font-semibold">
@@ -40,7 +40,7 @@
                         @endif
                     </p>
                 </div>
-                 <div>
+                <div>
                     <strong class="block text-sm font-medium text-gray-500 dark:text-gray-400">Sub-Department</strong>
                     <p class="mt-1 text-sm text-gray-900 dark:text-gray-200">
                         @if ($product->subDepartment)
@@ -53,21 +53,35 @@
                     </p>
                 </div>
             </div>
+
             <!-- Column 2 -->
             <div class="space-y-4">
                 <div>
-                    <strong class="block text-sm font-medium text-gray-500 dark:text-gray-400">Cost Price</strong>
-                    <p class="mt-1 text-sm text-gray-900 dark:text-gray-200">{{ number_format($product->cost_price, 2) }}</p>
+                    <strong class="block text-sm font-medium text-gray-500 dark:text-gray-400">Default Cost Price</strong>
+                    <p class="mt-1 text-sm text-gray-900 dark:text-gray-200">
+                        @if(!is_null($product->cost_price))
+                            {{ number_format($product->cost_price, 2) }}
+                        @else
+                            —
+                        @endif
+                    </p>
                 </div>
                 <div>
-                    <strong class="block text-sm font-medium text-gray-500 dark:text-gray-400">Selling Price</strong>
-                    <p class="mt-1 text-sm text-gray-900 dark:text-gray-200">{{ number_format($product->selling_price, 2) }}</p>
+                    <strong class="block text-sm font-medium text-gray-500 dark:text-gray-400">Default Selling Price</strong>
+                    <p class="mt-1 text-sm text-gray-900 dark:text-gray-200">
+                        @if(!is_null($product->selling_price))
+                            {{ number_format($product->selling_price, 2) }}
+                        @else
+                            —
+                        @endif
+                    </p>
                 </div>
-                 <div>
+                <div>
                     <strong class="block text-sm font-medium text-gray-500 dark:text-gray-400">Reorder Quantity</strong>
                     <p class="mt-1 text-sm text-gray-900 dark:text-gray-200">{{ $product->reorder_qty }}</p>
                 </div>
             </div>
+
             <!-- Column 3 -->
             <div class="space-y-4">
                 <div>
@@ -79,7 +93,55 @@
                     <p class="mt-1 text-sm text-gray-900 dark:text-gray-200">{{ $product->unit_of_measure }}</p>
                 </div>
             </div>
-             <!-- Stock Details -->
+
+            <!-- Company-wise Prices -->
+            <div class="md:col-span-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
+                <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-200 mb-3">Company Wise Prices</h3>
+
+                @php
+                    // Load company prices with company relation if available
+                    $companyPrices = $product->relationLoaded('companyPrices')
+                        ? $product->companyPrices
+                        : $product->companyPrices()->with('company')->get();
+                @endphp
+
+                @if($companyPrices->isEmpty())
+                    <p class="text-sm text-gray-600 dark:text-gray-400">No company-specific prices configured.</p>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full border border-gray-200 dark:border-gray-700 rounded-md">
+                            <thead>
+                                <tr class="bg-gray-100 dark:bg-gray-700/40">
+                                    <th class="p-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200">Company</th>
+                                    <th class="p-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200">Cost Price</th>
+                                    <th class="p-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200">Selling Price</th>
+                                    <th class="p-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200">Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($companyPrices as $row)
+                                    <tr class="border-t border-gray-200 dark:border-gray-700">
+                                        <td class="p-2 text-sm text-gray-900 dark:text-gray-200">
+                                            {{ optional($row->company)->company_name ?? optional($row->company)->name ?? ('Company #'.$row->company_id) }}
+                                        </td>
+                                        <td class="p-2 text-sm text-gray-900 dark:text-gray-200">
+                                            {{ number_format((float) $row->cost_price, 2) }}
+                                        </td>
+                                        <td class="p-2 text-sm text-gray-900 dark:text-gray-200">
+                                            {{ number_format((float) $row->selling_price, 2) }}
+                                        </td>
+                                        <td class="p-2 text-sm text-gray-600 dark:text-gray-400">
+                                            {{ optional($row->updated_at ?? $row->created_at)->format('Y-m-d') }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+
+            <!-- Stock Details -->
             <div class="md:col-span-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
                 <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-200 mb-2">Stock Details</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -97,12 +159,13 @@
                     </div>
                 </div>
             </div>
-             <!-- Statuses -->
+
+            <!-- Statuses -->
             <div class="md:col-span-3 flex space-x-6 pt-4 border-t border-gray-200 dark:border-gray-700 mt-6">
-                 <div>
+                <div>
                     <strong class="block text-sm font-medium text-gray-500 dark:text-gray-400">Status</strong>
                     <p class="mt-1 text-sm">
-                         @if($product->is_active)
+                        @if($product->is_active)
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
                         @else
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
@@ -112,7 +175,7 @@
                 <div>
                     <strong class="block text-sm font-medium text-gray-500 dark:text-gray-400">VAT Status</strong>
                     <p class="mt-1 text-sm">
-                         @if($product->is_vat)
+                        @if($product->is_vat)
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">VAT Applicable</span>
                         @else
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">No VAT</span>
@@ -123,6 +186,7 @@
         </div>
     </div>
 </div>
+
 <style>
     @media print {
         body * {
@@ -137,7 +201,7 @@
             top: 0;
             width: 100%;
             margin: 0;
-            padding: 20px; /* Add some padding for the print version */
+            padding: 20px;
             border: none;
             box-shadow: none;
         }
@@ -147,4 +211,3 @@
     }
 </style>
 @endsection
-

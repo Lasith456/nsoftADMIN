@@ -3,13 +3,31 @@
 @section('content')
 <div class="container mx-auto">
     <div id="grn-details" class="bg-white dark:bg-gray-800 shadow-md rounded-lg max-w-4xl mx-auto p-4">
+        
+        <!-- Letterhead Section -->
+        <div class="mb-6 border-b border-gray-300 pb-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">H.G.P.M. (PVT) Ltd.</h1>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">No: 412/B, Galle Road, Pamburana, Matara.</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Tel: 041 2229231, 041 2224121 | Fax: 041 2224122 | Email: hgpm.ltd@sltnet.lk</p>
+                </div>
+                <div>
+                    <img src="{{ asset('images/logo.png') }}" alt="Company Logo" class="h-16 w-auto">
+                </div>
+            </div>
+        </div>
+
+        <!-- Header Title & Actions -->
         <div class="flex justify-between items-center mb-4 print:hidden">
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">GRN Details</h2>
             <div class="flex items-center space-x-2">
-                <a href="{{ url()->previous() }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">
+                <a href="{{ url()->previous() }}" 
+                   class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">
                     Back to List
                 </a>
-                <button onclick="window.print()" class="inline-flex items-center px-4 py-2 bg-blue-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-700">
+                <button onclick="window.print()" 
+                        class="inline-flex items-center px-4 py-2 bg-blue-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-700">
                     Print PDF
                 </button>
             </div>
@@ -37,7 +55,7 @@
                 <strong class="font-medium text-gray-900 dark:text-gray-200 text-sm">Delivery Date:</strong>
                 <p class="text-gray-600 dark:text-gray-400 text-sm">{{ $grn->delivery_date->format('F j, Y') }}</p>
             </div>
-             <div>
+            <div>
                 <strong class="font-medium text-gray-900 dark:text-gray-200 text-sm">Invoice Number:</strong>
                 <p class="text-gray-600 dark:text-gray-400 text-sm">{{ $grn->invoice_number ?? 'N/A' }}</p>
             </div>
@@ -122,4 +140,3 @@
     }
 </style>
 @endsection
-

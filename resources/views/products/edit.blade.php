@@ -124,32 +124,67 @@
                 </div>
                 <!-- Other Fields -->
                 <div>
-                    <label for="cost_price" class="block text-sm font-medium">Cost Price*</label>
-                    <input type="number" step="0.01" name="cost_price" id="cost_price" x-model.number="mainForm.cost_price" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
-                </div>
-                <div>
-                    <label for="selling_price" class="block text-sm font-medium">Selling Price*</label>
-                    <input type="number" step="0.01" name="selling_price" id="selling_price" x-model.number="mainForm.selling_price" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
-                </div>
-                <div>
                     <label for="reorder_qty" class="block text-sm font-medium">Reorder Level*</label>
                     <input type="number" name="reorder_qty" id="reorder_qty" x-model.number="mainForm.reorder_qty" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
                 </div>
-                <!-- Toggles -->
-                <div class="lg:col-span-3 flex items-center space-x-6 pt-4">
-                     <label class="inline-flex items-center">
-                        <input type="checkbox" name="is_active" class="h-4 w-4 text-indigo-600 rounded" x-model="mainForm.is_active">
-                        <span class="ml-2 text-sm">Is Active</span>
-                    </label>
-                     <label class="inline-flex items-center">
-                        <input type="checkbox" name="is_vat" class="h-4 w-4 text-indigo-600 rounded" x-model="mainForm.is_vat">
-                        <span class="ml-2 text-sm">Is VAT</span>
-                    </label>
-                     <label class="inline-flex items-center">
-                        <input type="checkbox" name="is_clear" class="h-4 w-4 text-indigo-600 rounded" x-model="mainForm.is_clear">
-                        <span class="ml-2 text-sm">Is Clear</span>
-                    </label>
-                </div>
+            </div>
+
+            <!-- Company Wise Prices (ADDED) -->
+            @isset($companies)
+            <div class="lg:col-span-3 mt-6">
+                <h3 class="text-lg font-semibold mb-2">Company Wise Prices</h3>
+                <table class="w-full border border-gray-300 rounded-md">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="p-2 text-left">Company</th>
+                            <th class="p-2 text-left">Cost Price</th>
+                            <th class="p-2 text-left">Selling Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @php
+                            // Map existing company prices by company_id for quick lookup
+                            $existing = ($product->relationLoaded('companyPrices') ? $product->companyPrices : $product->companyPrices())->get()->keyBy('company_id');
+                        @endphp
+                        @foreach($companies as $company)
+                            @php
+                                $cp = optional($existing->get($company->id));
+                            @endphp
+                            <tr>
+                                <td class="p-2">{{ $company->company_name }}</td>
+                                <td class="p-2">
+                                    <input type="number" step="0.01"
+                                           name="company_prices[{{ $company->id }}][cost_price]"
+                                           class="w-full border rounded-md px-2 py-1"
+                                           value="{{ old('company_prices.' . $company->id . '.cost_price', $cp->cost_price ?? null) }}">
+                                </td>
+                                <td class="p-2">
+                                    <input type="number" step="0.01"
+                                           name="company_prices[{{ $company->id }}][selling_price]"
+                                           class="w-full border rounded-md px-2 py-1"
+                                           value="{{ old('company_prices.' . $company->id . '.selling_price', $cp->selling_price ?? null) }}">
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @endisset
+
+            <!-- Toggles -->
+            <div class="lg:col-span-3 flex items-center space-x-6 pt-4">
+                 <label class="inline-flex items-center">
+                    <input type="checkbox" name="is_active" class="h-4 w-4 text-indigo-600 rounded" x-model="mainForm.is_active">
+                    <span class="ml-2 text-sm">Is Active</span>
+                </label>
+                 <label class="inline-flex items-center">
+                    <input type="checkbox" name="is_vat" class="h-4 w-4 text-indigo-600 rounded" x-model="mainForm.is_vat">
+                    <span class="ml-2 text-sm">Is VAT</span>
+                </label>
+                 <label class="inline-flex items-center">
+                    <input type="checkbox" name="is_clear" class="h-4 w-4 text-indigo-600 rounded" x-model="mainForm.is_clear">
+                    <span class="ml-2 text-sm">Is Clear</span>
+                </label>
             </div>
         </form>
     </div>
@@ -312,4 +347,3 @@
     });
 </script>
 @endsection
-

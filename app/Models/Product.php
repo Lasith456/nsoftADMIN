@@ -99,4 +99,9 @@ class Product extends Model
     {
         return $this->belongsTo(Company::class);
     }
+    public function companyPrices()
+        {
+            return $this->hasMany(CompanyProductPrice::class);
+        }
+
 }

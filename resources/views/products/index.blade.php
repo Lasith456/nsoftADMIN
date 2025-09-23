@@ -70,8 +70,6 @@
                 <tr>
                     <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Product ID</th>
                     <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Name</th>
-                    <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Cost Price</th>
-                    <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Selling Price</th>
                     <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Clear Stock</th>
                     <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Non-Clear Stock</th>
                     <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Total Stock</th>
@@ -83,8 +81,6 @@
                <tr>
                     <td class="px-2 py-2 text-sm font-medium text-black">{{ $product->product_id }}</td>
                     <td class="px-2 py-2 text-sm text-black whitespace-normal w-1/4">{{ $product->name }}</td>
-                    <td class="px-2 py-2 text-sm text-black">{{ number_format($product->cost_price, 2) }}</td>
-                    <td class="px-2 py-2 text-sm text-black">{{ number_format($product->selling_price, 2) }}</td>
                     <td class="px-2 py-2 text-sm text-black">{{ $product->clear_stock_quantity }}</td>
                     <td class="px-2 py-2 text-sm text-black">{{ $product->non_clear_stock_quantity }}</td>
                     <td class="px-2 py-2 text-sm text-black">{{ $product->total_stock }}</td>
