@@ -10,6 +10,8 @@ use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use App\Models\Bank;
 use App\Models\Customer; 
+use App\Models\Agent;
+use App\Models\Supplier;
 class PaymentController extends Controller
 {
     public function __construct()
@@ -193,32 +195,89 @@ public function createBulk(Request $request, Customer $customer = null): View
     }
 
 
-    public function showReceipt(string $batchId): View
-    {
-        $payments = Payment::with('invoice', 'bank')
-            ->where('batch_id', $batchId)
-            ->get();
+    // public function showReceipt(string $batchId): View
+    // {
+    //     $payments = Payment::with('invoice', 'bank')
+    //         ->where('batch_id', $batchId)
+    //         ->get();
 
-        if ($payments->isEmpty()) {
-            abort(404, 'Receipt not found.');
-        }
+    //     if ($payments->isEmpty()) {
+    //         abort(404, 'Receipt not found.');
+    //     }
 
-        $customer = $payments->first()->invoice->invoiceable;
+    //     $customer = $payments->first()->invoice->invoiceable;
 
-        $vatTotal = $payments->filter(fn($p) => $p->invoice->is_vat_invoice)->sum('amount');
-        $nonVatTotal = $payments->filter(fn($p) => !$p->invoice->is_vat_invoice)->sum('amount');
+    //     $vatTotal = $payments->filter(fn($p) => $p->invoice->is_vat_invoice)->sum('amount');
+    //     $nonVatTotal = $payments->filter(fn($p) => !$p->invoice->is_vat_invoice)->sum('amount');
 
-        $stampFee = session('stampFee', 0);
+    //     $stampFee = session('stampFee', 0);
 
-        return view('payments.receipt', [
-            'payments'   => $payments,
-            'customer'   => $customer,
-            'batchId'    => $batchId,
-            'vatTotal'   => $vatTotal,
-            'nonVatTotal'=> $nonVatTotal,
-            'stampFee'   => $stampFee,
+    //     return view('payments.receipt', [
+    //         'payments'   => $payments,
+    //         'customer'   => $customer,
+    //         'batchId'    => $batchId,
+    //         'vatTotal'   => $vatTotal,
+    //         'nonVatTotal'=> $nonVatTotal,
+    //         'stampFee'   => $stampFee,
+    //     ]);
+    // }
+
+public function showReceipt(string $batchId): View
+{
+    $payments = Payment::with(['invoice.invoiceable', 'bank'])
+        ->where('batch_id', $batchId)
+        ->get();
+
+    if ($payments->isEmpty()) {
+        abort(404, 'Receipt not found.');
+    }
+
+    $invoiceable = $payments->first()->invoice->invoiceable;
+
+    $vatTotal = $payments->filter(fn($p) => $p->invoice->is_vat_invoice)->sum('amount');
+    $nonVatTotal = $payments->filter(fn($p) => !$p->invoice->is_vat_invoice)->sum('amount');
+    $stampFee = session('stampFee', 0);
+
+    // Supplier Receipt
+    if ($invoiceable instanceof \App\Models\Supplier) {
+        return view('payments.supplier_receipt', [
+            'payments'    => $payments,
+            'supplier'    => $invoiceable,
+            'batchId'     => $batchId,
+            'vatTotal'    => $vatTotal,
+            'nonVatTotal' => $nonVatTotal,
+            'stampFee'    => $stampFee,
         ]);
     }
+
+    // Agent Receipt
+    if ($invoiceable instanceof \App\Models\Agent) {
+        return view('payments.agent_receipt', [
+            'payments'    => $payments,
+            'agent'       => $invoiceable,
+            'batchId'     => $batchId,
+            'vatTotal'    => $vatTotal,
+            'nonVatTotal' => $nonVatTotal,
+            'stampFee'    => $stampFee,
+        ]);
+    }
+
+    // Customer Receipt (default fallback)
+    if ($invoiceable instanceof \App\Models\Customer) {
+        return view('payments.receipt', [
+            'payments'    => $payments,
+            'customer'    => $invoiceable,
+            'batchId'     => $batchId,
+            'vatTotal'    => $vatTotal,
+            'nonVatTotal' => $nonVatTotal,
+            'stampFee'    => $stampFee,
+        ]);
+    }
+
+    abort(404, 'Unsupported receipt type.');
+}
+
+
     public function history(Customer $customer)
         {
             // Load all payments with invoice + bank details
@@ -237,5 +296,253 @@ public function createBulk(Request $request, Customer $customer = null): View
             ]);
         }
 
+
+
+// ...
+
+/**
+ * Show agents with outstanding balances
+ */
+public function agentOutstanding(Request $request): View
+{
+    $agents = Agent::with('invoices')
+        ->whereHas('invoices', function ($query) {
+            $query->whereIn('status', ['unpaid', 'partially-paid']);
+        })
+        ->get()
+        ->map(function ($agent) {
+            $agent->outstanding_balance = $agent->invoices->sum(function ($invoice) {
+                return $invoice->total_amount - $invoice->amount_paid;
+            });
+            return $agent;
+        })
+        ->filter(fn($agent) => $agent->outstanding_balance > 0);
+
+    return view('payments.agentOutstanding', compact('agents'));
+}
+
+/**
+ * Show bulk payment form for agent
+ */
+public function createBulkAgent(Request $request, Agent $agent = null): View
+{
+    $allAgents = Agent::whereHas('invoices', function ($query) {
+        $query->whereIn('status', ['unpaid', 'partially-paid']);
+    })->orderBy('name')->get();
+
+    $banks = Bank::where('is_active', true)->orderBy('name')->get();
+
+    return view('payments.create_bulk_agent', [
+        'agents' => $allAgents,
+        'selectedAgentId' => $agent?->id,
+        'banks' => $banks,
+    ]);
+}
+
+/**
+ * Store a new bulk agent payment
+ */
+public function storeBulkAgent(Request $request): RedirectResponse
+{
+    $request->validate([
+        'agent_id' => 'required|exists:agents,id',
+        'invoice_ids' => 'required|array|min:1',
+        'invoice_ids.*' => 'exists:invoices,id',
+        'amount' => 'required|numeric|min:0.01',
+        'stamp_fee' => 'nullable|numeric|min:0',
+        'payment_date' => 'required|date',
+        'payment_method' => 'required|string',
+        'reference_number' => 'nullable|string',
+    ]);
+
+    DB::beginTransaction();
+    try {
+        $amountToDistribute = $request->amount;
+        $stampFee = $request->stamp_fee ?? 0;
+
+        $batchId = uniqid('BATCH-');
+
+        $invoices = Invoice::where('invoiceable_id', $request->agent_id)
+            ->where('invoiceable_type', Agent::class)
+            ->whereIn('id', $request->invoice_ids)
+            ->whereIn('status', ['unpaid', 'partially-paid'])
+            ->orderBy('created_at', 'asc')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($invoices as $invoice) {
+            if ($amountToDistribute <= 0) break;
+
+            $balanceDue = $invoice->total_amount - $invoice->amount_paid;
+            $paymentAmount = min($amountToDistribute, $balanceDue);
+
+            if ($paymentAmount > 0) {
+                $invoice->payments()->create([
+                    'payment_date'        => $request->payment_date,
+                    'amount'              => $paymentAmount,
+                    'payment_method'      => $request->payment_method,
+                    'reference_number'    => $request->reference_number,
+                    'notes'               => $request->notes ?? null,
+                    'batch_id'            => $batchId,
+                    'bank_id'             => $request->bank_id,
+                    'cheque_number'       => $request->cheque_number,
+                    'cheque_date'         => $request->cheque_date,
+                    'cheque_received_date'=> $request->cheque_received_date,
+                ]);
+
+                $totalPaid = $invoice->payments()->sum('amount');
+                $invoice->amount_paid = $totalPaid;
+
+                $invoice->status = abs($invoice->amount_paid - $invoice->total_amount) < 0.01
+                    ? 'paid'
+                    : 'partially-paid';
+                $invoice->save();
+
+                $amountToDistribute -= $paymentAmount;
+            }
+        }
+
+        DB::commit();
+
+        return redirect()->route('payments.receipt', $batchId)
+            ->with('stampFee', $stampFee);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withInput()->withErrors(['error' => 'An error occurred: ' . $e->getMessage()]);
+    }
+}
+public function supplierOutstanding(): View
+{
+    $suppliers = Supplier::whereHas('invoices', function ($q) {
+        $q->whereIn('status', ['unpaid', 'partially-paid']);
+    })
+    ->with(['invoices' => function ($q) {
+        $q->whereIn('status', ['unpaid', 'partially-paid']);
+    }])
+    ->orderBy('supplier_name')
+    ->get();
+
+    return view('payments.supplierOutstanding', compact('suppliers'));
+}
+public function createBulkSupplier(Request $request, Supplier $supplier = null): View
+{
+    $suppliers = Supplier::whereHas('invoices', function ($q) {
+        $q->whereIn('status', ['unpaid', 'partially-paid']);
+    })
+    ->orderBy('supplier_name')
+    ->get();
+
+    $banks = Bank::where('is_active', true)->orderBy('name')->get();
+
+    return view('payments.create_bulk_supplier', [
+        'suppliers' => $suppliers,
+        'selectedSupplierId' => $supplier?->id,
+        'banks' => $banks,
+    ]);
+}
+
+// Store bulk supplier payment
+public function storeBulkSupplier(Request $request): RedirectResponse
+{
+    $request->validate([
+        'supplier_id' => 'required|exists:suppliers,id',
+        'invoice_ids' => 'required|array|min:1',
+        'invoice_ids.*' => 'exists:invoices,id',
+        'amount' => 'required|numeric|min:0.01',
+        'stamp_fee' => 'nullable|numeric|min:0',
+        'payment_date' => 'required|date',
+        'payment_method' => 'required|string',
+        'reference_number' => 'nullable|string|max:255',
+    ]);
+
+    DB::beginTransaction();
+    try {
+        $amountToDistribute = $request->amount;
+        $stampFee = $request->stamp_fee ?? 0;
+        $batchId = uniqid('SUP-BATCH-');
+
+        $invoices = Invoice::where('invoiceable_id', $request->supplier_id)
+            ->where('invoiceable_type', Supplier::class)
+            ->whereIn('id', $request->invoice_ids)
+            ->whereIn('status', ['unpaid', 'partially-paid'])
+            ->orderBy('created_at', 'asc')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($invoices as $invoice) {
+            if ($amountToDistribute <= 0) break;
+
+            $balanceDue = $invoice->total_amount - $invoice->amount_paid;
+            $paymentAmount = min($amountToDistribute, $balanceDue);
+
+            if ($paymentAmount > 0) {
+                $invoice->payments()->create([
+                    'payment_date'         => $request->payment_date,
+                    'amount'               => $paymentAmount,
+                    'payment_method'       => $request->payment_method,
+                    'reference_number'     => $request->reference_number,
+                    'notes'                => $request->notes ?? null,
+                    'batch_id'             => $batchId,
+                    'bank_id'              => $request->bank_id,
+                    'cheque_number'        => $request->cheque_number,
+                    'cheque_date'          => $request->cheque_date,
+                    'cheque_received_date' => $request->cheque_received_date,
+                ]);
+
+                $totalPaid = $invoice->payments()->sum('amount');
+                $invoice->amount_paid = $totalPaid;
+                $invoice->status = abs($invoice->amount_paid - $invoice->total_amount) < 0.01
+                    ? 'paid'
+                    : 'partially-paid';
+                $invoice->save();
+
+                $amountToDistribute -= $paymentAmount;
+            }
+        }
+
+        DB::commit();
+
+        return redirect()->route('payments.receipt', $batchId)
+            ->with('stampFee', $stampFee);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withInput()->withErrors(['error' => 'An error occurred: ' . $e->getMessage()]);
+    }
+}public function agentPaymentHistory(Agent $agent): View
+{
+    $payments = Payment::with(['invoice', 'bank'])
+        ->whereHas('invoice', fn($q) => 
+            $q->where('invoiceable_id', $agent->id)
+              ->where('invoiceable_type', \App\Models\Agent::class)
+        )
+        ->orderBy('payment_date', 'desc')
+        ->get();
+
+    $paymentsByBatch = $payments->groupBy('batch_id');
+
+    return view('payments.agent_payment_history', [
+        'agent' => $agent,
+        'paymentsByBatch' => $paymentsByBatch,
+    ]);
+}
+public function supplierPaymentHistory(Supplier $supplier): View
+{
+    $payments = Payment::with(['invoice', 'bank'])
+        ->whereHas('invoice', fn($q) =>
+            $q->where('invoiceable_id', $supplier->id)
+              ->where('invoiceable_type', \App\Models\Supplier::class)
+        )
+        ->orderBy('payment_date', 'desc')
+        ->get();
+
+    $paymentsByBatch = $payments->groupBy('batch_id');
+
+    return view('payments.supplier_payment_history', [
+        'supplier' => $supplier,
+        'paymentsByBatch' => $paymentsByBatch,
+    ]);
+}
 
 }

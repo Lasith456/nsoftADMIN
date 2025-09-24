@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Supplier;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -107,4 +108,12 @@ class SupplierController extends Controller
         return redirect()->route('suppliers.index')
                          ->with('success','Supplier deleted successfully.');
     }
+    public function getUnpaidInvoices(Supplier $supplier)
+{
+    $invoices = $supplier->invoices()
+        ->whereIn('status', ['unpaid', 'partially-paid'])
+        ->get(['id', 'invoice_id', 'total_amount', 'amount_paid', 'created_at']);
+
+    return response()->json($invoices);
+}
 }

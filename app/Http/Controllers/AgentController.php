@@ -156,5 +156,14 @@ public function edit(Agent $agent): View
         return redirect()->route('agents.index')
                          ->with('success','Agent deleted successfully.');
     }
+    public function getUnpaidInvoices(Agent $agent)
+{
+    $invoices = $agent->invoices()
+        ->whereIn('status', ['unpaid', 'partially-paid'])
+        ->get(['id', 'invoice_id', 'total_amount', 'amount_paid', 'created_at']);
+
+    return response()->json($invoices);
+}
+
 }
 

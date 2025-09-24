@@ -112,7 +112,8 @@
                         <li><a href="{{ route('payments.history.supplier') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Suppliers Payment</a></li>
                         <li><a href="{{ route('payments.history.customer') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Customer Payments</a></li>
                         <li><a href="{{ route('payments.customerOutstanding') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Customer Outstanding</a></li>
-
+                        <li><a href="{{ route('payments.agentOutstanding') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Agent Outstanding</a></li>
+                        <li><a href="{{ route('payments.supplierOutstanding') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Supplier Outstanding</a></li>
                     </ul>
                 </li>
 

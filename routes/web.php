@@ -133,6 +133,33 @@ Route::get('/invoices/{id}/printopt3', [InvoiceController::class, 'printInvoice'
     Route::get('/payments/receipt/{batchId}', [PaymentController::class, 'showReceipt'])->name('payments.receipt');
 Route::get('/payments/history/{customer}', [PaymentController::class, 'history'])
     ->name('payments.history.customerPayments');
+Route::prefix('payments')->name('payments.')->group(function () {
+    // Agent outstanding
+    Route::get('/agent-outstanding', [PaymentController::class, 'agentOutstanding'])
+        ->name('agentOutstanding');
+        Route::get('/supplier-outstanding', [PaymentController::class, 'supplierOutstanding'])
+        ->name('supplierOutstanding');
+    // Bulk agent payment
+    Route::get('/create-bulk-agent/{agent?}', [PaymentController::class, 'createBulkAgent'])
+        ->name('createBulkAgent');
+
+    Route::post('/store-bulk-agent', [PaymentController::class, 'storeBulkAgent'])
+        ->name('storeBulkAgent');
+    Route::get('/create-bulk-supplier/{supplier?}', [PaymentController::class, 'createBulkSupplier'])
+    ->name('createBulkSupplier');
+    Route::post('/store-bulk-supplier', [PaymentController::class, 'storeBulkSupplier'])
+        ->name('storeBulkSupplier');
+
+
+});
+        Route::get('/agents/{agent}/unpaid-invoices', [AgentController::class, 'getUnpaidInvoices'])
+    ->name('agents.unpaid-invoices');
+    Route::get('/suppliers/{supplier}/unpaid-invoices', [SupplierController::class, 'getUnpaidInvoices'])
+    ->name('suppliers.unpaid-invoices');
+    Route::get('/payments/history/agent/{agent}', [PaymentController::class, 'agentPaymentHistory'])
+    ->name('payments.history.agentPayments');
+    Route::get('/payments/history/supplier/{supplier}', [PaymentController::class, 'supplierPaymentHistory'])
+    ->name('payments.history.supplierPayments');
 
 });
 
