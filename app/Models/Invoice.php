@@ -67,22 +67,36 @@ class Invoice extends Model
      * Auto-generate invoice_id like "INV-0001" on create.
      */
     protected static function boot()
-    {
-        parent::boot();
+{
+    parent::boot();
 
-        static::creating(function ($invoice) {
-            $latest = static::latest('id')->first();
+    static::creating(function ($invoice) {
+        // Decide prefix based on type
+        $prefix = match ($invoice->invoiceable_type) {
+            \App\Models\Customer::class => 'INV_CUSTOMER',
+            \App\Models\Supplier::class => 'INV_SUPPLIER',
+            \App\Models\Agent::class    => 'INV_AGENT',
+            default                     => 'INV',
+        };
 
-            if (!$latest) {
-                $number = 1;
-            } else {
-                // Extract numeric part from last invoice_id (after "INV-")
-                $lastNumber = (int) substr($latest->invoice_id, 4);
-                $number = $lastNumber + 1;
-            }
+        // Find latest invoice of the same type
+        $latest = static::where('invoiceable_type', $invoice->invoiceable_type)
+                        ->latest('id')
+                        ->first();
 
-            // Format with 4 digits padded with zeros
-            $invoice->invoice_id = 'INV-' . str_pad($number, 4, "0", STR_PAD_LEFT);
-        });
-    }
+        if (!$latest) {
+            $number = 1;
+        } else {
+            // Extract the number part safely
+            $lastId = $latest->invoice_id;
+            preg_match('/(\d+)$/', $lastId, $matches);
+            $lastNumber = $matches[1] ?? 0;
+            $number = (int) $lastNumber + 1;
+        }
+
+        // Generate invoice_id with type prefix
+        $invoice->invoice_id = $prefix . '-' . str_pad($number, 4, "0", STR_PAD_LEFT);
+    });
+}
+
 }

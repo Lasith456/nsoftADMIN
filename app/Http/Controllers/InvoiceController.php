@@ -801,40 +801,38 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
 
 public function storeAgentInvoice(Request $request): RedirectResponse
 {
-    $request->validate(['agent_id' => 'required|exists:agents,id']);
+    $validated = $request->validate([
+        'agent_id'            => 'required|exists:agents,id',
+        'delivery_item_ids'   => 'required|array|min:1',
+        'delivery_item_ids.*' => 'exists:delivery_note_items,id',
+    ]);
 
     DB::beginTransaction();
     try {
-        $agent = Agent::findOrFail($request->agent_id);
+        $agent = Agent::findOrFail($validated['agent_id']);
 
+        // Only selected items
         $itemsToInvoice = DeliveryNoteItem::where('agent_id', $agent->id)
             ->where('quantity_from_agent', '>', 0)
             ->where('agent_invoiced', false)
-            ->whereHas('deliveryNote.receiveNotes')
-            ->with(['deliveryNote', 'product', 'agent']) // include agent + product
+            ->whereIn('id', $validated['delivery_item_ids']) // ✅ filter selected
+            ->with(['deliveryNote', 'product', 'agent'])
             ->get();
 
         if ($itemsToInvoice->isEmpty()) {
-            return back()->withErrors(['error' => 'No pending items to invoice for this agent.']);
+            return back()->withErrors(['error' => 'No pending items found for the selected delivery notes.']);
         }
 
-        $totalAmount      = 0;
+        $totalAmount = 0;
         $invoiceItemsData = [];
 
         foreach ($itemsToInvoice as $item) {
-            if (!$item->agent) {
-                throw new \Exception("Agent not found for delivery item ID {$item->id}");
-            }
-
-            // ✅ get pivot record (price_per_case from agent_product_pivot)
             $pivot = $item->agent->products()
-                ->where('products.id', $item->product_id) // disambiguated
+                ->where('products.id', $item->product_id)
                 ->first();
 
             if (!$pivot || is_null($pivot->pivot->price_per_case)) {
-                throw new \Exception(
-                    "No price_per_case found for Agent {$item->agent->id} and Product {$item->product_id}"
-                );
+                throw new \Exception("No price_per_case found for Agent {$item->agent->id} and Product {$item->product_id}");
             }
 
             $unitPrice = $pivot->pivot->price_per_case;
@@ -852,9 +850,9 @@ public function storeAgentInvoice(Request $request): RedirectResponse
             $totalAmount += $total;
         }
 
-        // Create the invoice for the agent
+        // Create Invoice
         $invoice = $agent->invoices()->create([
-            'invoice_id'     => 'INV-AGENT-' . strtoupper(Str::random(6)),
+            'invoice_id'     => 'INV_AGENT-' . strtoupper(Str::random(6)),
             'due_date'       => now()->addDays(30),
             'sub_total'      => $totalAmount,
             'vat_percentage' => 0,
@@ -866,6 +864,7 @@ public function storeAgentInvoice(Request $request): RedirectResponse
 
         $invoice->items()->createMany($invoiceItemsData);
 
+        // Mark selected items invoiced
         DeliveryNoteItem::whereIn('id', $itemsToInvoice->pluck('id'))
             ->update(['agent_invoiced' => true]);
 
@@ -878,6 +877,7 @@ public function storeAgentInvoice(Request $request): RedirectResponse
         return back()->withInput()->withErrors(['error' => $e->getMessage()]);
     }
 }
+
 
     public function showOpt2($id)
 {
