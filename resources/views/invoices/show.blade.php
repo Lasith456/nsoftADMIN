@@ -10,12 +10,12 @@
             <div class="flex items-center space-x-2">
                 <a href="{{ route('invoices.index') }}" 
                    class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md text-xs uppercase font-semibold">Back to List</a>
-                @can('payment-create')
+                <!-- @can('payment-create')
                     @if($invoice->total_amount - $invoice->amount_paid > 0)
                         <a href="{{ route('payments.create', $invoice->id) }}" 
                            class="px-4 py-2 bg-green-600 text-white rounded-md text-xs uppercase font-semibold">Record Payment</a>
                     @endif
-                @endcan
+                @endcan -->
                 <a href="{{ route('invoices.print', $invoice->id) }}" 
                    class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</a>
             </div>
