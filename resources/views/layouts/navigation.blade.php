@@ -176,7 +176,7 @@
                         <li><a href="{{ route('reports.agents') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Agent Report</a></li>
                         <li><a href="{{ route('reports.order_flow') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Order Flow Report</a></li>
                         <li><a href="{{ route('stock.wastage.report') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Wastage Report</a></li>
-
+                        <li><a href="{{ route('reports.outstanding') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Outstanding Payments Report</a></li>
                     </ul>
                 </li>
                 <li x-data="{ open: {{ request()->routeIs('company_department_names.*') ? 'true' : 'false' }} }">

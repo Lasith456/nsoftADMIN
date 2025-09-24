@@ -126,5 +126,55 @@ class ReportController extends Controller
         $customers = Customer::orderBy('customer_name')->get();
         return view('reports.order_flow_report', compact('purchaseOrders', 'customers'));
     }
+public function outstandingPayments(Request $request)
+{
+    $type   = $request->get('type', 'all');
+    $from   = $request->get('from');
+    $to     = $request->get('to');
+
+    $query = Invoice::with(['invoiceable', 'payments']);
+
+    // Filter by type
+    switch ($type) {
+        case 'customer':
+            $query->where('invoiceable_type', Customer::class);
+            break;
+        case 'supplier':
+            $query->where('invoiceable_type', Supplier::class);
+            break;
+        case 'agent':
+            $query->where('invoiceable_type', Agent::class);
+            break;
+    }
+
+    // Filter by date
+    if ($from && $to) {
+        $query->whereBetween('created_at', [$from, $to]);
+    }
+
+    $invoices = $query->get()->map(function ($invoice) {
+        $paid = $invoice->payments->sum('amount');
+        $balance = $invoice->total_amount - $paid;
+
+        // Get first receipt (batch id)
+        $receiptId = $invoice->payments->first()?->batch_id;
+
+        return [
+            'invoice_id'    => $invoice->invoice_id,
+            'receipt_id'    => $receiptId,
+            'type'          => class_basename($invoice->invoiceable_type),
+            'name'          => $invoice->invoiceable?->name ?? 
+                               $invoice->invoiceable?->customer_name ?? 
+                               $invoice->invoiceable?->supplier_name,
+            'date'          => $invoice->created_at->format('Y-m-d'),
+            'total'         => $invoice->total_amount,
+            'paid'          => $paid,
+            'outstanding'   => $balance,
+        ];
+    })->filter(fn($row) => $row['outstanding'] > 0);
+
+    return view('reports.outstanding', compact('invoices', 'type', 'from', 'to'));
+}
+
 }
 

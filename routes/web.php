@@ -168,6 +168,7 @@ Route::get('/stock/wastage-report/export-excel', [StockManagementController::cla
 
 Route::get('/stock/wastage-report/export-pdf', [StockManagementController::class, 'exportWastagePdf'])
     ->name('stock.wastage.export.pdf');
+Route::get('/reports/outstanding-payments', [ReportController::class, 'outstandingPayments'])->name('reports.outstanding');
 
 });
 
