@@ -35,15 +35,47 @@
         <div class="space-y-6">
             @forelse ($purchaseOrders as $po)
                 <div class="border rounded-lg p-4">
-                    <h3 class="font-bold text-lg text-gray-800 dark:text-gray-200">
-                        PO: {{ $po->po_id }} 
-                        <span class="text-sm font-normal text-gray-600 dark:text-gray-400">
+                    <h3 class="font-bold text-lg text-gray-800">
+                        PO: 
+                        <a href="{{ route('purchase-orders.show', $po->id) }}" class="text-blue-600 hover:underline">
+                            {{ $po->po_id }}
+                        </a>
+                        <span class="text-sm font-normal text-gray-600">
                             (Customer: {{ $po->customer->customer_name ?? 'N/A' }})
                         </span>
                     </h3>
+
+                    {{-- Linked Delivery Notes & Receive Notes --}}
+                    <div class="mt-2 text-sm text-gray-600">
+                        <p>
+                            <strong>Delivery Notes:</strong>
+                            @forelse($po->deliveryNotes as $dn)
+                                <a href="{{ route('delivery-notes.show', $dn->id) }}" class="text-purple-600 hover:underline">
+                                    {{ $dn->delivery_note_id }}
+                                </a>@if(!$loop->last), @endif
+                            @empty
+                                <span class="text-gray-400">None</span>
+                            @endforelse
+                        </p>
+
+                        <p>
+                            <strong>Receive Notes:</strong>
+                            @php
+                                $rns = $po->deliveryNotes->flatMap->receiveNotes->unique('id');
+                            @endphp
+                            @forelse($rns as $rn)
+                                <a href="{{ route('receive-notes.show', $rn->id) }}" class="text-green-600 hover:underline">
+                                    {{ $rn->receive_note_id }}
+                                </a>@if(!$loop->last), @endif
+                            @empty
+                                <span class="text-gray-400">None</span>
+                            @endforelse
+                        </p>
+                    </div>
+
                     <div class="overflow-x-auto mt-2">
-                        <table class="w-full min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
+                        <table class="w-full min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
                                  <tr>
                                     <th class="px-2 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Product</th>
                                     <th class="px-2 py-2 text-right text-xs font-medium text-black uppercase tracking-wider">Ordered (PO)</th>
@@ -52,7 +84,7 @@
                                     <th class="px-2 py-2 text-right text-xs font-medium text-black uppercase tracking-wider">Discrepancy</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                            <tbody class="bg-white divide-y divide-gray-200">
                                 @foreach($po->items->groupBy('product_id') as $productId => $poItems)
                                     @php
                                         $productName = $poItems->first()->product_name;
@@ -70,10 +102,10 @@
                                         $discrepancy = $poQty - $rnQty;
                                     @endphp
                                     <tr>
-                                        <td class="px-2 py-2 text-sm text-gray-800 dark:text-gray-200">{{ $productName }}</td>
-                                        <td class="px-2 py-2 text-sm text-gray-500 dark:text-gray-400 text-right">{{ $poQty }}</td>
-                                        <td class="px-2 py-2 text-sm text-gray-500 dark:text-gray-400 text-right">{{ $dnQty }}</td>
-                                        <td class="px-2 py-2 text-sm text-gray-500 dark:text-gray-400 text-right">{{ $rnQty }}</td>
+                                        <td class="px-2 py-2 text-sm text-gray-800">{{ $productName }}</td>
+                                        <td class="px-2 py-2 text-sm text-gray-500 text-right">{{ $poQty }}</td>
+                                        <td class="px-2 py-2 text-sm text-gray-500 text-right">{{ $dnQty }}</td>
+                                        <td class="px-2 py-2 text-sm text-gray-500 text-right">{{ $rnQty }}</td>
                                         <td class="px-2 py-2 text-sm text-right font-bold {{ $discrepancy != 0 ? 'text-red-500' : 'text-green-500' }}">
                                             {{ $discrepancy }}
                                         </td>
@@ -103,4 +135,3 @@
     }
 </style>
 @endsection
-
