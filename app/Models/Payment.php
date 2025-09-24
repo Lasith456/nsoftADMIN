@@ -17,18 +17,30 @@ class Payment extends Model
         'payment_method',
         'reference_number',
         'notes',
+        'batch_id',
+        'bank_id',
+        'cheque_number',
+        'cheque_date',
+        'cheque_received_date',
     ];
 
     protected function casts(): array
     {
         return [
-            'payment_date' => 'date',
-            'amount' => 'decimal:2',
+            'payment_date'         => 'date',
+            'amount'               => 'decimal:2',
+            'cheque_date'          => 'date',
+            'cheque_received_date' => 'date',
         ];
     }
 
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    public function bank(): BelongsTo
+    {
+        return $this->belongsTo(Bank::class);
     }
 }

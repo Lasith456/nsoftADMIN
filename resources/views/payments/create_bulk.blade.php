@@ -33,9 +33,7 @@
                     <select name="customer_id" x-model="selectedCustomerId" @change="fetchInvoices" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600 focus:border-indigo-500 focus:ring-indigo-500" required>
                         <option value="">Select a customer...</option>
                         @foreach($customers as $customer)
-                            {{-- MODIFICATION START --}}
                             <option value="{{ $customer->id }}" {{ $selectedCustomerId == $customer->id ? 'selected' : '' }}>
-                            {{-- MODIFICATION END --}}
                                 {{ $customer->customer_name }} ({{ $customer->customer_id }})
                             </option>
                         @endforeach
@@ -46,15 +44,42 @@
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Date</label>
                         <input type="date" name="payment_date" value="{{ date('Y-m-d') }}" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600" required>
                     </div>
-                     <div>
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                        <select name="payment_method" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600" required>
-                            <option>Cash</option>
-                            <option>Bank Transfer</option>
-                            <option>Cheque</option>
+                        <select name="payment_method" x-model="paymentMethod" class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600" required>
+                            <option value="">Select Method</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Cheque">Cheque</option>
                         </select>
                     </div>
-                     <div>
+
+                    {{-- Cheque fields --}}
+                    <div x-show="paymentMethod === 'Cheque'" x-cloak class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 col-span-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Bank</label>
+                            <select name="bank_id" class="mt-1 block w-full dark:bg-gray-900 rounded-md border-gray-300 dark:border-gray-600">
+                                <option value="">Select Bank</option>
+                                @foreach($banks as $bank)
+                                    <option value="{{ $bank->id }}">{{ $bank->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cheque Number</label>
+                            <input type="text" name="cheque_number" class="mt-1 block w-full dark:bg-gray-900 rounded-md border-gray-300 dark:border-gray-600">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cheque Date</label>
+                            <input type="date" name="cheque_date" class="mt-1 block w-full dark:bg-gray-900 rounded-md border-gray-300 dark:border-gray-600">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Cheque Received Date</label>
+                            <input type="date" name="cheque_received_date" class="mt-1 block w-full dark:bg-gray-900 rounded-md border-gray-300 dark:border-gray-600">
+                        </div>
+                    </div>
+
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reference</label>
                         <input type="text" name="reference_number" placeholder="e.g., Cheque No." class="mt-1 block w-full dark:bg-gray-900 rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600">
                     </div>
@@ -73,21 +98,34 @@
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
-                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount to Pay</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount to Pay</label>
                         <input type="number" step="0.01" name="amount" x-model.number="amountPaid" placeholder="0.00" class="mt-1 block w-full dark:bg-gray-900 text-lg rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600" required>
                     </div>
-                    <div class="pt-6 text-sm">
+
+                    {{-- Stamp Fee --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Stamp Fee</label>
+                        <input type="number" step="0.01" name="stamp_fee" x-model.number="stampFee" placeholder="0.00"
+                               class="mt-1 block w-full dark:bg-gray-900 text-lg rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600">
+                    </div>
+
+                    <div class="pt-6 text-sm col-span-2">
                         <div class="flex justify-between">
                             <span class="text-gray-500 dark:text-gray-400">Total Selected:</span>
                             <span class="font-semibold" x-text="formatCurrency(totalSelectedForPayment)"></span>
                         </div>
-                         <div class="flex justify-between font-bold" :class="amountPaid > totalSelectedForPayment ? 'text-red-500' : 'text-green-600'">
-                            <span>Amount to Distribute:</span>
-                            <span x-text="formatCurrency(Math.min(amountPaid, totalSelectedForPayment))"></span>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Stamp Fee:</span>
+                            <span class="font-semibold" x-text="formatCurrency(stampFee || 0)"></span>
+                        </div>
+                        <div class="flex justify-between font-bold text-blue-600">
+                            <span>Grand Total:</span>
+                            <span x-text="formatCurrency(grandTotal)"></span>
                         </div>
                     </div>
                 </div>
 
+                {{-- Invoice Table --}}
                 <div class="mt-4 max-h-80 overflow-y-auto border rounded-md">
                      <table class="w-full min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0">
@@ -110,7 +148,7 @@
                                 </tr>
                             </template>
                         </tbody>
-                    </table>
+                     </table>
                 </div>
             </div>
         </form>
@@ -125,6 +163,8 @@ document.addEventListener('alpine:init', () => {
         isLoading: false,
         selectedInvoiceIds: [],
         amountPaid: '',
+        stampFee: 0,
+        paymentMethod: '',
 
         init() {
             if (this.selectedCustomerId) {
@@ -136,7 +176,7 @@ document.addEventListener('alpine:init', () => {
             this.invoices = [];
             this.selectedInvoiceIds = [];
             if (!this.selectedCustomerId) return;
-            
+
             this.isLoading = true;
             fetch(`/customers/${this.selectedCustomerId}/unpaid-invoices`)
                 .then(res => res.json())
@@ -145,7 +185,7 @@ document.addEventListener('alpine:init', () => {
                     this.isLoading = false;
                 });
         },
-        
+
         get totalOutstanding() {
             return this.invoices.reduce((total, inv) => total + (parseFloat(inv.total_amount) - parseFloat(inv.amount_paid)), 0);
         },
@@ -155,7 +195,11 @@ document.addEventListener('alpine:init', () => {
                 .filter(inv => this.selectedInvoiceIds.includes(String(inv.id)))
                 .reduce((total, inv) => total + (parseFloat(inv.total_amount) - parseFloat(inv.amount_paid)), 0);
         },
-        
+
+        get grandTotal() {
+            return (parseFloat(this.amountPaid) || 0) + (parseFloat(this.stampFee) || 0);
+        },
+
         isFormValid() {
             return this.selectedCustomerId && this.selectedInvoiceIds.length > 0 && this.amountPaid > 0;
         },

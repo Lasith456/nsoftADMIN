@@ -125,9 +125,14 @@ Route::middleware(['auth'])->group(function () {
     });
     Route::get('/invoices/{invoice}/showopt2', [App\Http\Controllers\InvoiceController::class, 'showOpt2'])
     ->name('invoices.showopt2');
+Route::get('/invoices/{id}/printopt3', [InvoiceController::class, 'printInvoice'])->name('invoices.opt3');
 
     Route::post('/purchase-orders/auto-create', [PurchaseOrderController::class, 'autoCreateFromDiscrepancy'])->name('purchase-orders.autoCreate');
     Route::post('/companies/store', [App\Http\Controllers\CompanyController::class, 'store'])->name('companies.api.store');
+
+    Route::get('/payments/receipt/{batchId}', [PaymentController::class, 'showReceipt'])->name('payments.receipt');
+Route::get('/payments/history/{customer}', [PaymentController::class, 'history'])
+    ->name('payments.history.customerPayments');
 
 });
 

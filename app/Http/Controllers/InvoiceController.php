@@ -884,5 +884,26 @@ public function storeAgentInvoice(Request $request): RedirectResponse
     $invoice = \App\Models\Invoice::with(['items.product', 'invoiceable'])->findOrFail($id);
     return view('invoices.showopt2', compact('invoice'));
 }
+public function printInvoice($id)
+{
+    $invoice = Invoice::with('items')->findOrFail($id);
+if (!$invoice->invoice_date && $invoice->created_at) {
+        $invoice->invoice_date = $invoice->created_at;
+    }
+    // Convert total amount to words (you can use helper if you have one)
+    $invoice->amount_in_words = $this->convertToWords($invoice->total_amount);
+
+    return view('invoices.printopt3', compact('invoice'));
+}
+
+/**
+ * Convert numbers to words (basic version).
+ * Replace with a package/helper if needed.
+ */
+private function convertToWords($number)
+{
+    $f = new \NumberFormatter("en", \NumberFormatter::SPELLOUT);
+    return ucfirst($f->format($number));
+}
 
 }

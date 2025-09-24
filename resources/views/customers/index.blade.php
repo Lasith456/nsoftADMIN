@@ -66,31 +66,48 @@
                     <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
                         <form action="{{ route('customers.destroy',$customer->id) }}" method="POST" class="flex justify-end items-center space-x-4">
                             <a href="{{ route('customers.show',$customer->id) }}" class="text-blue-600 hover:text-blue-800" title="Show">
+                                {{-- Show Icon --}}
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                             </a>
+
                             @can('customer-edit')
                                 <a href="{{ route('customers.edit',$customer->id) }}" class="text-green-600 hover:text-green-800" title="Edit">
+                                    {{-- Edit Icon --}}
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z"></path></svg>
                                 </a>
                             @endcan
+
                             @can('purchase-order-create')
                                 <a href="{{ route('purchase-orders.create', ['customer_id' => $customer->id]) }}" 
                                 class="text-indigo-600 hover:text-indigo-800" title="Add PO">
+                                    {{-- PO Icon --}}
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
                                             d="M12 4v16m8-8H4"/>
                                     </svg>
                                 </a>
                             @endcan
+
+<a href="{{ route('payments.history.customerPayments', $customer->id) }}" 
+   class="text-purple-600 hover:text-purple-800" title="Payment History">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+</a>
+
+
                             @csrf
                             @method('DELETE')
                             @can('customer-delete')
                                 <button type="submit" class="text-red-600 hover:text-red-800" title="Delete" onclick="return confirm('Are you sure you want to delete this customer?')">
+                                    {{-- Delete Icon --}}
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
                             @endcan
                         </form>
                     </td>
+
                 </tr>
                 @empty
                     <tr>

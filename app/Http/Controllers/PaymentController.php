@@ -109,13 +109,16 @@ public function createBulk(Request $request, Customer $customer = null): View
     $allCustomers = Customer::whereHas('invoices', function ($query) {
         $query->whereIn('status', ['unpaid', 'partially-paid']);
     })->orderBy('customer_name')->get();
-    
-    $selectedCustomerId = $customer?->id;
+
+    $banks = Bank::where('is_active', true)->orderBy('name')->get();
+
     return view('payments.create_bulk', [
         'customers' => $allCustomers,
-        'selectedCustomerId' => $selectedCustomerId,
+        'selectedCustomerId' => $customer?->id,
+        'banks' => $banks,
     ]);
 }
+
     /**
      * Store a new bulk payment and distribute it across selected invoices.
      */
@@ -126,6 +129,7 @@ public function createBulk(Request $request, Customer $customer = null): View
             'invoice_ids' => 'required|array|min:1',
             'invoice_ids.*' => 'exists:invoices,id',
             'amount' => 'required|numeric|min:0.01',
+            'stamp_fee' => 'nullable|numeric|min:0',
             'payment_date' => 'required|date',
             'payment_method' => 'required|string',
             'reference_number' => 'nullable|string',
@@ -134,16 +138,18 @@ public function createBulk(Request $request, Customer $customer = null): View
         DB::beginTransaction();
         try {
             $amountToDistribute = $request->amount;
-            
-            // ** THE FIX IS HERE: Use the correct polymorphic relationship columns **
+            $stampFee = $request->stamp_fee ?? 0;
+
+            $batchId = uniqid('BATCH-');
+
             $invoices = Invoice::where('invoiceable_id', $request->customer_id)
-                ->where('invoiceable_type', Customer::class) // Ensure we only get customer invoices
+                ->where('invoiceable_type', Customer::class)
                 ->whereIn('id', $request->invoice_ids)
                 ->whereIn('status', ['unpaid', 'partially-paid'])
                 ->orderBy('created_at', 'asc')
                 ->lockForUpdate()
                 ->get();
-                
+
             foreach ($invoices as $invoice) {
                 if ($amountToDistribute <= 0) break;
 
@@ -152,34 +158,84 @@ public function createBulk(Request $request, Customer $customer = null): View
 
                 if ($paymentAmount > 0) {
                     $invoice->payments()->create([
-                        'payment_date' => $request->payment_date,
-                        'amount' => $paymentAmount,
-                        'payment_method' => $request->payment_method,
-                        'reference_number' => $request->reference_number,
+                        'payment_date'        => $request->payment_date,
+                        'amount'              => $paymentAmount,
+                        'payment_method'      => $request->payment_method,
+                        'reference_number'    => $request->reference_number,
+                        'notes'               => $validated['notes'] ?? null,
+                        'batch_id'            => $batchId,  // 👈 always set
+                        'bank_id'             => $request->bank_id,
+                        'cheque_number'       => $request->cheque_number,
+                        'cheque_date'         => $request->cheque_date,
+                        'cheque_received_date'=> $request->cheque_received_date,
+                        'batch_id'            => $batchId,
                     ]);
 
-                    // Refresh the sum of payments to get the most accurate total
                     $totalPaid = $invoice->payments()->sum('amount');
                     $invoice->amount_paid = $totalPaid;
-                    
-                    if (abs($invoice->amount_paid - $invoice->total_amount) < 0.01) {
-                        $invoice->status = 'paid';
-                    } else {
-                        $invoice->status = 'partially-paid';
-                    }
+
+                    $invoice->status = abs($invoice->amount_paid - $invoice->total_amount) < 0.01 ? 'paid' : 'partially-paid';
                     $invoice->save();
-                    
+
                     $amountToDistribute -= $paymentAmount;
                 }
             }
 
             DB::commit();
-            return redirect()->route('payments.history.customer')->with('success', 'Bulk payment recorded and distributed successfully.');
+
+            return redirect()->route('payments.receipt', $batchId)
+                ->with('stampFee', $stampFee);
 
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withInput()->withErrors(['error' => 'An error occurred: ' . $e->getMessage()]);
         }
     }
-    
+
+
+    public function showReceipt(string $batchId): View
+    {
+        $payments = Payment::with('invoice', 'bank')
+            ->where('batch_id', $batchId)
+            ->get();
+
+        if ($payments->isEmpty()) {
+            abort(404, 'Receipt not found.');
+        }
+
+        $customer = $payments->first()->invoice->invoiceable;
+
+        $vatTotal = $payments->filter(fn($p) => $p->invoice->is_vat_invoice)->sum('amount');
+        $nonVatTotal = $payments->filter(fn($p) => !$p->invoice->is_vat_invoice)->sum('amount');
+
+        $stampFee = session('stampFee', 0);
+
+        return view('payments.receipt', [
+            'payments'   => $payments,
+            'customer'   => $customer,
+            'batchId'    => $batchId,
+            'vatTotal'   => $vatTotal,
+            'nonVatTotal'=> $nonVatTotal,
+            'stampFee'   => $stampFee,
+        ]);
+    }
+    public function history(Customer $customer)
+        {
+            // Load all payments with invoice + bank details
+            $payments = Payment::with(['invoice', 'bank'])
+                ->whereHas('invoice', fn($q) => $q->where('invoiceable_id', $customer->id)
+                                                ->where('invoiceable_type', Customer::class))
+                ->orderBy('payment_date', 'desc')
+                ->get();
+
+            // Group by batch (so one receipt = one group)
+            $paymentsByBatch = $payments->groupBy('batch_id');
+
+            return view('payments.history', [
+                'customer' => $customer,
+                'paymentsByBatch' => $paymentsByBatch,
+            ]);
+        }
+
+
 }

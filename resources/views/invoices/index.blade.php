@@ -118,13 +118,17 @@
                             <a href="{{ route('invoices.print', $invoice->id) }}" class="text-gray-400 hover:text-purple-600" title="Print Invoice">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm7-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                             </a>
-                            <a href="{{ route('invoices.show', $invoice->id) }}" class="text-blue-600 hover:text-blue-800" title="Show Details">
+                            <!-- <a href="{{ route('invoices.show', $invoice->id) }}" class="text-blue-600 hover:text-blue-800" title="Show Details">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542 7z"></path></svg>
-                            </a>
+                            </a> -->
                             <a href="{{ route('invoices.showopt2', $invoice->id) }}" 
-   class="px-4 py-2 bg-purple-600 text-white rounded-md text-xs uppercase font-semibold">
-   Show Opt2
-</a>
+                                class="px-4 py-2 bg-purple-600 text-white rounded-md text-xs uppercase font-semibold">
+                                Show Opt2
+                            </a>
+                            <a href="{{ route('invoices.opt3', $invoice->id) }}"  target="_blank" 
+                                class="inline-flex items-center px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
+                                    Print
+                            </a>
                         </div>
                     </td>
                 </tr>
