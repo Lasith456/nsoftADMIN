@@ -160,6 +160,14 @@ Route::prefix('payments')->name('payments.')->group(function () {
     ->name('payments.history.agentPayments');
     Route::get('/payments/history/supplier/{supplier}', [PaymentController::class, 'supplierPaymentHistory'])
     ->name('payments.history.supplierPayments');
+Route::get('/stock/wastage-report', [StockManagementController::class, 'wastageReport'])
+    ->name('stock.wastage.report');
+
+Route::get('/stock/wastage-report/export-excel', [StockManagementController::class, 'exportWastageExcel'])
+    ->name('stock.wastage.export.excel');
+
+Route::get('/stock/wastage-report/export-pdf', [StockManagementController::class, 'exportWastagePdf'])
+    ->name('stock.wastage.export.pdf');
 
 });
 

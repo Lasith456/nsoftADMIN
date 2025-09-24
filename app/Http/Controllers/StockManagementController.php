@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\WastageLogsExport;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class StockManagementController extends Controller
 {
@@ -108,5 +111,64 @@ class StockManagementController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()]);
         }
     }
+
+public function exportWastageExcel(Request $request)
+{
+    return Excel::download(new WastageLogsExport($request), 'wastage_report.xlsx');
+}
+
+public function exportWastagePdf(Request $request)
+{
+    // reuse same query as report
+    $query = WastageLog::with('product.department')->latest();
+
+    if ($request->filled('product_id')) {
+        $query->where('product_id', $request->product_id);
+    }
+    if ($request->filled('department_id')) {
+        $query->whereHas('product', fn($q) => $q->where('department_id', $request->department_id));
+    }
+    if ($request->filled('from_date')) {
+        $query->whereDate('created_at', '>=', $request->from_date);
+    }
+    if ($request->filled('to_date')) {
+        $query->whereDate('created_at', '<=', $request->to_date);
+    }
+
+    $logs = $query->get();
+
+    $pdf = Pdf::loadView('stock_management.wastage_report_pdf', compact('logs'))
+              ->setPaper('a4', 'landscape');
+
+    return $pdf->download('wastage_report.pdf');
+}
+/**
+ * Show the wastage report.
+ */
+public function wastageReport(Request $request): View
+{
+    $query = WastageLog::with('product.department')->latest();
+
+    // Optional filters
+    if ($request->filled('product_id')) {
+        $query->where('product_id', $request->product_id);
+    }
+    if ($request->filled('department_id')) {
+        $query->whereHas('product', fn($q) => $q->where('department_id', $request->department_id));
+    }
+    if ($request->filled('from_date')) {
+        $query->whereDate('created_at', '>=', $request->from_date);
+    }
+    if ($request->filled('to_date')) {
+        $query->whereDate('created_at', '<=', $request->to_date);
+    }
+
+    $wastageLogs = $query->paginate(20);
+    $products = Product::orderBy('name')->get();
+    $departments = Department::orderBy('name')->get();
+
+    return view('stock_management.wastage_report', compact('wastageLogs', 'products', 'departments'));
+}
+
 }
 
