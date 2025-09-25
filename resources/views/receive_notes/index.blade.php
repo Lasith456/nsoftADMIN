@@ -120,7 +120,7 @@
                     <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
                         <form action="{{ route('receive-notes.destroy', $receiveNote->id) }}" 
                               method="POST" class="flex justify-end items-center space-x-2">
-                            @if($receiveNote->invoices->count() === 0 && in_array($receiveNote->status, ['completed','discrepancy']))
+                            <!-- @if($receiveNote->invoices->count() === 0 && in_array($receiveNote->status, ['completed','discrepancy']))
                                 <a href="{{ route('invoices.createFromRN', $receiveNote->id) }}"
                                    class="text-purple-600 hover:text-purple-800" title="Generate Invoice">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,7 +131,7 @@
                                                  01-2 2z"/>
                                     </svg>
                                 </a>
-                            @endif
+                            @endif -->
 
                             <a href="{{ route('receive-notes.show', $receiveNote->id) }}"
                                class="text-blue-600 hover:text-blue-800" title="Show">

@@ -740,5 +740,55 @@ private function convertToWords($number)
     $f = new \NumberFormatter("en", \NumberFormatter::SPELLOUT);
     return ucfirst($f->format($number));
 }
+public function destroy(Invoice $invoice): RedirectResponse
+{
+    // If invoice has payments, check amounts
+    $totalPaid = $invoice->payments()->sum('amount');
+
+    if ($invoice->status === 'paid' || $totalPaid > 0) {
+        // Calculate outstanding balance
+        $outstanding = 0;
+        if ($invoice->invoiceable) {
+            $outstanding = $invoice->invoiceable->invoices()
+                ->where('status', 'unpaid')
+                ->sum(DB::raw('total_amount - amount_paid'));
+        }
+
+        return redirect()->route('invoices.index')
+            ->withErrors([
+                'error' => sprintf(
+                    'Invoice %s cannot be deleted because it has payments. Outstanding balance for %s is %.2f.',
+                    $invoice->invoice_id,
+                    class_basename($invoice->invoiceable_type),
+                    $outstanding
+                )
+            ]);
+    }
+
+    DB::beginTransaction();
+    try {
+        // Detach receive notes if pivot exists
+        if (method_exists($invoice, 'receiveNotes')) {
+            $invoice->receiveNotes()->detach();
+        }
+
+        // Delete items first
+        $invoice->items()->delete();
+
+        // Delete payments if any (safety)
+        $invoice->payments()->delete();
+
+        // Delete invoice
+        $invoice->delete();
+
+        DB::commit();
+        return redirect()->route('invoices.index')
+            ->with('success', "Invoice {$invoice->invoice_id} deleted successfully.");
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withErrors(['error' => 'Failed to delete invoice: ' . $e->getMessage()]);
+    }
+}
+
 
 }
