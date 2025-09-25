@@ -17,6 +17,7 @@ class Grn extends Model
         'supplier_id',
         'invoice_number',
         'status', 
+        'confirmed_at',
         'total_amount',
         'total_discount',
         'net_amount',
@@ -31,6 +32,7 @@ class Grn extends Model
             'total_amount' => 'decimal:2',
             'total_discount' => 'decimal:2',
             'net_amount' => 'decimal:2',
+            'confirmed_at' => 'datetime',
         ];
     }
 

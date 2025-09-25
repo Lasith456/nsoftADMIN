@@ -136,18 +136,34 @@
                                     </form>
                                 @endcan
                             @endif
-
                             @can('grn-delete')
-                                @if(!in_array($grn->status, ['invoiced','cancelled']))
+                                @php
+                                    $showDelete = false;
+
+                                    if (!in_array($grn->status, ['invoiced','cancelled'])) {
+                                        if ($grn->status === 'confirmed' && $grn->confirmed_at) {
+                                            $showDelete = now()->diffInHours($grn->confirmed_at) <= 24;
+                                        } elseif ($grn->status !== 'confirmed') {
+                                            $showDelete = true;
+                                        }
+                                    }
+                                @endphp
+
+                                @if($showDelete)
                                     <form action="{{ route('grns.destroy', $grn->id) }}" method="POST" class="inline">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="text-red-600 hover:text-red-800" title="Delete" onclick="return confirm('Are you sure? This will revert stock if the GRN was completed.')">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        <button type="submit" class="text-red-600 hover:text-red-800" title="Delete"
+                                            onclick="return confirm('Are you sure? This will revert stock if the GRN was completed.')">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
                                         </button>
                                     </form>
                                 @endif
                             @endcan
+
                         </div>
                     </td>
                 </tr>

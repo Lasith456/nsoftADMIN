@@ -234,7 +234,10 @@ class GrnController extends Controller
                 }
             }
 
-            $grn->update(['status' => 'confirmed']);
+                 $grn->update([
+                    'status' => 'confirmed',
+                    'confirmed_at' => now(),
+                ]);
             DB::commit();
             return redirect()->route('grns.index')->with('success', 'GRN has been confirmed and stock updated.');
         } catch (\Exception $e) {
