@@ -1,4 +1,3 @@
-
 @extends('layouts.app')
 
 @section('content')
@@ -40,11 +39,17 @@
         </div>
     </div>
 
-
     {{-- Success Message --}}
     @if ($message = Session::get('success'))
         <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
             <p>{{ $message }}</p>
+        </div>
+    @endif
+
+    {{-- Error Message --}}
+    @if ($errors->any())
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+            <p>{{ $errors->first() }}</p>
         </div>
     @endif
 
@@ -72,7 +77,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 @forelse ($purchaseOrders as $po)
-               <tr>
+                <tr>
                     <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-black">{{ $po->po_id }}</td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $po->customer->customer_name ?? 'N/A' }}</td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $po->delivery_date->format('Y-m-d') }}</td>
@@ -101,9 +106,16 @@
                             @csrf
                             @method('DELETE')
                             @can('purchase-order-delete')
-                                <button type="submit" class="text-red-600 hover:text-red-800" title="Delete" onclick="return confirm('Are you sure?')">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
+                                @if($po->deliveryNotes->count() > 0)
+                                    {{-- Disable delete if linked to delivery notes --}}
+                                    <button type="button" class="text-gray-400 cursor-not-allowed" title="Delete Delivery Note(s) first" disabled>
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                @else
+                                    <button type="submit" class="text-red-600 hover:text-red-800" title="Delete" onclick="return confirm('Are you sure?')">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                @endif
                             @endcan
                         </form>
                     </td>
@@ -124,8 +136,4 @@
         {!! $purchaseOrders->withQueryString()->links() !!}
     </div>
 </div>
-@endsection 
-
-
-
-
+@endsection

@@ -150,9 +150,20 @@ public function create(Request $request): View
 
     public function destroy(PurchaseOrder $purchaseOrder): RedirectResponse
     {
-        $purchaseOrder->delete(); // Items will be cascade deleted
-        return redirect()->route('purchase-orders.index')->with('success', 'Purchase Order deleted successfully.');
+        // ✅ Check if this Purchase Order has delivery notes
+        if ($purchaseOrder->deliveryNotes()->exists()) {
+            return redirect()->route('purchase-orders.index')
+                ->withErrors(['error' => 'This Purchase Order is already assigned to a Delivery Note. Please delete the Delivery Note first.']);
+        }
+
+        try {
+            $purchaseOrder->delete(); // cascade deletes items
+            return redirect()->route('purchase-orders.index')->with('success', 'Purchase Order deleted successfully.');
+        } catch (\Exception $e) {
+            return redirect()->route('purchase-orders.index')->withErrors(['error' => 'Failed to delete Purchase Order: ' . $e->getMessage()]);
+        }
     }
+
     public function autoCreateFromDiscrepancy(Request $request): RedirectResponse
 {
     $request->validate([
