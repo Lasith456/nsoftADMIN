@@ -62,7 +62,10 @@ class Invoice extends Model
     {
         return $this->hasMany(Payment::class);
     }
-
+    public function receiveNotes()
+    {
+        return $this->belongsToMany(ReceiveNote::class, 'invoice_receive_note');
+    }
     /**
      * Auto-generate invoice_id like "INV-0001" on create.
      */
@@ -73,9 +76,9 @@ class Invoice extends Model
     static::creating(function ($invoice) {
         // Decide prefix based on type
         $prefix = match ($invoice->invoiceable_type) {
-            \App\Models\Customer::class => 'INV_CUSTOMER',
-            \App\Models\Supplier::class => 'INV_SUPPLIER',
-            \App\Models\Agent::class    => 'INV_AGENT',
+            \App\Models\Customer::class => 'INV_CUS',
+            \App\Models\Supplier::class => 'INV_SUPP',
+            \App\Models\Agent::class    => 'INV_AGEN',
             default                     => 'INV',
         };
 

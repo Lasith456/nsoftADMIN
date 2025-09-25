@@ -60,4 +60,9 @@ class ReceiveNote extends Model
             $receiveNote->receive_note_id = 'RN-' . str_pad($nextNumber, 4, "0", STR_PAD_LEFT);
         });
     }
+
+    public function invoices()
+    {
+        return $this->belongsToMany(Invoice::class, 'invoice_receive_note');
+    }
 }

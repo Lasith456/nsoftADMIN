@@ -24,9 +24,10 @@ class ReceiveNoteController extends Controller
 
     public function index(): View
     {
-        $receiveNotes = ReceiveNote::with('deliveryNotes')->latest()->paginate(10);
+        $receiveNotes = ReceiveNote::with(['deliveryNotes', 'invoices'])->latest()->paginate(10);
         return view('receive_notes.index', compact('receiveNotes'));
     }
+
 
  public function create(Request $request): View
     {
@@ -129,5 +130,35 @@ class ReceiveNoteController extends Controller
 
         return response()->json(['items' => $responseItems]);
     }
+    public function destroy(ReceiveNote $receiveNote): RedirectResponse
+    {
+        try {
+            // Block if invoices exist
+            if ($receiveNote->invoices()->exists()) {
+                return redirect()->route('receive-notes.index')
+                    ->withErrors(['error' => 'Cannot delete: This Receive Note is already linked to an Invoice.']);
+            }
+
+            DB::beginTransaction();
+
+            // Delete related items first
+            $receiveNote->items()->delete();
+
+            // Detach delivery notes
+            $receiveNote->deliveryNotes()->detach();
+
+            // Finally delete receive note
+            $receiveNote->delete();
+
+            DB::commit();
+            return redirect()->route('receive-notes.index')
+                            ->with('success', 'Receive Note deleted successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withErrors(['error' => 'Failed to delete Receive Note: ' . $e->getMessage()]);
+        }
+    }
+
 }
 
