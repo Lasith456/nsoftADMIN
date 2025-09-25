@@ -12,7 +12,7 @@
                 <a class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-xs uppercase font-semibold" href="{{ url()->previous() }}">
                     Back
                 </a>
-                 <a class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-xs uppercase font-semibold" href="{{ route('delivery-notes.index') }}">
+                <a class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-xs uppercase font-semibold" href="{{ route('delivery-notes.index') }}">
                     Back to List
                 </a>
                 <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs uppercase font-semibold">
@@ -38,13 +38,32 @@
                         N/A
                     @endif
                 </p>
-                <p><strong>Vehicle:</strong> {{ $deliveryNote->vehicle->vehicle_no }}</p>
                 <p><strong>Driver:</strong> {{ $deliveryNote->driver_name }} ({{ $deliveryNote->driver_mobile }})</p>
             </div>
             <div>
                 <strong class="font-medium text-gray-900 dark:text-gray-200 text-sm">Delivery Date:</strong>
                 <p class="text-gray-600 dark:text-gray-400 text-sm">{{ $deliveryNote->delivery_date->format('F j, Y') }}</p>
             </div>
+        </div>
+
+        <!-- Assigned Purchase Orders -->
+        <div class="mt-4 mb-6">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Assigned Purchase Orders</h3>
+            @if($deliveryNote->purchaseOrders->count() > 0)
+                <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400">
+                    @foreach($deliveryNote->purchaseOrders as $po)
+                        <li>
+                            <a href="{{ route('purchase-orders.show', $po->id) }}" 
+                               class="text-blue-600 dark:text-blue-400 hover:underline">
+                                {{ $po->po_id }}
+                            </a>
+                            – <span class="text-gray-500 dark:text-gray-400">{{ $po->customer->customer_name ?? 'N/A' }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            @else
+                <p class="text-sm text-gray-500 dark:text-gray-400">No purchase orders assigned.</p>
+            @endif
         </div>
 
         <!-- Items Table -->
@@ -62,7 +81,7 @@
                     @foreach($deliveryNote->items as $item)
                     <tr>
                         <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
-                             @if($item->product)
+                            @if($item->product)
                                 <a href="{{ route('products.show', $item->product->id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">
                                     {{ $item->product_name }}
                                 </a>
@@ -72,10 +91,10 @@
                         </td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $item->quantity_requested }}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                           <p>From Stock: {{ $item->quantity_from_stock }}</p>
-                           @if($item->quantity_from_agent > 0)
-                            <p>From Agent ({{ $item->agent->name ?? 'N/A' }}): {{ $item->quantity_from_agent }}</p>
-                           @endif
+                            <p>From Stock: {{ $item->quantity_from_stock }}</p>
+                            @if($item->quantity_from_agent > 0)
+                                <p>From Agent ({{ $item->agent->name ?? 'N/A' }}): {{ $item->quantity_from_agent }}</p>
+                            @endif
                         </td>
                     </tr>
                     @endforeach
@@ -109,4 +128,3 @@
     }
 </style>
 @endsection
-

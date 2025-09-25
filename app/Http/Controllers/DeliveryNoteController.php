@@ -221,34 +221,41 @@ public function checkStock(Request $request)
         return redirect()->route('delivery-notes.manage')->with('success', 'Delivery Note status updated successfully.');
     }
 
-    public function destroy(DeliveryNote $deliveryNote)
+    public function destroy(DeliveryNote $deliveryNote): RedirectResponse
     {
+        // ✅ Prevent deletion if connected to receive notes
+        if ($deliveryNote->receiveNotes()->exists()) {
+            return redirect()->route('delivery-notes.index')
+                ->withErrors(['error' => 'This Delivery Note is linked to Receive Notes. Please delete the Receive Notes first.']);
+        }
+
         DB::beginTransaction();
         try {
-            // Restore stock for each item in the delivery note
+            // Restore stock for each item
             foreach ($deliveryNote->items as $item) {
                 if ($item->quantity_from_stock > 0) {
                     $product = Product::find($item->product_id);
                     if ($product) {
-                        // Revert the stock deduction
                         $product->increment('clear_stock_quantity', $item->quantity_from_stock);
                     }
                 }
             }
 
-            // Revert the status of associated purchase orders
-            foreach($deliveryNote->purchaseOrders as $po) {
+            // Revert associated POs back to pending
+            foreach ($deliveryNote->purchaseOrders as $po) {
                 $po->update(['status' => 'pending']);
             }
 
             $deliveryNote->delete();
 
             DB::commit();
-            return redirect()->route('delivery-notes.index')->with('success', 'Delivery Note deleted and stock has been reverted.');
+            return redirect()->route('delivery-notes.index')
+                ->with('success', 'Delivery Note deleted and stock has been reverted.');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withErrors(['error' => 'Failed to delete Delivery Note: ' . $e->getMessage()]);
         }
     }
+
 }
 

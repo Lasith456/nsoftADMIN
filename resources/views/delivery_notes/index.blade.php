@@ -18,7 +18,7 @@
         </div>
         <div class="flex items-center space-x-2 mt-3 md:mt-0">
             @can('delivery-note-manage')
-                 <a class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700" href="{{ route('delivery-notes.manage') }}">Manage Statuses</a>
+                <a class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700" href="{{ route('delivery-notes.manage') }}">Manage Statuses</a>
             @endcan
             @can('delivery-note-create')
                 <a class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700" href="{{ route('delivery-notes.create') }}">
@@ -33,6 +33,13 @@
     @if ($message = Session::get('success'))
         <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
             <p>{{ $message }}</p>
+        </div>
+    @endif
+
+    {{-- Error Message --}}
+    @if ($errors->any())
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+            <p>{{ $errors->first() }}</p>
         </div>
     @endif
 
@@ -60,7 +67,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 @forelse ($deliveryNotes as $deliveryNote)
-               <tr>
+                <tr>
                     <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-black">{{ $deliveryNote->delivery_note_id }}</td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $deliveryNote->vehicle->vehicle_no ?? 'N/A' }}</td>
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $deliveryNote->delivery_date->format('Y-m-d') }}</td>
@@ -78,18 +85,31 @@
                         </span>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
-                        <form action="{{ route('delivery-notes.destroy', $deliveryNote->id) }}" method="POST" class="flex justify-end items-center space-x-6">
+                        <div class="flex justify-end items-center space-x-6">
                             <a href="{{ route('delivery-notes.show', $deliveryNote->id) }}" class="text-blue-600 hover:text-blue-800" title="Show">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                             </a>
-                            @csrf
-                            @method('DELETE')
+
                             @can('delivery-note-delete')
-                                <button type="submit" class="text-red-600 hover:text-red-800" title="Delete" onclick="return confirm('Are you sure? This will revert stock and set associated POs back to pending.')">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
+                                @csrf
+                                @method('DELETE')
+
+                                @if($deliveryNote->receiveNotes && $deliveryNote->receiveNotes->count() > 0)
+                                    {{-- Disable delete if linked to receive notes --}}
+                                    <button type="button" class="text-gray-400 cursor-not-allowed" title="Delete Receive Notes first" disabled>
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                @else
+                                    <form action="{{ route('delivery-notes.destroy', $deliveryNote->id) }}" method="POST" onsubmit="return confirm('Are you sure? This will revert stock and set associated POs back to pending.')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-600 hover:text-red-800" title="Delete">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </form>
+                                @endif
                             @endcan
-                        </form>
+                        </div>
                     </td>
                 </tr>
                 @empty
@@ -109,4 +129,3 @@
     </div>
 </div>
 @endsection
-
