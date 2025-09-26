@@ -50,7 +50,12 @@ class DeliveryNote extends Model
     {
         return $this->belongsToMany(ReceiveNote::class, 'delivery_note_receive_note');
     }
-    
+
+    public function getCustomerAttribute()
+    {
+        return $this->purchaseOrders->first()?->customer;
+    }
+
     /**
      * THE FIX IS HERE: This logic is now more robust to prevent duplicate IDs.
      */

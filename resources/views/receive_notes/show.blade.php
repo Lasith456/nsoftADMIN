@@ -31,7 +31,8 @@
                 <strong class="font-medium text-gray-900 dark:text-gray-200 text-sm">Associated Delivery Notes:</strong>
                 <div class="text-gray-600 dark:text-gray-400 text-sm">
                     @forelse($receiveNote->deliveryNotes as $deliveryNote)
-                        <a href="{{ route('delivery-notes.show', $deliveryNote->id) }}" class="text-blue-600 dark:text-blue-400 hover:underline block">
+                        <a href="{{ route('delivery-notes.show', $deliveryNote->id) }}"
+                        class="text-blue-600 dark:text-blue-400 hover:underline block">
                             {{ $deliveryNote->delivery_note_id }}
                         </a>
                     @empty
@@ -44,6 +45,12 @@
                 <p class="text-gray-600 dark:text-gray-400 text-sm">{{ $receiveNote->received_date->format('F j, Y') }}</p>
             </div>
             <div>
+                <strong class="font-medium text-gray-900 dark:text-gray-200 text-sm">Customer:</strong>
+                <p class="text-gray-600 dark:text-gray-400 text-sm">
+                    {{ $receiveNote->deliveryNotes->first()?->purchaseOrders->first()?->customer?->customer_name ?? 'N/A' }}
+                </p>
+            </div>
+            <div>
                 <strong class="font-medium text-gray-900 dark:text-gray-200 text-sm">Status:</strong>
                 <p class="text-sm">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -54,6 +61,7 @@
                 </p>
             </div>
         </div>
+
 
         <!-- Items Table -->
         <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Items Received</h3>

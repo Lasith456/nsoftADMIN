@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ReceiveNote;
 use App\Models\ReceiveNoteItem;
 use App\Models\DeliveryNote;
+use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -29,22 +30,42 @@ class ReceiveNoteController extends Controller
     }
 
 
- public function create(Request $request): View
+    public function create(Request $request): View
     {
-        $query = DeliveryNote::where('status', 'delivered')
-                                ->whereDoesntHave('receiveNotes');
-        
-        // **THE FIX IS HERE**: Add date filtering to the query
-        if ($request->filled('from_date')) {
-            $query->whereDate('delivery_date', '>=', $request->from_date);
-        }
-        if ($request->filled('to_date')) {
-            $query->whereDate('delivery_date', '<=', $request->to_date);
+        $deliveryNotes = collect(); // empty by default
+
+        if ($request->filled('customer_id')) {
+            $query = DeliveryNote::where('status', 'delivered')
+                ->whereDoesntHave('receiveNotes')
+                ->with(['purchaseOrders.customer']);
+
+            // Date filters
+            if ($request->filled('from_date')) {
+                $query->whereDate('delivery_date', '>=', $request->from_date);
+            }
+            if ($request->filled('to_date')) {
+                $query->whereDate('delivery_date', '<=', $request->to_date);
+            }
+
+            // Customer filter
+            $query->whereHas('purchaseOrders', function ($q) use ($request) {
+                $q->where('customer_id', $request->customer_id);
+            });
+
+            $deliveryNotes = $query->latest()->get();
         }
 
-        $deliveryNotes = $query->latest()->get();
-        return view('receive_notes.create', compact('deliveryNotes'));
+        // Always load customers who have eligible delivery notes
+        $customers = Customer::whereHas('purchaseOrders.deliveryNotes', function ($q) {
+            $q->where('status', 'delivered')
+            ->whereDoesntHave('receiveNotes');
+        })->orderBy('customer_name')->get();
+
+        return view('receive_notes.create', compact('deliveryNotes', 'customers'));
     }
+
+
+
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
@@ -102,9 +123,14 @@ class ReceiveNoteController extends Controller
 
     public function show(ReceiveNote $receiveNote): View
     {
-        $receiveNote->load(['deliveryNotes', 'items.product']);
+        $receiveNote->load([
+            'deliveryNotes.purchaseOrders.customer', // ✅ add this
+            'items.product'
+        ]);
+
         return view('receive_notes.show', compact('receiveNote'));
     }
+
 
     public function getItemsForDeliveryNote(Request $request)
     {

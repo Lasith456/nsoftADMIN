@@ -173,6 +173,8 @@
             <div class="lg:col-span-2 flex flex-col space-y-4">
                 <div>
                     <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">1. Select POs & Details</h3>
+                    
+                    <!-- Date Filter -->
                     <form action="{{ route('delivery-notes.create') }}" method="GET" class="mb-2 flex space-x-2">
                         <input type="date" name="from_date" value="{{ request('from_date') }}" class="border rounded-md p-1">
                         <input type="date" name="to_date" value="{{ request('to_date') }}" class="border rounded-md p-1">
@@ -180,6 +182,21 @@
                         <a href="{{ route('delivery-notes.create') }}" class="px-3 py-1 bg-gray-200 rounded-md text-xs">Clear</a>
                     </form>
 
+                    <!-- Customer Filter -->
+                    <form action="{{ route('delivery-notes.create') }}" method="GET" class="mb-2 flex space-x-2">
+                        <input type="hidden" name="from_date" value="{{ request('from_date') }}">
+                        <input type="hidden" name="to_date" value="{{ request('to_date') }}">
+                        <select name="customer_id" class="border rounded-md p-1" onchange="this.form.submit()">
+                            <option value="">Select Customer</option>
+                            @foreach($customers as $customer)
+                                <option value="{{ $customer->id }}" {{ request('customer_id') == $customer->id ? 'selected' : '' }}>
+                                    {{ $customer->customer_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </form>
+
+                    <!-- PO List -->
                     <form id="deliveryForm" x-ref="deliveryForm"
                           action="{{ route('delivery-notes.store') }}"
                           method="POST" class="space-y-4"
@@ -197,7 +214,7 @@
                                     <span class="ml-3 text-sm">{{ $po->po_id }} - {{ $po->customer->customer_name }}</span>
                                 </label>
                             @empty
-                                <p class="text-sm text-gray-500 p-2">No pending purchase orders found.</p>
+                                <p class="text-sm text-gray-500 p-2">No purchase orders found. Select a customer above.</p>
                             @endforelse
                         </div>
 
@@ -278,7 +295,7 @@
                                 </tr>
                             </template>
                             <tr x-show="items.length === 0 && selectedPurchaseOrderIds.length > 0"><td colspan="6" class="text-center py-4 text-sm">Loading items...</td></tr>
-                            <tr x-show="items.length === 0 && selectedPurchaseOrderIds.length === 0"><td colspan="6" class="text-center py-4 text-sm">Select one or more POs to check stock.</td></tr>
+                            <tr x-show="items.length === 0 && selectedPurchaseOrderIds.length === 0"><td colspan="6" class="text-center py-4 text-sm">Select a customer and PO above.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -373,7 +390,11 @@ document.addEventListener('alpine:init', () => {
             }).then(res => res.json()).then(data => {
                 this.stockModalSuccess = data.success;
                 this.stockModalMessage = data.message;
-                if (data.success) this.convert = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', product_name: '', quantity: 1 };
+                if (data.success) {
+                    this.convert = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', product_name: '', quantity: 1 };
+                    this.checkStock(); // ✅ refresh stock
+                    setTimeout(() => { this.stockModalMessage = '' }, 3000); // auto hide
+                }
             });
         },
 
@@ -386,7 +407,11 @@ document.addEventListener('alpine:init', () => {
             }).then(res => res.json()).then(data => {
                 this.stockModalSuccess = data.success;
                 this.stockModalMessage = data.message;
-                if (data.success) this.wastage = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', product_name: '', stock_type: 'clear', quantity: 1, reason: '' };
+                if (data.success) {
+                    this.wastage = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', product_name: '', stock_type: 'clear', quantity: 1, reason: '' };
+                    this.checkStock(); // ✅ refresh stock
+                    setTimeout(() => { this.stockModalMessage = '' }, 3000); // auto hide
+                }
             });
         }
     }));
