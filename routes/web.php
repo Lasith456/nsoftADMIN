@@ -86,8 +86,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('invoices.create');
     Route::get('/invoices/create/agent', [InvoiceController::class, 'createAgentInvoice'])->name('invoices.createAgent');
     Route::post('/invoices/store/agent', [InvoiceController::class, 'storeAgentInvoice'])->name('invoices.storeAgent');
-    Route::get('/invoices/store/customer', [InvoiceController::class, 'createCustomerInvoice'])->name('invoices.createCustomer');
-    Route::post('/invoices/create/customer', [InvoiceController::class, 'storeCustomerInvoice'])->name('invoices.storeCustomer');
+    Route::get('/invoices/create/customer', [InvoiceController::class, 'createCustomerInvoice'])->name('invoices.createCustomer'); // shows the form
+    Route::post('/invoices/store/customer', [InvoiceController::class, 'storeCustomerInvoice'])->name('invoices.storeCustomer'); // handles form submit
     Route::get('/invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print'); 
     Route::get('/invoices/create/supplier', [InvoiceController::class, 'createSupplierInvoice'])->name('invoices.createSupplier');
     Route::post('/invoices/store/supplier', [InvoiceController::class, 'storeSupplierInvoice'])->name('invoices.storeSupplier');
@@ -169,6 +169,13 @@ Route::get('/stock/wastage-report/export-excel', [StockManagementController::cla
 Route::get('/stock/wastage-report/export-pdf', [StockManagementController::class, 'exportWastagePdf'])
     ->name('stock.wastage.export.pdf');
 Route::get('/reports/outstanding-payments', [ReportController::class, 'outstandingPayments'])->name('reports.outstanding');
+
+
+Route::get('/agents/{agent}/outstanding', [AgentController::class, 'outstanding'])
+    ->name('agents.outstanding');
+
+Route::post('/agents/{agent}/outstanding/pay', [AgentController::class, 'payOutstanding'])
+    ->name('agents.outstanding.pay');
 
 });
 

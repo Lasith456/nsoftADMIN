@@ -3,36 +3,50 @@
 @section('content')
 <div class="container mx-auto p-2" x-data="customerInvoiceForm()">
     <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
-        <form id="customer-invoice-form" action="{{ route('invoices.storeCustomer') }}" method="POST">
+        <form id="customer-invoice-form" action="{{ route('invoices.storeCustomer') }}" method="POST" @submit.prevent="handleSubmit">
             @csrf
 
+            <!-- Header -->
             <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Generate Customer Invoice</h2>
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                    Generate Customer Invoice
+                </h2>
                 <div class="flex items-center space-x-2">
-                    <a href="{{ route('invoices.create') }}" 
+                    <a href="{{ route('invoices.index') }}" 
                        class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">
                         Cancel
                     </a>
+
+                    <!-- Blue button (normal) -->
                     <button type="submit" 
-                            class="inline-flex items-center px-4 py-2 bg-blue-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-700"
-                            :disabled="!selectedCustomerId || selectedReceiveNotes.length === 0">
+                            @click="mode = 'invoice'"
+                            class="inline-flex items-center px-4 py-2 bg-blue-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-700">
                         Generate Invoice
                     </button>
+
+                    <!-- Yellow button (only visible if discrepancy error exists) -->
+                    @if(session('html_error'))
+                        <button type="submit" 
+                                @click="mode = 'invoice_po'"
+                                class="inline-flex items-center px-4 py-2 bg-yellow-500 border rounded-md font-semibold text-xs text-white uppercase hover:bg-yellow-600">
+                            Generate Invoice & Create PO
+                        </button>
+                    @endif
                 </div>
             </div>
 
-            {{-- Discrepancy Error --}}
+            <!-- Discrepancy Error -->
             @if(session('html_error'))
-                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 space-y-2" role="alert">
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded" role="alert">
                     {!! session('html_error') !!}
                 </div>
             @endif
 
-            {{-- Standard Errors --}}
+            <!-- Validation Errors (Laravel) -->
             @if ($errors->any())
-                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded" role="alert">
                     <p class="font-bold">Error</p>
-                    <ul class="list-disc pl-5 mt-2">
+                    <ul class="list-disc pl-5 mt-2 space-y-1">
                         @foreach ($errors->all() as $error)
                             <li>{{ $error }}</li>
                         @endforeach
@@ -40,13 +54,21 @@
                 </div>
             @endif
 
+            <!-- Inline Alert (Alpine) -->
+            <div x-show="showAlert" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded">
+                Please select a customer and at least one receive note before proceeding.
+            </div>
+
+            <!-- Form Body -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
                 <!-- Customer Search -->
                 <div>
                     <h3 class="text-lg font-bold mb-2 text-gray-800 dark:text-gray-200">1. Select Customer</h3>
-                    <input type="text" placeholder="Search customer name..." 
+                    <input id="customer-search-input" type="text" placeholder="Search customer name..." 
                            class="mt-1 block w-full border rounded-md dark:bg-gray-900 py-2 px-3"
                            x-model="customerSearch" @input="filterCustomers">
+
                     <ul class="border rounded-md mt-2 max-h-40 overflow-y-auto bg-white dark:bg-gray-800" 
                         x-show="filteredCustomers.length > 0">
                         <template x-for="cust in filteredCustomers" :key="cust.id">
@@ -55,6 +77,8 @@
                                 x-text="`${cust.customer_name} (${cust.customer_id})`"></li>
                         </template>
                     </ul>
+
+                    <!-- Hidden bound field -->
                     <input type="hidden" name="customer_id" :value="selectedCustomerId">
                 </div>
 
@@ -93,14 +117,18 @@
                 </div>
             </div>
 
-            <!-- ✅ Hidden sync field -->
+            <!-- Hidden sync for selected notes -->
             <template x-for="id in selectedReceiveNotes" :key="id">
                 <input type="hidden" name="receive_note_ids[]" :value="id">
             </template>
+
+            <!-- Hidden mode input -->
+            <input type="hidden" name="create_po" :value="mode === 'invoice_po' ? 1 : ''">
         </form>
     </div>
 </div>
 
+<!-- Alpine.js Script -->
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('customerInvoiceForm', () => ({
@@ -112,6 +140,8 @@ document.addEventListener('alpine:init', () => {
         selectedReceiveNotes: [],
         dateFrom: '',
         dateTo: '',
+        showAlert: false,
+        mode: 'invoice',
 
         get availableReceiveNotes() {
             return this.selectedCustomer ? this.selectedCustomer.uninvoiced_receive_notes : [];
@@ -148,6 +178,14 @@ document.addEventListener('alpine:init', () => {
         },
         applyDateFilter() {
             this.selectedReceiveNotes = [];
+        },
+        handleSubmit(e) {
+            if (!this.selectedCustomerId || this.selectedReceiveNotes.length === 0) {
+                this.showAlert = true;
+                return;
+            }
+            this.showAlert = false;
+            e.target.submit();
         }
     }));
 });
