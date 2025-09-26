@@ -3,7 +3,10 @@
 @section('content')
 <div class="container mx-auto p-2" x-data="customerInvoiceForm()">
     <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
-        <form id="customer-invoice-form" action="{{ route('invoices.storeCustomer') }}" method="POST" @submit.prevent="handleSubmit">
+        <form id="customer-invoice-form" 
+              action="{{ route('invoices.storeCustomer') }}" 
+              method="POST" 
+              @submit.prevent="handleSubmit">
             @csrf
 
             <!-- Header -->
@@ -17,14 +20,14 @@
                         Cancel
                     </a>
 
-                    <!-- Blue button (normal) -->
+                    <!-- Blue button -->
                     <button type="submit" 
                             @click="mode = 'invoice'"
                             class="inline-flex items-center px-4 py-2 bg-blue-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-700">
                         Generate Invoice
                     </button>
 
-                    <!-- Yellow button (only visible if discrepancy error exists) -->
+                    <!-- Yellow button -->
                     @if(session('html_error'))
                         <button type="submit" 
                                 @click="mode = 'invoice_po'"
@@ -35,14 +38,12 @@
                 </div>
             </div>
 
-            <!-- Discrepancy Error -->
+            <!-- Errors -->
             @if(session('html_error'))
                 <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded" role="alert">
                     {!! session('html_error') !!}
                 </div>
             @endif
-
-            <!-- Validation Errors (Laravel) -->
             @if ($errors->any())
                 <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded" role="alert">
                     <p class="font-bold">Error</p>
@@ -54,36 +55,31 @@
                 </div>
             @endif
 
-            <!-- Inline Alert (Alpine) -->
-            <div x-show="showAlert" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded">
+            <!-- Inline Alert -->
+            <div x-show="showAlert" 
+                 class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded">
                 Please select a customer and at least one receive note before proceeding.
             </div>
 
             <!-- Form Body -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                <!-- Customer Search -->
+                <!-- Customer Dropdown -->
                 <div>
                     <h3 class="text-lg font-bold mb-2 text-gray-800 dark:text-gray-200">1. Select Customer</h3>
-                    <input id="customer-search-input" type="text" placeholder="Search customer name..." 
-                           class="mt-1 block w-full border rounded-md dark:bg-gray-900 py-2 px-3"
-                           x-model="customerSearch" @input="filterCustomers">
-
-                    <ul class="border rounded-md mt-2 max-h-40 overflow-y-auto bg-white dark:bg-gray-800" 
-                        x-show="filteredCustomers.length > 0">
-                        <template x-for="cust in filteredCustomers" :key="cust.id">
-                            <li @click="selectCustomer(cust)"
-                                class="px-3 py-2 hover:bg-indigo-100 dark:hover:bg-gray-700 cursor-pointer"
-                                x-text="`${cust.customer_name} (${cust.customer_id})`"></li>
+                    <select x-model="selectedCustomerId" @change="setCustomer" 
+                            class="mt-1 block w-full border rounded-md dark:bg-gray-900 py-2 px-3">
+                        <option value="">-- Select Customer --</option>
+                        <template x-for="cust in customers" :key="cust.id">
+                            <option :value="cust.id" 
+                                    x-text="`${cust.customer_name} (${cust.customer_id})`"></option>
                         </template>
-                    </ul>
-
-                    <!-- Hidden bound field -->
+                    </select>
                     <input type="hidden" name="customer_id" :value="selectedCustomerId">
                 </div>
 
                 <!-- Receive Notes -->
-                <div>
+                <div x-show="selectedCustomerId" x-cloak>
                     <h3 class="text-lg font-bold mb-2 text-gray-800 dark:text-gray-200">2. Select Receive Notes</h3>
 
                     <!-- Date Filter -->
@@ -100,7 +96,7 @@
                     </div>
 
                     <!-- Notes List -->
-                    <div x-show="selectedCustomerId" class="space-y-2 max-h-60 overflow-y-auto border rounded-md p-2" x-cloak>
+                    <div class="space-y-2 max-h-60 overflow-y-auto border rounded-md p-2">
                         <template x-if="filteredReceiveNotes.length > 0">
                             <template x-for="rn in filteredReceiveNotes" :key="rn.id">
                                 <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
@@ -133,9 +129,7 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('customerInvoiceForm', () => ({
         customers: @json($customersWithInvoices),
-        filteredCustomers: [],
-        customerSearch: '',
-        selectedCustomerId: null,
+        selectedCustomerId: '',
         selectedCustomer: null,
         selectedReceiveNotes: [],
         dateFrom: '',
@@ -155,18 +149,8 @@ document.addEventListener('alpine:init', () => {
                 return (!from || date >= from) && (!to || date <= to);
             });
         },
-        filterCustomers() {
-            let search = this.customerSearch.toLowerCase();
-            this.filteredCustomers = this.customers.filter(c => 
-                c.customer_name.toLowerCase().includes(search) || 
-                c.customer_id.toLowerCase().includes(search)
-            );
-        },
-        selectCustomer(cust) {
-            this.selectedCustomer = cust;
-            this.selectedCustomerId = cust.id;
-            this.filteredCustomers = [];
-            this.customerSearch = `${cust.customer_name} (${cust.customer_id})`;
+        setCustomer() {
+            this.selectedCustomer = this.customers.find(c => c.id == this.selectedCustomerId) || null;
             this.selectedReceiveNotes = [];
         },
         toggleSelectAll(event) {
