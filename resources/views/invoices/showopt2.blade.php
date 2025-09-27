@@ -20,11 +20,21 @@
 
         {{-- Top bilingual heading --}}
         <div class="text-center" style="margin-bottom:4mm;">
+                <div class="flex justify-end text-[11px] mt-1">
+      <div class="text-right">
+        <div>සම්මත අංකය 92</div>
+        <div>ශ්‍රී ලං.ගු.හ. 892</div>
+        <div>(F4* S.& E.) 1/74</div>
+      </div>
+    </div>
             <div class="fs-12" style="font-weight:700;">ශ්‍රී ලංකා ගුවන් හමුදාව</div>
             <div class="fs-12" style="font-weight:700; text-transform:uppercase;">SRI LANKA AIR FORCE</div>
             <div class="fs-11" style="font-weight:700; margin-top:2mm;">විවිධ ගෙවීම් වවුචරය</div>
             <div class="fs-11" style="font-weight:700; text-transform:uppercase;">MISCELLANEOUS PAYMENT VOUCHER</div>
+            
         </div>
+    <!-- Top Right Numbers -->
+
 
         @php
             $partyLabel = $invoice->invoiceable_type === 'App\\Models\\Customer' ? 'Unit'
@@ -172,6 +182,9 @@
         <div style="margin-top:10mm;" class="fs-8">
             <em>N.B. – Where the amount is on account of a suspended receipt on a List of Differences, the relative Account should be stated</em>
         </div>
+        <div class="mt-4 text-[11px]">
+      H 053409 – 1500 (2019/08) ශ්‍රී ලංකා රජයේ මුද්‍රණ දෙපාර්තමේන්තුව
+    </div>
     </div>
 </div>
 
