@@ -6,40 +6,87 @@
     <div x-show="isStockModalOpen"
          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
          @click.away="isStockModalOpen = false" x-cloak>
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-4xl">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-6xl">
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">Stock Management</h2>
+
             <div x-show="stockModalMessage"
                  class="p-4 mb-4 text-sm rounded-lg"
                  :class="stockModalSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
                  x-text="stockModalMessage"></div>
 
+            <!-- === Products needing conversion only === -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-200 border-b pb-2 mb-2">
+                    PO Products Needing Conversion
+                </h3>
+                <div class="overflow-x-auto max-h-60">
+                    <table class="w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-100 dark:bg-gray-700">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Product</th>
+                                <th class="px-3 py-2 text-right">Clear Stock</th>
+                                <th class="px-3 py-2 text-right">Non-Clear Stock</th>
+                                <th class="px-3 py-2 text-right">Requested</th>
+                                <th class="px-3 py-2 text-right">Shortage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="item in convertibleItems" :key="item.product_id">
+                                <tr>
+                                    <td class="px-3 py-2" x-text="item.product_name"></td>
+                                    <td class="px-3 py-2 text-right" x-text="item.clear_stock"></td>
+                                    <td class="px-3 py-2 text-right" x-text="item.non_clear_stock"></td>
+                                    <td class="px-3 py-2 text-right" x-text="item.requested"></td>
+                                    <td class="px-3 py-2 text-right text-orange-600 font-semibold"
+                                        x-text="item.clear_stock_shortage"></td>
+                                </tr>
+                            </template>
+                            <tr x-show="convertibleItems.length === 0">
+                                <td colspan="5" class="px-3 py-4 text-center text-gray-500">
+                                    No products require conversion.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- === Convert & Wastage Forms === -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <!-- Convert Form -->
+                <!-- Convert Stock Form -->
                 <form @submit.prevent="convertStock" class="space-y-4">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-200 border-b pb-2">Convert Stock</h3>
 
+                    <!-- Department -->
                     <div>
                         <label class="block text-sm font-medium">Department*</label>
-                        <input list="departments-list"
-                               x-model="convert.department_name"
-                               @change="departmentChangedByName('convert')"
-                               placeholder="Type department..."
-                               class="mt-1 block w-full dark:bg-gray-900 border rounded-md py-2 px-3">
+                        <select x-model="convert.selectedDepartment"
+                                @change="updateDepartmentName('convert')"
+                                class="mt-1 block w-full dark:bg-gray-900 border rounded-md py-2 px-3">
+                            <option value="">Select Department</option>
+                            @foreach($departments as $dept)
+                                <option value="{{ $dept->id }}">{{ $dept->name }}</option>
+                            @endforeach
+                        </select>
                         <p x-show="convert.departmentError"
                            class="text-red-600 text-xs mt-1"
                            x-text="convert.departmentError"></p>
                     </div>
 
+                    <!-- Product (✅ show ALL products of department) -->
                     <div>
                         <label class="block text-sm font-medium">Product*</label>
-                        <input list="products-list-modal"
-                               x-model="convert.product_name"
-                               @change="updateSelectedProduct('convert')"
-                               :disabled="!convert.selectedDepartment"
-                               placeholder="Select department first"
-                               class="mt-1 block w-full dark:bg-gray-900 border rounded-md py-2 px-3">
+                        <select x-model="convert.product_id"
+                                class="mt-1 block w-full dark:bg-gray-900 border rounded-md py-2 px-3"
+                                :disabled="!convert.selectedDepartment">
+                            <option value="">Select Product</option>
+                            <template x-for="p in filteredProducts(convert.selectedDepartment)" :key="p.id">
+                                <option :value="p.id" x-text="p.name"></option>
+                            </template>
+                        </select>
                     </div>
 
+                    <!-- Quantity -->
                     <div>
                         <label class="block text-sm font-medium">Quantity to Convert</label>
                         <input type="number"
@@ -61,28 +108,36 @@
                 <form @submit.prevent="logWastage" class="space-y-4">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-200 border-b pb-2">Log Wastage</h3>
 
+                    <!-- Department -->
                     <div>
                         <label class="block text-sm font-medium">Department*</label>
-                        <input list="departments-list"
-                               x-model="wastage.department_name"
-                               @change="departmentChangedByName('wastage')"
-                               placeholder="Type department..."
-                               class="mt-1 block w-full dark:bg-gray-900 border rounded-md py-2 px-3">
+                        <select x-model="wastage.selectedDepartment"
+                                @change="updateDepartmentName('wastage')"
+                                class="mt-1 block w-full dark:bg-gray-900 border rounded-md py-2 px-3">
+                            <option value="">Select Department</option>
+                            @foreach($departments as $dept)
+                                <option value="{{ $dept->id }}">{{ $dept->name }}</option>
+                            @endforeach
+                        </select>
                         <p x-show="wastage.departmentError"
                            class="text-red-600 text-xs mt-1"
                            x-text="wastage.departmentError"></p>
                     </div>
 
+                    <!-- Product -->
                     <div>
                         <label class="block text-sm font-medium">Product*</label>
-                        <input list="products-list-modal"
-                               x-model="wastage.product_name"
-                               @change="updateSelectedProduct('wastage')"
-                               :disabled="!wastage.selectedDepartment"
-                               placeholder="Select department first"
-                               class="mt-1 block w-full dark:bg-gray-900 border rounded-md py-2 px-3">
+                        <select x-model="wastage.product_id"
+                                class="mt-1 block w-full dark:bg-gray-900 border rounded-md py-2 px-3"
+                                :disabled="!wastage.selectedDepartment">
+                            <option value="">Select Product</option>
+                            <template x-for="p in filteredProducts(wastage.selectedDepartment)" :key="p.id">
+                                <option :value="p.id" x-text="p.name"></option>
+                            </template>
+                        </select>
                     </div>
 
+                    <!-- Stock Type -->
                     <div>
                         <label class="block text-sm font-medium">Stock Type</label>
                         <select x-model="wastage.stock_type"
@@ -92,6 +147,7 @@
                         </select>
                     </div>
 
+                    <!-- Quantity -->
                     <div>
                         <label class="block text-sm font-medium">Wastage Quantity</label>
                         <input type="number"
@@ -101,6 +157,7 @@
                                required>
                     </div>
 
+                    <!-- Reason -->
                     <div>
                         <label class="block text-sm font-medium">Reason</label>
                         <input type="text"
@@ -117,6 +174,7 @@
                 </form>
             </div>
 
+            <!-- Close Button -->
             <div class="text-right mt-4">
                 <button type="button"
                         @click="isStockModalOpen = false"
@@ -126,21 +184,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Department list -->
-    <datalist id="departments-list">
-        @foreach($departments as $dept)
-            <option value="{{ $dept->name }}" data-id="{{ $dept->id }}"></option>
-        @endforeach
-    </datalist>
-
-    <!-- Product list -->
-    <datalist id="products-list-modal">
-        <template x-for="product in filteredProducts" :key="product.id">
-            <option :value="product.name" :data-id="product.id"></option>
-        </template>
-    </datalist>
-
     <!-- === Main Delivery Note Form === -->
     <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
         <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
@@ -310,14 +353,23 @@ document.addEventListener('alpine:init', () => {
         products: @json($products),
         selectedPurchaseOrderIds: [],
         items: [],
-        agentSelections: {},
+        agentSelections: {},   // ✅ required
         isStockModalOpen: false,
         stockModalMessage: '',
         stockModalSuccess: false,
 
-        convert: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', product_name: '', quantity: 1 },
-        wastage: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', product_name: '', stock_type: 'clear', quantity: 1, reason: '' },
+        convert: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', quantity: 1 },
+        wastage: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', stock_type: 'clear', quantity: 1, reason: '' },
 
+        // only products needing conversion
+        get convertibleItems() {
+            return this.items.filter(item =>
+                item.clear_stock_shortage > 0 &&
+                item.non_clear_stock >= item.clear_stock_shortage
+            );
+        },
+
+        // used for delivery note create button
         get isStockSufficient() {
             if (this.items.length === 0 && this.selectedPurchaseOrderIds.length > 0) return false;
             if (this.items.length === 0) return false;
@@ -331,36 +383,21 @@ document.addEventListener('alpine:init', () => {
             });
         },
 
-        get filteredProducts() {
-            let dept = this.convert.selectedDepartment || this.wastage.selectedDepartment;
-            if (!dept) return [];
-            return this.products.filter(p => p.department_id == dept);
+        filteredProducts(deptId) {
+            if (!deptId) return [];
+            return this.products.filter(p => p.department_id == deptId);
         },
 
-        departmentChangedByName(formType) {
+        updateDepartmentName(formType) {
             const form = this[formType];
-            const options = document.getElementById('departments-list').options;
-            let deptId = '';
-            for (let i = 0; i < options.length; i++) {
-                if (options[i].value === form.department_name) {
-                    deptId = options[i].dataset.id;
-                    break;
-                }
-            }
-            if (deptId) {
-                form.selectedDepartment = deptId;
+            if (form.selectedDepartment) {
                 form.departmentError = '';
+                form.department_name = this.products.find(
+                    p => p.department_id == form.selectedDepartment
+                )?.department_name || '';
             } else {
-                form.selectedDepartment = '';
-                form.departmentError = 'Department not found';
-                form.department_name = '';
+                form.departmentError = 'Please select a department';
             }
-        },
-
-        updateSelectedProduct(formType) {
-            const form = this[formType];
-            const product = this.filteredProducts.find(p => p.name === form.product_name);
-            form.product_id = product ? product.id : '';
         },
 
         checkStock() {
@@ -372,7 +409,6 @@ document.addEventListener('alpine:init', () => {
                 body: JSON.stringify({ po_ids: this.selectedPurchaseOrderIds })
             }).then(res => res.json()).then(data => { this.items = data.items; });
         },
-
         submitForm() {
             if (!this.isStockSufficient) {
                 alert('Cannot create delivery note. Please resolve shortages.');
@@ -380,7 +416,6 @@ document.addEventListener('alpine:init', () => {
             }
             this.$refs.deliveryForm.submit();
         },
-
         convertStock() {
             this.stockModalMessage = '';
             fetch('{{ route("stock-management.api.convert") }}', {
@@ -391,9 +426,9 @@ document.addEventListener('alpine:init', () => {
                 this.stockModalSuccess = data.success;
                 this.stockModalMessage = data.message;
                 if (data.success) {
-                    this.convert = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', product_name: '', quantity: 1 };
-                    this.checkStock(); // ✅ refresh stock
-                    setTimeout(() => { this.stockModalMessage = '' }, 3000); // auto hide
+                    this.convert = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', quantity: 1 };
+                    this.checkStock();
+                    setTimeout(() => { this.stockModalMessage = '' }, 3000);
                 }
             });
         },
@@ -408,9 +443,9 @@ document.addEventListener('alpine:init', () => {
                 this.stockModalSuccess = data.success;
                 this.stockModalMessage = data.message;
                 if (data.success) {
-                    this.wastage = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', product_name: '', stock_type: 'clear', quantity: 1, reason: '' };
-                    this.checkStock(); // ✅ refresh stock
-                    setTimeout(() => { this.stockModalMessage = '' }, 3000); // auto hide
+                    this.wastage = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', stock_type: 'clear', quantity: 1, reason: '' };
+                    this.checkStock();
+                    setTimeout(() => { this.stockModalMessage = '' }, 3000);
                 }
             });
         }
