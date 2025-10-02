@@ -44,9 +44,10 @@
                                class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md p-1">
                         <input type="date" name="to_date" value="{{ request('to_date') }}"
                                class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md p-1">
-
+                        <button type="submit" class="px-3 py-1 bg-gray-800 text-white rounded-md text-xs">Filter</button>
+                        <a href="{{ route('receive-notes.create') }}" class="px-3 py-1 bg-gray-200 text-black rounded-md text-xs">Clear</a>
                         <select name="customer_id"
-                                class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md p-1"
+                                class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md p-1 w-full"
                                 onchange="this.form.submit()">
                             <option value="">Select Customer</option>
                             @foreach($customers as $customer)
@@ -56,8 +57,7 @@
                             @endforeach
                         </select>
 
-                        <button type="submit" class="px-3 py-1 bg-gray-800 text-white rounded-md text-xs">Filter</button>
-                        <a href="{{ route('receive-notes.create') }}" class="px-3 py-1 bg-gray-200 text-black rounded-md text-xs">Clear</a>
+
                     </form>
 
                     <!-- Delivery Notes -->
@@ -116,7 +116,7 @@
                     <table class="w-full min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0">
                             <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium uppercase">Product</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium uppercase  w-64">Product</th>
                                 <th class="px-4 py-2 text-right text-xs font-medium uppercase">Expected</th>
                                 <th class="px-4 py-2 text-right text-xs font-medium uppercase">Received</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium uppercase">Discrepancy Reason</th>

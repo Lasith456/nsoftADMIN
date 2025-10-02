@@ -16,7 +16,6 @@ class Product extends Model
         'name',
         'appear_name',
         'department_id',
-        'sub_department_id',
         'supplier_id', 
         'is_active',
         'is_vat',
@@ -55,10 +54,6 @@ class Product extends Model
         return $this->belongsTo(Department::class);
     }
 
-    public function subDepartment(): BelongsTo
-    {
-        return $this->belongsTo(SubDepartment::class, 'sub_department_id');
-    }
 
     public function supplier(): BelongsTo
     {

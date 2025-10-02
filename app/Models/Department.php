@@ -12,9 +12,5 @@ class Department extends Model
 
     protected $fillable = ['name'];
 
-    public function subDepartments(): HasMany
-    {
-        return $this->hasMany(SubDepartment::class);
-    }
 }
 

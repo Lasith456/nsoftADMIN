@@ -10,7 +10,6 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\DepartmentController;
-use App\Http\Controllers\SubDepartmentController;
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\GrnController;
@@ -50,7 +49,6 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('vehicles', VehicleController::class);
     Route::resource('agents', AgentController::class);
     Route::resource('departments', DepartmentController::class);
-    Route::resource('subdepartments', SubDepartmentController::class);
     Route::resource('purchase-orders', PurchaseOrderController::class);
     Route::resource('grns', GrnController::class);
     Route::resource('delivery-notes', DeliveryNoteController::class);
@@ -60,7 +58,6 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('company_department_names', CompanyDepartmentNameController::class);
 
     // Dynamic Form Routes
-    Route::post('/products/getSubDepartments', [ProductController::class, 'getSubDepartments'])->name('products.getSubDepartments');
     Route::get('/purchase-orders/get-agents-for-product', [PurchaseOrderController::class, 'getAgentsForProduct'])->name('purchase-orders.getAgentsForProduct');
     Route::post('/delivery-notes/check-stock', [DeliveryNoteController::class, 'checkStock'])->name('delivery-notes.checkStock');
     Route::post('/receive-notes/get-items', [ReceiveNoteController::class, 'getItemsForDeliveryNote'])->name('receive-notes.getItems');
@@ -75,7 +72,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('delivery-notes-manage', [DeliveryNoteController::class, 'manage'])->name('delivery-notes.manage');
     Route::post('delivery-notes/{deliveryNote}/update-status', [DeliveryNoteController::class, 'updateStatus'])->name('delivery-notes.updateStatus');
     Route::post('/departments/api-store', [DepartmentController::class, 'apiStore'])->name('departments.api.store');
-    Route::post('/subdepartments/api-store', [SubDepartmentController::class, 'apiStore'])->name('subdepartments.api.store');
 
     // Stock Management Routes
     Route::get('/stock-management', [StockManagementController::class, 'index'])->name('stock-management.index');

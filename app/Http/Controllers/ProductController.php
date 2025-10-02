@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\Department;
-use App\Models\SubDepartment;
 use Illuminate\Support\Facades\DB;
 use App\Models\Company;
 use App\Models\Supplier;
@@ -27,7 +26,7 @@ class ProductController extends Controller
 
     public function index(Request $request): View
     {
-        $query = Product::with(['department', 'subDepartment', 'supplier']);
+        $query = Product::with(['department', 'supplier']);
 
         // 🔍 Search filter
         if ($request->has('search') && $request->search != '') {
@@ -67,7 +66,6 @@ public function store(Request $request): RedirectResponse
         'name' => 'required|string|max:255',
         'appear_name' => 'required|string|max:255',
         'department_id' => 'required|exists:departments,id',
-        'sub_department_id' => 'required|exists:sub_departments,id',
         'supplier_id' => 'nullable|exists:suppliers,id',
 
         // IMPORTANT: validate type & units together
@@ -97,7 +95,6 @@ public function store(Request $request): RedirectResponse
             'name' => $request->name,
             'appear_name' => $request->appear_name,
             'department_id' => $request->department_id,
-            'sub_department_id' => $request->sub_department_id,
             'supplier_id' => $request->supplier_id,
             'units_per_case' => $unitsPerCase,
             'unit_of_measure' => $request->unit_of_measure,
@@ -139,10 +136,9 @@ public function store(Request $request): RedirectResponse
     public function edit(Product $product): View
     {
         $departments = Department::orderBy('name')->get();
-        $subDepartments = SubDepartment::where('department_id', $product->department_id)->orderBy('name')->get();
         $suppliers = Supplier::orderBy('supplier_name')->get();
          $companies = Company::orderBy('company_name')->get(); 
-        return view('products.edit', compact('product', 'departments', 'subDepartments', 'suppliers', 'companies'));
+        return view('products.edit', compact('product', 'departments', 'suppliers', 'companies'));
     }
 
     public function update(Request $request, Product $product): RedirectResponse
@@ -151,7 +147,6 @@ public function store(Request $request): RedirectResponse
             'name' => 'required|string|max:255',
             'appear_name' => 'required|string|max:255',
             'department_id' => 'required|exists:departments,id',
-            'sub_department_id' => 'required|exists:sub_departments,id',
             'supplier_id' => 'nullable|exists:suppliers,id',
             'units_per_case' => 'integer|min:1',
             'unit_of_measure' => 'required|string|max:255',
@@ -167,7 +162,6 @@ public function store(Request $request): RedirectResponse
                 'name' => $request->name,
                 'appear_name' => $request->appear_name,
                 'department_id' => $request->department_id,
-                'sub_department_id' => $request->sub_department_id,
                 'supplier_id' => $request->supplier_id,
                 'units_per_case' => $request->units_per_case,
                 'unit_of_measure' => $request->unit_of_measure,
@@ -203,9 +197,5 @@ public function store(Request $request): RedirectResponse
                          ->with('success','Product deleted successfully.');
     }
     
-    public function getSubDepartments(Request $request)
-    {
-        $subDepartments = SubDepartment::where('department_id', $request->department_id)->orderBy('name')->get();
-        return response()->json($subDepartments);
-    }
+
 }

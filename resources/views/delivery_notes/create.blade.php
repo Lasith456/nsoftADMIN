@@ -186,7 +186,7 @@
                     <form action="{{ route('delivery-notes.create') }}" method="GET" class="mb-2 flex space-x-2">
                         <input type="hidden" name="from_date" value="{{ request('from_date') }}">
                         <input type="hidden" name="to_date" value="{{ request('to_date') }}">
-                        <select name="customer_id" class="border rounded-md p-1" onchange="this.form.submit()">
+                        <select name="customer_id" class="border rounded-md p-1 w-full" onchange="this.form.submit()">
                             <option value="">Select Customer</option>
                             @foreach($customers as $customer)
                                 <option value="{{ $customer->id }}" {{ request('customer_id') == $customer->id ? 'selected' : '' }}>

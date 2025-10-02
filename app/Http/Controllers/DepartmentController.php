@@ -51,7 +51,6 @@ class DepartmentController extends Controller
     public function show(Department $department): View
     {
         // Load the related sub-departments to display them
-        $department->load('subDepartments');
         return view('departments.show', compact('department'));
     }
 

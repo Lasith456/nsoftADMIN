@@ -19,18 +19,6 @@
                 <p class="text-gray-600 dark:text-gray-400 mt-1">{{ $department->name }}</p>
             </div>
             
-            <div>
-                <strong class="font-medium text-gray-900 dark:text-gray-200">Sub-Departments:</strong>
-                @if($department->subDepartments->isNotEmpty())
-                    <ul class="list-disc pl-5 mt-2 text-gray-600 dark:text-gray-400">
-                        @foreach ($department->subDepartments as $subDepartment)
-                            <li>{{ $subDepartment->name }}</li>
-                        @endforeach
-                    </ul>
-                @else
-                    <p class="text-gray-600 dark:text-gray-400 mt-1">No sub-departments found for this department.</p>
-                @endif
-            </div>
         </div>
     </div>
 </div>
