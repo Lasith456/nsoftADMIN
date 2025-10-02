@@ -40,18 +40,7 @@
                         @endif
                     </p>
                 </div>
-                <div>
-                    <strong class="block text-sm font-medium text-gray-500 dark:text-gray-400">Sub-Department</strong>
-                    <p class="mt-1 text-sm text-gray-900 dark:text-gray-200">
-                        @if ($product->subDepartment)
-                            <a href="{{ route('subdepartments.show', $product->subDepartment->id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">
-                                {{ $product->subDepartment->name }}
-                            </a>
-                        @else
-                            N/A
-                        @endif
-                    </p>
-                </div>
+
             </div>
 
             <!-- Column 2 -->
