@@ -6,7 +6,6 @@ use App\Models\Product;
 use App\Models\Department;
 use Illuminate\Support\Facades\DB;
 use App\Models\Company;
-use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -26,7 +25,7 @@ class ProductController extends Controller
 
     public function index(Request $request): View
     {
-        $query = Product::with(['department', 'supplier']);
+        $query = Product::with(['department']);
 
         // 🔍 Search filter
         if ($request->has('search') && $request->search != '') {
@@ -55,9 +54,8 @@ class ProductController extends Controller
     public function create(): View
     {
         $departments = Department::orderBy('name')->get();
-        $suppliers = Supplier::orderBy('supplier_name')->get();
         $companies = Company::orderBy('company_name')->get();
-        return view('products.create', compact('departments', 'suppliers', 'companies'));
+        return view('products.create', compact('departments', 'companies'));
     }
 
 public function store(Request $request): RedirectResponse
@@ -66,7 +64,6 @@ public function store(Request $request): RedirectResponse
         'name' => 'required|string|max:255',
         'appear_name' => 'required|string|max:255',
         'department_id' => 'required|exists:departments,id',
-        'supplier_id' => 'nullable|exists:suppliers,id',
 
         // IMPORTANT: validate type & units together
         'product_type' => 'required|in:pack,case',
@@ -95,7 +92,6 @@ public function store(Request $request): RedirectResponse
             'name' => $request->name,
             'appear_name' => $request->appear_name,
             'department_id' => $request->department_id,
-            'supplier_id' => $request->supplier_id,
             'units_per_case' => $unitsPerCase,
             'unit_of_measure' => $request->unit_of_measure,
             'reorder_qty' => $request->reorder_qty,
@@ -136,9 +132,8 @@ public function store(Request $request): RedirectResponse
     public function edit(Product $product): View
     {
         $departments = Department::orderBy('name')->get();
-        $suppliers = Supplier::orderBy('supplier_name')->get();
          $companies = Company::orderBy('company_name')->get(); 
-        return view('products.edit', compact('product', 'departments', 'suppliers', 'companies'));
+        return view('products.edit', compact('product', 'departments','companies'));
     }
 
     public function update(Request $request, Product $product): RedirectResponse
@@ -147,7 +142,6 @@ public function store(Request $request): RedirectResponse
             'name' => 'required|string|max:255',
             'appear_name' => 'required|string|max:255',
             'department_id' => 'required|exists:departments,id',
-            'supplier_id' => 'nullable|exists:suppliers,id',
             'units_per_case' => 'integer|min:1',
             'unit_of_measure' => 'required|string|max:255',
             'reorder_qty' => 'required|integer|min:0',
@@ -162,7 +156,6 @@ public function store(Request $request): RedirectResponse
                 'name' => $request->name,
                 'appear_name' => $request->appear_name,
                 'department_id' => $request->department_id,
-                'supplier_id' => $request->supplier_id,
                 'units_per_case' => $request->units_per_case,
                 'unit_of_measure' => $request->unit_of_measure,
                 'reorder_qty' => $request->reorder_qty,

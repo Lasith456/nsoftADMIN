@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="container mx-auto p-2" 
-     x-data="productForm({ product: {{ json_encode($product) }}, departments: {{ json_encode($departments) }}, suppliers: {{ json_encode($suppliers) }} })">
+     x-data="productForm({ product: {{ json_encode($product) }}, departments: {{ json_encode($departments) }} })">
      
     <!-- Add New Modal -->
     <div x-show="isModalOpen" 
@@ -32,8 +32,6 @@
                             class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold">Save</button>
                 </div>
             </form>
-
-            <!-- REMOVED SUBDEPARTMENT FORM -->
         </div>
     </div>
     
@@ -95,23 +93,6 @@
                         </template>
                     </datalist>
                     <input type="hidden" name="department_id" id="department_id" x-model="mainForm.department_id">
-                </div>
-
-                <!-- REMOVED SUBDEPARTMENT FIELD -->
-
-                <!-- Supplier -->
-                <div>
-                    <label for="supplier_name" class="block text-sm font-medium">Supplier</label>
-                    <input list="suppliers-list" id="supplier_name" x-model="mainForm.supplier_name" 
-                           @change="updateSupplierId" 
-                           class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 
-                           rounded-md py-2 px-3">
-                    <datalist id="suppliers-list">
-                        <template x-for="supp in suppliers" :key="supp.id">
-                            <option :value="supp.supplier_name" :data-id="supp.id"></option>
-                        </template>
-                    </datalist>
-                    <input type="hidden" name="supplier_id" id="supplier_id" x-model="mainForm.supplier_id">
                 </div>
 
                 <!-- Product Type -->
@@ -231,15 +212,11 @@
             modalMessage: '',
             modalSuccess: false,
             departments: initialData.departments,
-            suppliers: initialData.suppliers,
             mainForm: {
                 name: initialData.product.name,
                 appear_name: initialData.product.appear_name,
                 department_id: initialData.product.department_id,
                 department_name: '',
-                // REMOVED sub_department_id + sub_department_name
-                supplier_id: initialData.product.supplier_id,
-                supplier_name: '',
                 product_type: initialData.product.units_per_case > 1 ? 'case' : 'pack',
                 units_per_case: initialData.product.units_per_case,
                 unit_of_measure: initialData.product.unit_of_measure,
@@ -249,7 +226,6 @@
                 is_clear: initialData.product.is_clear
             },
             newDepartment: { name: '' },
-            // REMOVED newSubDepartment
 
             init() {
                 this.$watch('mainForm.product_type', (value) => {
@@ -259,10 +235,6 @@
                 if (this.mainForm.department_id) {
                     const dept = this.departments.find(d => d.id == this.mainForm.department_id);
                     if (dept) this.mainForm.department_name = dept.name;
-                }
-                if (this.mainForm.supplier_id) {
-                    const supp = this.suppliers.find(s => s.id == this.mainForm.supplier_id);
-                    if (supp) this.mainForm.supplier_name = supp.supplier_name;
                 }
             },
 
@@ -274,19 +246,12 @@
                 if (type === 'department') {
                     this.modalTitle = 'Add New Department';
                 }
-                // REMOVED subdepartment modal
             },
 
             updateDepartmentId() {
                 const options = document.getElementById('departments-list').options;
                 const selected = Array.from(options).find(opt => opt.value === this.mainForm.department_name);
                 this.mainForm.department_id = selected ? selected.dataset.id : '';
-            },
-            
-            updateSupplierId() {
-                const options = document.getElementById('suppliers-list').options;
-                const selected = Array.from(options).find(opt => opt.value === this.mainForm.supplier_name);
-                this.mainForm.supplier_id = selected ? selected.dataset.id : '';
             },
 
             storeDepartment() {
@@ -309,8 +274,6 @@
                     }
                 });
             }
-
-            // REMOVED fetchSubDepartments + storeSubDepartment
         }));
     });
 </script>

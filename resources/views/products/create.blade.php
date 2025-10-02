@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="container mx-auto" 
-     x-data="productForm({ departments: {{ json_encode($departments) }}, suppliers: {{ json_encode($suppliers) }} })">
+     x-data="productForm({ departments: {{ json_encode($departments) }} })">
      
     <!-- Add New Modal -->
     <div x-show="isModalOpen" 
@@ -102,21 +102,6 @@
                     <input type="hidden" name="department_id" id="department_id" x-model="mainForm.department_id">
                 </div>
 
-                <!-- Supplier -->
-                <div>
-                    <label for="supplier_name" class="block text-sm font-medium">Supplier</label>
-                    <input list="suppliers-list" id="supplier_name" x-model="mainForm.supplier_name" 
-                           @change="updateSupplierId" 
-                           class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 
-                           rounded-md py-2 px-3">
-                    <datalist id="suppliers-list">
-                        @foreach($suppliers as $supplier)
-                            <option value="{{ $supplier->supplier_name }}" data-id="{{ $supplier->id }}"></option>
-                        @endforeach
-                    </datalist>
-                    <input type="hidden" name="supplier_id" id="supplier_id" x-model="mainForm.supplier_id">
-                </div>
-
                 <!-- Product Type -->
                 <div>
                     <label class="block text-sm font-medium">Product Type*</label>
@@ -167,8 +152,19 @@
 
             <!-- Company Wise Prices -->
             @isset($companies)
-            <div class="lg:col-span-3 mt-6">
+            <div class="lg:col-span-3 mt-6" 
+                 x-data="companyPricesHandler({ companies: {{ json_encode($companies) }} })" x-init="init()">
+
                 <h3 class="text-lg font-semibold mb-2">Company Wise Prices</h3>
+
+                <!-- Same Price Checkbox -->
+                <div class="mb-3">
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" x-model="samePriceEnabled" class="h-4 w-4 text-indigo-600 rounded">
+                        <span class="ml-2 text-sm">Use Same Price for All Companies</span>
+                    </label>
+                </div>
+
                 <table class="w-full border border-gray-300 rounded-md">
                     <thead>
                         <tr class="bg-gray-100">
@@ -178,23 +174,25 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($companies as $company)
+                        <template x-for="company in companyPrices" :key="company.id">
                             <tr>
-                                <td class="p-2">{{ $company->company_name }}</td>
+                                <td class="p-2" x-text="company.company_name"></td>
                                 <td class="p-2">
                                     <input type="number" step="0.01"
-                                           name="company_prices[{{ $company->id }}][cost_price]"
+                                           :name="`company_prices[${company.id}][cost_price]`"
                                            class="w-full border rounded-md px-2 py-1"
-                                           value="{{ old('company_prices.' . $company->id . '.cost_price') }}">
+                                           x-model="company.cost_price"
+                                           @input="applySamePrice('cost_price', company.cost_price)">
                                 </td>
                                 <td class="p-2">
                                     <input type="number" step="0.01"
-                                           name="company_prices[{{ $company->id }}][selling_price]"
+                                           :name="`company_prices[${company.id}][selling_price]`"
                                            class="w-full border rounded-md px-2 py-1"
-                                           value="{{ old('company_prices.' . $company->id . '.selling_price') }}">
+                                           x-model="company.selling_price"
+                                           @input="applySamePrice('selling_price', company.selling_price)">
                                 </td>
                             </tr>
-                        @endforeach
+                        </template>
                     </tbody>
                 </table>
             </div>
@@ -228,14 +226,11 @@
             modalMessage: '',
             modalSuccess: false,
             departments: initialData.departments,
-            suppliers: initialData.suppliers,
             mainForm: {
                 name: '{{ old('name') }}',
                 appear_name: '{{ old('appear_name') }}',
                 department_id: '{{ old('department_id') }}',
                 department_name: '',
-                supplier_id: '{{ old('supplier_id') }}',
-                supplier_name: '',
                 product_type: '{{ old('product_type', 'pack') }}',
                 units_per_case: '{{ old('units_per_case', 1) }}',
             },
@@ -249,10 +244,6 @@
                 if (this.mainForm.department_id) {
                     const dept = this.departments.find(d => d.id == this.mainForm.department_id);
                     if (dept) this.mainForm.department_name = dept.name;
-                }
-                if (this.mainForm.supplier_id) {
-                    const supp = this.suppliers.find(s => s.id == this.mainForm.supplier_id);
-                    if (supp) this.mainForm.supplier_name = supp.supplier_name;
                 }
             },
 
@@ -270,12 +261,6 @@
                 const options = document.getElementById('departments-list').options;
                 const selected = Array.from(options).find(opt => opt.value === this.mainForm.department_name);
                 this.mainForm.department_id = selected ? selected.dataset.id : '';
-            },
-            
-            updateSupplierId() {
-                const options = document.getElementById('suppliers-list').options;
-                const selected = Array.from(options).find(opt => opt.value === this.mainForm.supplier_name);
-                this.mainForm.supplier_id = selected ? selected.dataset.id : '';
             },
 
             storeDepartment() {
@@ -297,6 +282,26 @@
                         this.modalSuccess = false;
                     }
                 });
+            }
+        }));
+
+        Alpine.data('companyPricesHandler', (initialData) => ({
+            companyPrices: [],
+            samePriceEnabled: false,
+
+            init() {
+                this.companyPrices = initialData.companies.map(c => ({
+                    id: c.id,
+                    company_name: c.company_name,
+                    cost_price: '',
+                    selling_price: ''
+                }));
+            },
+
+            applySamePrice(field, value) {
+                if (this.samePriceEnabled) {
+                    this.companyPrices.forEach(c => { c[field] = value; });
+                }
             }
         }));
     });
