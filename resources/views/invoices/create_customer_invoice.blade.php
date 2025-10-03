@@ -101,8 +101,14 @@
                             <template x-for="rn in filteredReceiveNotes" :key="rn.id">
                                 <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
                                     <input type="checkbox" :value="rn.id" x-model="selectedReceiveNotes">
-                                    <span class="ml-3 text-sm" 
-                                          x-text="`${rn.receive_note_id} - ${new Date(rn.received_date).toLocaleDateString()}`"></span>
+
+                                    <!-- RN clickable for popup -->
+                                    <span class="ml-3 text-sm text-blue-600 underline cursor-pointer"
+                                          @click.prevent="openRnPopup(rn.id)"
+                                          x-text="`${rn.receive_note_id}`"></span>
+
+                                    <span class="ml-2 text-gray-500 text-xs"
+                                          x-text="new Date(rn.received_date).toLocaleDateString()"></span>
                                 </label>
                             </template>
                         </template>
@@ -122,6 +128,20 @@
             <input type="hidden" name="create_po" :value="mode === 'invoice_po' ? 1 : ''">
         </form>
     </div>
+
+    <!-- Popup Modal with iframe -->
+    <div x-show="isRnPopupOpen" 
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+         @click.away="isRnPopupOpen = false"
+         x-cloak>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-5xl h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-3 border-b dark:border-gray-700">
+                <h2 class="text-lg font-bold text-gray-800 dark:text-gray-200">Receive Note Details</h2>
+                <button @click="isRnPopupOpen = false" class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">&times;</button>
+            </div>
+            <iframe :src="rnPopupUrl" class="flex-1 w-full border-0"></iframe>
+        </div>
+    </div>
 </div>
 
 <!-- Alpine.js Script -->
@@ -136,6 +156,10 @@ document.addEventListener('alpine:init', () => {
         dateTo: '',
         showAlert: false,
         mode: 'invoice',
+
+        // popup state
+        isRnPopupOpen: false,
+        rnPopupUrl: '',
 
         get availableReceiveNotes() {
             return this.selectedCustomer ? this.selectedCustomer.uninvoiced_receive_notes : [];
@@ -170,8 +194,16 @@ document.addEventListener('alpine:init', () => {
             }
             this.showAlert = false;
             e.target.submit();
+        },
+
+        // ✅ show RN full page (with sidebar) inside iframe
+        openRnPopup(rnId) {
+            this.rnPopupUrl = `/receive-notes/${rnId}/popup`; // 👈 clean view without navbar
+            this.isRnPopupOpen = true;
         }
+
     }));
 });
 </script>
+
 @endsection

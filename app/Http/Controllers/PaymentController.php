@@ -124,75 +124,84 @@ public function createBulk(Request $request, Customer $customer = null): View
     /**
      * Store a new bulk payment and distribute it across selected invoices.
      */
-    public function storeBulk(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'customer_id' => 'required|exists:customers,id',
-            'invoice_ids' => 'required|array|min:1',
-            'invoice_ids.*' => 'exists:invoices,id',
-            'amount' => 'required|numeric|min:0.01',
-            'stamp_fee' => 'nullable|numeric|min:0',
-            'payment_date' => 'required|date',
-            'payment_method' => 'required|string',
-            'reference_number' => 'nullable|string',
-        ]);
+public function storeBulk(Request $request): RedirectResponse
+{
+    $request->validate([
+        'customer_id'      => 'required|exists:customers,id',
+        'invoice_ids'      => 'required|array|min:1',
+        'invoice_ids.*'    => 'exists:invoices,id',
+        'amount'           => 'required|numeric|min:0.01',
+        'stamp_fee'        => 'nullable|numeric|min:0',
+        'surcharge_fee'    => 'nullable|numeric|min:0',
+        'payment_date'     => 'required|date',
+        'payment_method'   => 'required|string',
+        'reference_number' => 'nullable|string',
+    ]);
 
-        DB::beginTransaction();
-        try {
-            $amountToDistribute = $request->amount;
-            $stampFee = $request->stamp_fee ?? 0;
+    DB::beginTransaction();
+    try {
+        $stampFee     = $request->stamp_fee ?? 0;
+        $surchargeFee = $request->surcharge_fee ?? 0;
 
-            $batchId = uniqid('BATCH-');
+        // ✅ Only this much goes to invoices
+        $amountToDistribute = $request->amount - ($stampFee + $surchargeFee);
 
-            $invoices = Invoice::where('invoiceable_id', $request->customer_id)
-                ->where('invoiceable_type', Customer::class)
-                ->whereIn('id', $request->invoice_ids)
-                ->whereIn('status', ['unpaid', 'partially-paid'])
-                ->orderBy('created_at', 'asc')
-                ->lockForUpdate()
-                ->get();
+        $batchId = uniqid('BATCH-');
 
-            foreach ($invoices as $invoice) {
-                if ($amountToDistribute <= 0) break;
+        $invoices = Invoice::where('invoiceable_id', $request->customer_id)
+            ->where('invoiceable_type', Customer::class)
+            ->whereIn('id', $request->invoice_ids)
+            ->whereIn('status', ['unpaid', 'partially-paid'])
+            ->orderBy('created_at', 'asc')
+            ->lockForUpdate()
+            ->get();
 
-                $balanceDue = $invoice->total_amount - $invoice->amount_paid;
-                $paymentAmount = min($amountToDistribute, $balanceDue);
+        $firstPayment = true; // ✅ fees will only be saved once
 
-                if ($paymentAmount > 0) {
-                    $invoice->payments()->create([
-                        'payment_date'        => $request->payment_date,
-                        'amount'              => $paymentAmount,
-                        'payment_method'      => $request->payment_method,
-                        'reference_number'    => $request->reference_number,
-                        'notes'               => $validated['notes'] ?? null,
-                        'batch_id'            => $batchId,  // 👈 always set
-                        'bank_id'             => $request->bank_id,
-                        'cheque_number'       => $request->cheque_number,
-                        'cheque_date'         => $request->cheque_date,
-                        'cheque_received_date'=> $request->cheque_received_date,
-                        'batch_id'            => $batchId,
-                    ]);
+        foreach ($invoices as $invoice) {
+            if ($amountToDistribute <= 0) break;
 
-                    $totalPaid = $invoice->payments()->sum('amount');
-                    $invoice->amount_paid = $totalPaid;
+            $balanceDue    = $invoice->total_amount - $invoice->amount_paid;
+            $paymentAmount = min($amountToDistribute, $balanceDue);
 
-                    $invoice->status = abs($invoice->amount_paid - $invoice->total_amount) < 0.01 ? 'paid' : 'partially-paid';
-                    $invoice->save();
+            if ($paymentAmount > 0) {
+                $invoice->payments()->create([
+                    'payment_date'         => $request->payment_date,
+                    'amount'               => $paymentAmount,   // only invoice portion
+                    'payment_method'       => $request->payment_method,
+                    'reference_number'     => $request->reference_number,
+                    'notes'                => $request->notes ?? null,
+                    'batch_id'             => $batchId,
+                    'bank_id'              => $request->bank_id,
+                    'cheque_number'        => $request->cheque_number,
+                    'cheque_date'          => $request->cheque_date,
+                    'cheque_received_date' => $request->cheque_received_date,
+                    'stamp_fee'            => $firstPayment ? $stampFee : 0,
+                    'surcharge_fee'        => $firstPayment ? $surchargeFee : 0,
+                ]);
 
-                    $amountToDistribute -= $paymentAmount;
-                }
+                // Update invoice totals
+                $invoice->amount_paid = $invoice->payments()->sum('amount');
+                $invoice->status      = abs($invoice->amount_paid - $invoice->total_amount) < 0.01
+                                        ? 'paid'
+                                        : 'partially-paid';
+                $invoice->save();
+
+                $amountToDistribute -= $paymentAmount;
+                $firstPayment = false; // ✅ only first payment carries fees
             }
-
-            DB::commit();
-
-            return redirect()->route('payments.receipt', $batchId)
-                ->with('stampFee', $stampFee);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->withInput()->withErrors(['error' => 'An error occurred: ' . $e->getMessage()]);
         }
+
+        DB::commit();
+
+        return redirect()->route('payments.receipt', $batchId);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withInput()->withErrors(['error' => 'An error occurred: ' . $e->getMessage()]);
     }
+}
+
 
 
     // public function showReceipt(string $batchId): View
@@ -234,48 +243,56 @@ public function showReceipt(string $batchId): View
 
     $invoiceable = $payments->first()->invoice->invoiceable;
 
-    $vatTotal = $payments->filter(fn($p) => $p->invoice->is_vat_invoice)->sum('amount');
+    $vatTotal    = $payments->filter(fn($p) => $p->invoice->is_vat_invoice)->sum('amount');
     $nonVatTotal = $payments->filter(fn($p) => !$p->invoice->is_vat_invoice)->sum('amount');
-    $stampFee = session('stampFee', 0);
+
+    // ✅ Now directly from DB
+    $stampFee    = $payments->first()->stamp_fee ?? 0;
+    $surchargeFee = $payments->first()->surcharge_fee ?? 0;
 
     // Supplier Receipt
     if ($invoiceable instanceof \App\Models\Supplier) {
         return view('payments.supplier_receipt', [
-            'payments'    => $payments,
-            'supplier'    => $invoiceable,
-            'batchId'     => $batchId,
-            'vatTotal'    => $vatTotal,
-            'nonVatTotal' => $nonVatTotal,
-            'stampFee'    => $stampFee,
+            'payments'      => $payments,
+            'supplier'      => $invoiceable,
+            'batchId'       => $batchId,
+            'vatTotal'      => $vatTotal,
+            'nonVatTotal'   => $nonVatTotal,
+            'stampFee'      => $stampFee,
+            'surchargeFee'  => $surchargeFee,
         ]);
     }
 
     // Agent Receipt
     if ($invoiceable instanceof \App\Models\Agent) {
         return view('payments.agent_receipt', [
-            'payments'    => $payments,
-            'agent'       => $invoiceable,
-            'batchId'     => $batchId,
-            'vatTotal'    => $vatTotal,
-            'nonVatTotal' => $nonVatTotal,
-            'stampFee'    => $stampFee,
+            'payments'      => $payments,
+            'agent'         => $invoiceable,
+            'batchId'       => $batchId,
+            'vatTotal'      => $vatTotal,
+            'nonVatTotal'   => $nonVatTotal,
+            'stampFee'      => $stampFee,
+            'surchargeFee'  => $surchargeFee,
         ]);
     }
 
     // Customer Receipt (default fallback)
     if ($invoiceable instanceof \App\Models\Customer) {
         return view('payments.receipt', [
-            'payments'    => $payments,
-            'customer'    => $invoiceable,
-            'batchId'     => $batchId,
-            'vatTotal'    => $vatTotal,
-            'nonVatTotal' => $nonVatTotal,
-            'stampFee'    => $stampFee,
+            'payments'      => $payments,
+            'customer'      => $invoiceable,
+            'batchId'       => $batchId,
+            'vatTotal'      => $vatTotal,
+            'nonVatTotal'   => $nonVatTotal,
+            'stampFee'      => $stampFee,
+            'surchargeFee'  => $surchargeFee,
         ]);
     }
 
     abort(404, 'Unsupported receipt type.');
 }
+
+
 
 
     public function history(Customer $customer)
@@ -388,6 +405,8 @@ public function storeBulkAgent(Request $request): RedirectResponse
                     'cheque_number'       => $request->cheque_number,
                     'cheque_date'         => $request->cheque_date,
                     'cheque_received_date'=> $request->cheque_received_date,
+                    'stamp_fee'       => $request->stamp_fee ?? 0,    
+                    'surcharge_fee'   => $request->surcharge_fee ?? 0, 
                 ]);
 
                 $totalPaid = $invoice->payments()->sum('amount');
@@ -488,6 +507,8 @@ public function storeBulkSupplier(Request $request): RedirectResponse
                     'cheque_number'        => $request->cheque_number,
                     'cheque_date'          => $request->cheque_date,
                     'cheque_received_date' => $request->cheque_received_date,
+                    'stamp_fee'       => $request->stamp_fee ?? 0,    
+                    'surcharge_fee'   => $request->surcharge_fee ?? 0, 
                 ]);
 
                 $totalPaid = $invoice->payments()->sum('amount');
@@ -543,6 +564,14 @@ public function supplierPaymentHistory(Supplier $supplier): View
         'supplier' => $supplier,
         'paymentsByBatch' => $paymentsByBatch,
     ]);
+}
+public function customerPayments($customerId): View
+{
+    $customer = \App\Models\Customer::with(['invoices' => function($q) {
+        $q->with('payments')->latest();
+    }])->findOrFail($customerId);
+
+    return view('customers.customer_history', compact('customer'));
 }
 
 }

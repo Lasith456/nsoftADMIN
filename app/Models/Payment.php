@@ -22,6 +22,8 @@ class Payment extends Model
         'cheque_number',
         'cheque_date',
         'cheque_received_date',
+        'stamp_fee',       
+        'surcharge_fee',   
     ];
 
     protected function casts(): array

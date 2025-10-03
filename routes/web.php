@@ -172,6 +172,10 @@ Route::get('/agents/{agent}/outstanding', [AgentController::class, 'outstanding'
 
 Route::post('/agents/{agent}/outstanding/pay', [AgentController::class, 'payOutstanding'])
     ->name('agents.outstanding.pay');
+Route::get('/receive-notes/{id}/popup', [ReceiveNoteController::class, 'popup'])
+    ->name('receive-notes.popup');
+Route::get('payments/customer/{customerId}', [PaymentController::class, 'customerPayments'])
+     ->name('payments.history.customerInvocies');
 
 });
 

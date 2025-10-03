@@ -88,11 +88,19 @@
                                 </a>
                             @endcan
 
-<a href="{{ route('payments.history.customerPayments', $customer->id) }}" 
-   class="text-purple-600 hover:text-purple-800" title="Payment History">
+                            <a href="{{ route('payments.history.customerPayments', $customer->id) }}" 
+                            class="text-purple-600 hover:text-purple-800" title="Payment History">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </a>
+<a href="{{ route('payments.history.customerInvocies', $customer->id) }}" 
+   class="text-orange-600 hover:text-orange-800" title="Invoice History">
+    {{-- Invoice Icon --}}
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+              d="M9 17v-6h13M9 5h13M5 5h.01M5 11h.01M5 17h.01" />
     </svg>
 </a>
 

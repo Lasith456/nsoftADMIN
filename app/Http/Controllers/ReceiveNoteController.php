@@ -130,7 +130,15 @@ class ReceiveNoteController extends Controller
 
         return view('receive_notes.show', compact('receiveNote'));
     }
+// app/Http/Controllers/ReceiveNoteController.php
 
+public function popup($id)
+{
+    $receiveNote = ReceiveNote::with(['items.product', 'deliveryNotes.purchaseOrders.customer'])->findOrFail($id);
+
+    // Return only the partial view (no layouts.app)
+    return view('receive_notes.partials.details', compact('receiveNote'));
+}
 
     public function getItemsForDeliveryNote(Request $request)
     {

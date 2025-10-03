@@ -65,7 +65,10 @@
         <p><strong>VAT Total:</strong> LKR {{ number_format($vatTotal, 2) }}</p>
         <p><strong>Non-VAT Total:</strong> LKR {{ number_format($nonVatTotal, 2) }}</p>
         <p><strong>Stamp Fee:</strong> LKR {{ number_format($stampFee, 2) }}</p>
-        <p class="text-xl font-bold">Grand Total: LKR {{ number_format($vatTotal + $nonVatTotal + $stampFee, 2) }}</p>
+        <p><strong>Surcharge Fee:</strong> LKR {{ number_format($surchargeFee, 2) }}</p>
+        <p class="text-xl font-bold">
+            Grand Total: LKR {{ number_format($vatTotal + $nonVatTotal + $stampFee + $surchargeFee, 2) }}
+        </p>
     </div>
 
     {{-- Footer + Print --}}

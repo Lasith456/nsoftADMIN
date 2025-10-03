@@ -109,6 +109,13 @@
                                class="mt-1 block w-full dark:bg-gray-900 text-lg rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600">
                     </div>
 
+                    {{-- Surcharge Fee --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Surcharge Fee</label>
+                        <input type="number" step="0.01" name="surcharge_fee" x-model.number="surchargeFee" placeholder="0.00"
+                               class="mt-1 block w-full dark:bg-gray-900 text-lg rounded-md py-2 px-3 border border-gray-300 dark:border-gray-600">
+                    </div>
+
                     <div class="pt-6 text-sm col-span-2">
                         <div class="flex justify-between">
                             <span class="text-gray-500 dark:text-gray-400">Total Selected:</span>
@@ -117,6 +124,10 @@
                         <div class="flex justify-between">
                             <span class="text-gray-500 dark:text-gray-400">Stamp Fee:</span>
                             <span class="font-semibold" x-text="formatCurrency(stampFee || 0)"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Surcharge Fee:</span>
+                            <span class="font-semibold" x-text="formatCurrency(surchargeFee || 0)"></span>
                         </div>
                         <div class="flex justify-between font-bold text-blue-600">
                             <span>Grand Total:</span>
@@ -164,6 +175,7 @@ document.addEventListener('alpine:init', () => {
         selectedInvoiceIds: [],
         amountPaid: '',
         stampFee: 0,
+        surchargeFee: 0, // NEW FIELD
         paymentMethod: '',
 
         init() {
@@ -197,7 +209,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         get grandTotal() {
-            return (parseFloat(this.amountPaid) || 0) + (parseFloat(this.stampFee) || 0);
+            // Total Selected - (Stamp Fee + Surcharge Fee)
+            return (parseFloat(this.totalSelectedForPayment) || 0) 
+                   - ((parseFloat(this.stampFee) || 0) + (parseFloat(this.surchargeFee) || 0));
         },
 
         isFormValid() {
