@@ -60,8 +60,8 @@
                         <li><a href="{{ route('purchase-orders.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">All Purchase Orders</a></li>
                         <li><a href="{{ route('delivery-notes.create') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Delivery Notes Add</a></li>
                         <li><a href="{{ route('delivery-notes.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">All Delivery Notes</a></li>
-                        <li><a href="{{ route('receive-notes.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">All Receive Notes</a></li>
                         <li><a href="{{ route('receive-notes.create') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Create Receive Note</a></li>
+                        <li><a href="{{ route('receive-notes.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">All Receive Notes</a></li>
                     </ul>
                 </li>
 

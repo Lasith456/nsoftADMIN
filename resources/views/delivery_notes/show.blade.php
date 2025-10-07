@@ -2,37 +2,46 @@
 
 @section('content')
 <div class="container mx-auto">
-    <div id="delivery-note-details" class="bg-white dark:bg-gray-800 shadow-md rounded-lg max-w-4xl mx-auto p-4">
-        <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700 print:hidden">
-            <div>
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Delivery Note Details</h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400">{{ $deliveryNote->delivery_note_id }}</p>
-            </div>
+    <div id="delivery-note-details" class="bg-white shadow-lg rounded-lg max-w-5xl mx-auto p-10 border border-gray-400">
+
+        {{-- Header & Action Buttons --}}
+        <div class="flex justify-between items-center mb-6 print:hidden">
+            <h2 class="text-3xl font-bold text-gray-800">Delivery Note Details</h2>
             <div class="flex items-center space-x-2">
-                <a class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-xs uppercase font-semibold" href="{{ url()->previous() }}">
+                <a href="{{ url()->previous() }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 border border-transparent rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase tracking-widest hover:bg-gray-300 dark:hover:bg-gray-600">
                     Back
                 </a>
-                <a class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-xs uppercase font-semibold" href="{{ route('delivery-notes.index') }}">
+                <a href="{{ route('delivery-notes.index') }}"
+                   class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md text-xs uppercase font-semibold">
                     Back to List
                 </a>
-                <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs uppercase font-semibold">
+                <button onclick="window.print()"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold hover:bg-blue-700">
                     Print
                 </button>
             </div>
         </div>
 
-        <!-- Main Details -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4 pb-4 border-b dark:border-gray-700">
+        {{-- Company Letterhead --}}
+        <div class="text-center border-b border-gray-700 pb-4 mb-6">
+            <h2 class="text-2xl font-extrabold uppercase">H.G.P.M. (PVT) Ltd.</h2>
+            <p class="text-sm">No: 412/B, Galle Road, Pamburana, Matara.</p>
+            <p class="text-sm">Tel: 041 2229231, 041 2224121 | Fax: 041 2224122 | Email: hgpm.ltd@sltnet.lk</p>
+        </div>
+
+        {{-- Delivery Note Meta Details --}}
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 pb-4 border-b border-gray-300">
             <div>
-                <strong class="font-medium text-gray-900 dark:text-gray-200 text-sm">DN ID:</strong>
-                <p class="text-gray-600 dark:text-gray-400 text-sm">{{ $deliveryNote->delivery_note_id }}</p>
+                <p><strong>Delivery Note No:</strong> {{ $deliveryNote->delivery_note_id }}</p>
+                <p><strong>Delivery Date:</strong> {{ $deliveryNote->delivery_date->format('d/m/Y') }}</p>
             </div>
             <div>
-                <strong class="font-medium text-gray-900 dark:text-gray-200 text-sm">Vehicle:</strong>
-                <p class="text-gray-600 dark:text-gray-400 text-sm">
+                <p>
+                    <strong>Vehicle:</strong>
                     @if($deliveryNote->vehicle)
-                        <a href="{{ route('vehicles.show', $deliveryNote->vehicle->id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">
-                            {{ $deliveryNote->vehicle->vehicle_no }}
+                        <a href="{{ route('vehicles.show', $deliveryNote->vehicle->id) }}"
+                           class="text-blue-600 hover:underline font-medium">
+                           {{ $deliveryNote->vehicle->vehicle_no }}
                         </a>
                     @else
                         N/A
@@ -41,90 +50,138 @@
                 <p><strong>Driver:</strong> {{ $deliveryNote->driver_name }} ({{ $deliveryNote->driver_mobile }})</p>
             </div>
             <div>
-                <strong class="font-medium text-gray-900 dark:text-gray-200 text-sm">Delivery Date:</strong>
-                <p class="text-gray-600 dark:text-gray-400 text-sm">{{ $deliveryNote->delivery_date->format('F j, Y') }}</p>
+                <strong>Status:</strong>
+                <span class="px-2 inline-flex text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                    {{ ucfirst($deliveryNote->status ?? 'Pending') }}
+                </span>
             </div>
         </div>
 
-        <!-- Assigned Purchase Orders -->
+        {{-- Assigned Purchase Orders --}}
         <div class="mt-4 mb-6">
-            <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Assigned Purchase Orders</h3>
+            <h3 class="text-lg font-bold text-gray-800 mb-2">Assigned Purchase Orders</h3>
             @if($deliveryNote->purchaseOrders->count() > 0)
-                <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400">
+                <ul class="list-disc list-inside text-sm text-gray-700">
                     @foreach($deliveryNote->purchaseOrders as $po)
                         <li>
-                            <a href="{{ route('purchase-orders.show', $po->id) }}" 
-                               class="text-blue-600 dark:text-blue-400 hover:underline">
+                            <a href="{{ route('purchase-orders.show', $po->id) }}"
+                               class="text-blue-600 hover:underline font-medium">
                                 {{ $po->po_id }}
                             </a>
-                            – <span class="text-gray-500 dark:text-gray-400">{{ $po->customer->customer_name ?? 'N/A' }}</span>
+                            – 
+                            @if($po->customer)
+                                <a href="{{ route('customers.show', $po->customer->id) }}"
+                                   class="text-blue-600 hover:underline font-medium">
+                                   {{ $po->customer->customer_name }}
+                                </a>
+                            @else
+                                <span class="text-gray-500">N/A</span>
+                            @endif
                         </li>
                     @endforeach
                 </ul>
             @else
-                <p class="text-sm text-gray-500 dark:text-gray-400">No purchase orders assigned.</p>
+                <p class="text-sm text-gray-500">No purchase orders assigned.</p>
             @endif
         </div>
 
-        <!-- Items Table -->
-        <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Items for Delivery</h3>
-        <div class="overflow-x-auto">
-            <table class="w-full min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
+        {{-- Items Table --}}
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Items for Delivery</h3>
+        <table class="w-full border border-gray-700 text-sm mb-8">
+            <thead class="bg-gray-200">
+                <tr>
+                    <th class="border px-2 py-1 text-left">Product Description</th>
+                    <th class="border px-2 py-1 text-right">Total Qty</th>
+                    <th class="border px-2 py-1 text-left">Source</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($deliveryNote->items as $item)
                     <tr>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Product</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Total Qty</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Source</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    @foreach($deliveryNote->items as $item)
-                    <tr>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
+                        <td class="border px-2 py-1">
                             @if($item->product)
-                                <a href="{{ route('products.show', $item->product->id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">
-                                    {{ $item->product_name }}
+                                <a href="{{ route('products.show', $item->product->id) }}"
+                                   class="text-blue-600 hover:underline font-medium">
+                                   {{ $item->product_name }}
                                 </a>
                             @else
                                 {{ $item->product_name }}
                             @endif
                         </td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $item->quantity_requested }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <td class="border px-2 py-1 text-right">{{ $item->quantity_requested }}</td>
+                        <td class="border px-2 py-1">
                             <p>From Stock: {{ $item->quantity_from_stock }}</p>
                             @if($item->quantity_from_agent > 0)
-                                <p>From Agent ({{ $item->agent->name ?? 'N/A' }}): {{ $item->quantity_from_agent }}</p>
+                                <p>
+                                    From Agent 
+                                    (<a href="{{ route('agents.show', $item->agent->id ?? '#') }}"
+                                       class="text-blue-600 hover:underline">
+                                       {{ $item->agent->name ?? 'N/A' }}
+                                    </a>): 
+                                    {{ $item->quantity_from_agent }}
+                                </p>
                             @endif
                         </td>
                     </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                @endforeach
+            </tbody>
+        </table>
+
+        {{-- Certification --}}
+        <div class="mt-8 text-sm">
+            <p>
+                Certified that the above items have been verified and dispatched according to company 
+                procedures and approved purchase orders.
+            </p>
+        </div>
+
+        {{-- Signature Section --}}
+        <div class="grid grid-cols-2 gap-10 mt-16 text-sm">
+            <div>
+                <p>Dispatched by:</p>
+                <div class="mt-12 border-t border-gray-600 w-64"></div>
+                <p class="mt-2">Name:</p>
+                <p>Designation:</p>
+            </div>
+            <div class="text-right">
+                <p>For and on behalf of</p>
+                <p class="font-bold">H.G.P.M. (PVT) Ltd.</p>
+                <div class="mt-12 border-t border-gray-600 w-64 ml-auto"></div>
+                <p class="mt-2">Date: {{ now()->format('d/m/Y') }}</p>
+            </div>
         </div>
     </div>
 </div>
 
+{{-- PRINT STYLING --}}
 <style>
     @media print {
-        body * {
-            visibility: hidden;
+        @page {
+            margin: 20mm;
+            size: A4 portrait;
+
+            /* 🔥 Hide browser title & footer URL */
+            @top-left, @top-center, @top-right,
+            @bottom-left, @bottom-center, @bottom-right {
+                content: none;
+            }
         }
-        #delivery-note-details, #delivery-note-details * {
-            visibility: visible;
-        }
+
+        /* Only print the delivery note area */
+        body * { visibility: hidden !important; }
+        #delivery-note-details, #delivery-note-details * { visibility: visible !important; }
+
         #delivery-note-details {
             position: absolute;
-            left: 0;
-            top: 0;
+            left: 0; top: 0;
             width: 100%;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             border: none;
             box-shadow: none;
         }
-        .print\:hidden {
-            display: none !important;
-        }
+
+        .print\:hidden { display: none !important; }
     }
 </style>
 @endsection

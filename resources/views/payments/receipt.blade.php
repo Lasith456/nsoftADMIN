@@ -1,92 +1,164 @@
 @extends('layouts.app')
 
 @section('content')
-<div id="receipt" class="bg-white shadow-lg rounded-lg p-8 max-w-4xl mx-auto border border-gray-300">
-    {{-- Header --}}
-    <div class="flex justify-between items-center border-b pb-4 mb-6">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-800">H.G.P.M. (PVT) Ltd.</h1>
-            <p class="text-sm text-gray-600">No: 412/B, Galle Road, Pamburana, Matara.</p>
-            <p class="text-sm text-gray-600">Tel: 041 2229231, 041 2224121 | Fax: 041 2224122 | Email: hgpm.ltd@sltnet.lk</p>
-        </div>
-        <div class="text-right">
-            <h2 class="text-xl font-bold text-gray-700">PAYMENT RECEIPT</h2>
-            <p class="text-gray-500">Receipt #: <span class="font-semibold">{{ $batchId }}</span></p>
-            <p class="text-gray-500">Date: <span class="font-semibold">{{ $payments->first()->payment_date->format('Y-m-d') }}</span></p>
-        </div>
-    </div>
+<div class="container mx-auto">
+    <div id="receipt" class="bg-white shadow-lg rounded-lg max-w-5xl mx-auto p-8 border border-gray-400 text-[13px]">
 
-    {{-- Customer + Payment Details --}}
-    <div class="grid grid-cols-2 gap-6 mb-6">
-        <div>
-            <h3 class="font-bold text-gray-700 mb-2">Customer Details</h3>
-            <p><strong>Name:</strong> {{ $customer->customer_name }}</p>
+        {{-- Header & Print Button --}}
+        <div class="flex justify-between items-center mb-4 print:hidden">
+            <h2 class="text-2xl font-bold text-gray-800">Payment Receipt</h2>
+            <button onclick="window.print()" 
+                    class="px-3 py-1.5 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold hover:bg-blue-700">
+                Print
+            </button>
         </div>
-        <div>
-            <h3 class="font-bold text-gray-700 mb-2">Payment Info</h3>
-            <p><strong>Method:</strong> {{ $payments->first()->payment_method }}</p>
-            <p><strong>Reference:</strong> {{ $payments->first()->reference_number }}</p>
-        </div>
-    </div>
 
-    @if($payments->first()->payment_method === 'Cheque')
-        <div class="mb-6">
-            <h3 class="font-bold text-gray-700 mb-2">Cheque Details</h3>
-            <p><strong>Bank:</strong> {{ $payments->first()->bank?->name }}</p>
-            <p><strong>Cheque Number:</strong> {{ $payments->first()->cheque_number }}</p>
-            <p><strong>Cheque Date:</strong> {{ optional($payments->first()->cheque_date)->format('Y-m-d') }}</p>
-            <p><strong>Received Date:</strong> {{ optional($payments->first()->cheque_received_date)->format('Y-m-d') }}</p>
+        {{-- Company Letterhead --}}
+        <div class="text-center border-b border-gray-700 pb-3 mb-4">
+            <!-- <img src="{{ asset('images/logo.png') }}" alt="Company Logo" class="h-14 w-auto mx-auto mb-2"> -->
+            <h2 class="text-xl font-extrabold uppercase tracking-wide">H.G.P.M. (PVT) Ltd.</h2>
+            <p class="text-xs">No: 412/B, Galle Road, Pamburana, Matara.</p>
+            <p class="text-xs">Tel: 041 2229231, 041 2224121 | Fax: 041 2224122 | Email: hgpm.ltd@sltnet.lk</p>
         </div>
-    @endif
 
-    {{-- Invoice Breakdown --}}
-    <h3 class="font-bold text-gray-700 mb-2">Invoices Paid</h3>
-    <table class="w-full border border-gray-300 mb-6">
-        <thead class="bg-gray-100">
-            <tr>
-                <th class="border p-2 text-left">Invoice ID</th>
-                <th class="border p-2 text-right">Amount Paid</th>
-                <th class="border p-2 text-center">Type</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($payments as $payment)
+        {{-- Receipt Info --}}
+        <div class="flex justify-between items-start mb-4 border-b border-gray-300 pb-2">
+            <div>
+                <h3 class="font-semibold text-gray-800">Receipt #: {{ $batchId }}</h3>
+                <p class="text-xs text-gray-600">Date: {{ $payments->first()->payment_date->format('d/m/Y') }}</p>
+            </div>
+            <div class="text-right">
+                <h3 class="text-lg font-semibold text-gray-700">PAYMENT RECEIPT</h3>
+            </div>
+        </div>
+
+        {{-- Compact Details Row --}}
+        <div class="grid grid-cols-3 gap-4 mb-4">
+            {{-- Customer Details --}}
+            <div>
+                <h3 class="font-bold text-gray-700 mb-1 text-sm border-b border-gray-200 pb-1">Customer Details</h3>
+                <p><strong>Name:</strong> 
+                    <a href="{{ route('customers.show', $customer->id) }}" 
+                       class="text-blue-600 hover:underline">
+                       {{ $customer->customer_name }}
+                    </a>
+                </p>
+            </div>
+
+            {{-- Payment Information --}}
+            <div>
+                <h3 class="font-bold text-gray-700 mb-1 text-sm border-b border-gray-200 pb-1">Payment Information</h3>
+                <p><strong>Method:</strong> {{ $payments->first()->payment_method }}</p>
+                <p><strong>Reference:</strong> {{ $payments->first()->reference_number }}</p>
+            </div>
+
+            {{-- Cheque Details (if applicable) --}}
+            @if($payments->first()->payment_method === 'Cheque')
+            <div>
+                <h3 class="font-bold text-gray-700 mb-1 text-sm border-b border-gray-200 pb-1">Cheque Details</h3>
+                <p><strong>Bank:</strong> {{ $payments->first()->bank?->name ?? 'N/A' }}</p>
+                <p><strong>Cheque No:</strong> {{ $payments->first()->cheque_number ?? 'N/A' }}</p>
+                <p><strong>Cheque Date:</strong> {{ optional($payments->first()->cheque_date)->format('d/m/Y') ?? 'N/A' }}</p>
+            </div>
+            @endif
+        </div>
+
+        {{-- Invoice Breakdown --}}
+        <h3 class="text-sm font-bold text-gray-800 mb-2">Invoices Paid</h3>
+        <table class="w-full border border-gray-700 text-xs mb-4">
+            <thead class="bg-gray-200">
                 <tr>
-                    <td class="border p-2">{{ $payment->invoice->invoice_id }}</td>
-                    <td class="border p-2 text-right">LKR {{ number_format($payment->amount, 2) }}</td>
-                    <td class="border p-2 text-center">{{ $payment->invoice->is_vat_invoice ? 'VAT' : 'Non-VAT' }}</td>
+                    <th class="border px-2 py-1 text-left">Invoice ID</th>
+                    <th class="border px-2 py-1 text-right">Amount Paid (LKR)</th>
+                    <th class="border px-2 py-1 text-center">Type</th>
                 </tr>
-            @endforeach
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach($payments as $payment)
+                    <tr>
+                        <td class="border px-2 py-1">
+                            <a href="{{ route('invoices.show', $payment->invoice->id) }}" 
+                               class="text-blue-600 hover:underline">
+                               {{ $payment->invoice->invoice_id }}
+                            </a>
+                        </td>
+                        <td class="border px-2 py-1 text-right">{{ number_format($payment->amount, 2) }}</td>
+                        <td class="border px-2 py-1 text-center">{{ $payment->invoice->is_vat_invoice ? 'VAT' : 'Non-VAT' }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
 
-    {{-- Totals --}}
-    <div class="text-right mb-6">
-        <p><strong>VAT Total:</strong> LKR {{ number_format($vatTotal, 2) }}</p>
-        <p><strong>Non-VAT Total:</strong> LKR {{ number_format($nonVatTotal, 2) }}</p>
-        <p><strong>Stamp Fee:</strong> LKR {{ number_format($stampFee, 2) }}</p>
-        <p><strong>Surcharge Fee:</strong> LKR {{ number_format($surchargeFee, 2) }}</p>
-        <p class="text-xl font-bold">
-            Grand Total: LKR {{ number_format($vatTotal + $nonVatTotal + $stampFee + $surchargeFee, 2) }}
-        </p>
-    </div>
+        {{-- Totals Section --}}
+        <div class="flex justify-end mb-6">
+            <div class="w-full max-w-xs text-xs space-y-1">
+                <div class="flex justify-between text-gray-600">
+                    <span>VAT Total:</span>
+                    <span>LKR {{ number_format($vatTotal, 2) }}</span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                    <span>Non-VAT Total:</span>
+                    <span>LKR {{ number_format($nonVatTotal, 2) }}</span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                    <span>Stamp Fee:</span>
+                    <span>LKR {{ number_format($stampFee, 2) }}</span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                    <span>Surcharge Fee:</span>
+                    <span>LKR {{ number_format($surchargeFee, 2) }}</span>
+                </div>
+                <div class="flex justify-between font-semibold text-gray-800 border-t pt-1">
+                    <span>Grand Total:</span>
+                    <span>LKR {{ number_format($vatTotal + $nonVatTotal + $stampFee + $surchargeFee, 2) }}</span>
+                </div>
+            </div>
+        </div>
 
-    {{-- Footer + Print --}}
-    <div class="flex justify-between items-center border-t pt-4">
-        <p class="text-sm text-gray-500">Thank you for your payment.</p>
-        <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 print:hidden">
-            Print Invoice
-        </button>
+        {{-- Certification --}}
+        <div class="mt-4 text-xs text-gray-700">
+            <p>
+                Certified that the above payment has been received in full and accurately recorded.
+                Thank you for your continued business with H.G.P.M. (PVT) Ltd.
+            </p>
+        </div>
+
+        {{-- Signature Section --}}
+        <div class="grid grid-cols-2 gap-8 mt-12 text-xs">
+            <div>
+                <p>Received by:</p>
+                <div class="mt-8 border-t border-gray-600 w-52"></div>
+                <p class="mt-1">Name:</p>
+                <p>Designation:</p>
+            </div>
+            <div class="text-right">
+                <p>For and on behalf of</p>
+                <p class="font-bold">H.G.P.M. (PVT) Ltd.</p>
+                <div class="mt-8 border-t border-gray-600 w-52 ml-auto"></div>
+                <p class="mt-1">Date: {{ now()->format('d/m/Y') }}</p>
+            </div>
+        </div>
     </div>
 </div>
 
-{{-- Print-only style --}}
+{{-- Print Styling --}}
 <style>
-@media print {
-    body * { visibility: hidden; }
-    #receipt, #receipt * { visibility: visible; }
-    #receipt { position: absolute; left: 0; top: 0; width: 100%; }
-    .print\:hidden { display: none !important; }
-}
+    @media print {
+        @page {
+            margin: 15mm;
+            size: A4 portrait;
+            @top-left, @top-center, @top-right,
+            @bottom-left, @bottom-center, @bottom-right { content: none; }
+        }
+        body * { visibility: hidden !important; }
+        #receipt, #receipt * { visibility: visible !important; }
+        #receipt {
+            position: absolute; left: 0; top: 0;
+            width: 100%; margin: 0; padding: 0;
+            border: none; box-shadow: none;
+            font-size: 11px !important;
+        }
+        .print\:hidden { display: none !important; }
+    }
 </style>
 @endsection
