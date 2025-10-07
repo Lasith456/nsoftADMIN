@@ -43,6 +43,7 @@ public function create(Request $request): View
           ->whereDoesntHave('deliveryNotes');
     })->with('company:id,company_name')->orderBy('customer_name')->get();
 
+    // Pending POs not yet delivered
     $query = PurchaseOrder::where('status', 'pending')
         ->whereDoesntHave('deliveryNotes')
         ->with('customer')
@@ -59,13 +60,26 @@ public function create(Request $request): View
     if ($request->filled('customer_id')) {
         $query->where('customer_id', $request->customer_id);
     } else {
-        $query->whereRaw('0=1'); // Only show POs after a customer is chosen
+        $query->whereRaw('0=1'); // Only show after selecting a customer
     }
 
     $purchaseOrders = $query->latest()->get();
     $vehicles = Vehicle::where('is_active', true)->orderBy('vehicle_no')->get();
-    $products = Product::where('is_active', true)->orderBy('name')->get();
     $departments = Department::orderBy('name')->get();
+
+    // ✅ Include department info for all products
+$products = Product::where('is_active', true)
+    ->with('department:id,name')
+    ->orderBy('name')
+    ->get()
+    ->map(function ($product) {
+        return [
+            'id' => $product->id,
+            'name' => $product->name,
+            'department_id' => $product->department_id,
+            'department_name' => $product->department->name ?? 'N/A',
+        ];
+    });
 
     return view('delivery_notes.create', compact(
         'purchaseOrders',
@@ -76,6 +90,7 @@ public function create(Request $request): View
         'companies'
     ));
 }
+
 
 
 
@@ -178,7 +193,7 @@ public function checkStock(Request $request)
     }
 
     $items = PurchaseOrderItem::whereIn('purchase_order_id', $po_ids)
-        ->with('product')
+        ->with(['product.department']) // ✅ Added department relationship
         ->select('product_id', DB::raw('SUM(quantity) as total_quantity'))
         ->groupBy('product_id')
         ->get();
@@ -212,6 +227,7 @@ public function checkStock(Request $request)
         $response[] = [
             'product_id' => $product->id,
             'product_name' => $product->name,
+            'department_name' => $product->department->name ?? 'N/A', // ✅ Added department name safely
             'requested' => $item->total_quantity,
             'clear_stock' => $product->clear_stock_quantity,
             'non_clear_stock' => $product->non_clear_stock_quantity,
@@ -222,6 +238,7 @@ public function checkStock(Request $request)
 
     return response()->json(['items' => $response]);
 }
+
 
     public function show(DeliveryNote $deliveryNote)
     {
