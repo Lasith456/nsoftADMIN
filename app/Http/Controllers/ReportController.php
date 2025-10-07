@@ -273,6 +273,7 @@ public function outstandingPayments(Request $request)
 
         return [
             'invoice_id'    => $invoice->invoice_id,
+            'inv_id'    => $invoice->id,
             'receipt_id'    => $receiptId,
             'type'          => class_basename($invoice->invoiceable_type),
             'name'          => $invoice->invoiceable?->name ?? 
