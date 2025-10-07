@@ -165,7 +165,7 @@ public function storeBulk(Request $request): RedirectResponse
             ->lockForUpdate()
             ->get();
 
-        $firstPayment = true; // ✅ fees will only be saved once
+        $firstPayment = true;
 
         foreach ($invoices as $invoice) {
             if ($amountToDistribute <= 0) break;
@@ -176,7 +176,7 @@ public function storeBulk(Request $request): RedirectResponse
             if ($paymentAmount > 0) {
                 $invoice->payments()->create([
                     'payment_date'         => $request->payment_date,
-                    'amount'               => $paymentAmount,   // only invoice portion
+                    'amount'               => $paymentAmount,
                     'payment_method'       => $request->payment_method,
                     'reference_number'     => $request->reference_number,
                     'notes'                => $request->notes ?? null,
@@ -189,20 +189,18 @@ public function storeBulk(Request $request): RedirectResponse
                     'surcharge_fee'        => $firstPayment ? $surchargeFee : 0,
                 ]);
 
-                // Update invoice totals
                 $invoice->amount_paid = $invoice->payments()->sum('amount');
-                $invoice->status      = abs($invoice->amount_paid - $invoice->total_amount) < 0.01
-                                        ? 'paid'
-                                        : 'partially-paid';
+                $invoice->status = abs($invoice->amount_paid - $invoice->total_amount) < 0.01
+                    ? 'paid'
+                    : 'partially-paid';
                 $invoice->save();
 
                 $amountToDistribute -= $paymentAmount;
-                $firstPayment = false; // ✅ only first payment carries fees
+                $firstPayment = false;
             }
         }
 
         DB::commit();
-
         return redirect()->route('payments.receipt', $batchId);
 
     } catch (\Exception $e) {
@@ -210,6 +208,7 @@ public function storeBulk(Request $request): RedirectResponse
         return back()->withInput()->withErrors(['error' => 'An error occurred: ' . $e->getMessage()]);
     }
 }
+
 
 
 

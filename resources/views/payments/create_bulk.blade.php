@@ -38,7 +38,6 @@
                 <div>
                     <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">1. Select Company & Customer</h3>
 
-                    <!-- Company -->
                     <select x-model="selectedCompany" @change="filterCustomersByCompany"
                             class="block w-full border rounded-md dark:bg-gray-900 py-2 px-3 mb-2">
                         <option value="">Select Company</option>
@@ -47,7 +46,6 @@
                         @endforeach
                     </select>
 
-                    <!-- Customer -->
                     <input list="customers-list" x-model="customerName" @change="setCustomerId"
                            placeholder="Type customer name..."
                            class="block w-full border rounded-md dark:bg-gray-900 py-2 px-3 mb-2"
@@ -143,7 +141,7 @@
                                class="mt-1 block w-full dark:bg-gray-900 text-lg rounded-md py-1 px-2 border border-gray-300 dark:border-gray-600">
                     </div>
                     <div class="pt-6 text-sm col-span-2">
-                        <div class="flex justify-between"><span>Total Selected:</span><span x-text="formatCurrency(totalSelectedForPayment)"></span></div>
+                        <div class="flex justify-between"><span>Total Selected (Invoices):</span><span x-text="formatCurrency(totalSelectedForPayment)"></span></div>
                         <div class="flex justify-between"><span>Stamp Fee:</span><span x-text="formatCurrency(stampFee || 0)"></span></div>
                         <div class="flex justify-between"><span>Surcharge Fee:</span><span x-text="formatCurrency(surchargeFee || 0)"></span></div>
                         <div class="flex justify-between font-bold text-blue-600"><span>Grand Total:</span><span x-text="formatCurrency(grandTotal)"></span></div>
@@ -242,10 +240,13 @@ document.addEventListener('alpine:init', () => {
                 .filter(i => this.selectedInvoiceIds.includes(String(i.id)))
                 .reduce((t, i) => t + (i.total_amount - i.amount_paid), 0);
         },
-        get grandTotal() {
-            return (this.totalSelectedForPayment || 0)
-                   - ((this.stampFee || 0) + (this.surchargeFee || 0));
-        },
+        // ✅ FIXED: Grand total is now Amount + Stamp + Surcharge
+get grandTotal() {
+    // ✅ Grand total = total invoices + stamp fee + surcharge fee
+    return (this.totalSelectedForPayment || 0)
+           +((this.stampFee || 0) + (this.surchargeFee || 0));
+},
+
         isFormValid() {
             return this.selectedCustomerId && this.selectedInvoiceIds.length > 0 && this.amountPaid > 0;
         },
