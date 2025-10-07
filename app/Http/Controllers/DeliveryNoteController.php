@@ -33,41 +33,50 @@ class DeliveryNoteController extends Controller
         return view('delivery_notes.index', compact('deliveryNotes'));
     }
 
-    public function create(Request $request): View
-    {
-        // Only customers who have pending POs without DNs
-        $customers = Customer::whereHas('purchaseOrders', function ($q) {
-            $q->where('status', 'pending')
-            ->whereDoesntHave('deliveryNotes');
-        })->orderBy('customer_name')->get();
+public function create(Request $request): View
+{
+    $companies = \App\Models\Company::orderBy('company_name')->get();
 
-        $query = PurchaseOrder::where('status', 'pending')
-            ->whereDoesntHave('deliveryNotes')
-            ->with('customer')
-            ->whereHas('customer'); 
+    // Load all active customers (for Alpine filtering)
+    $allCustomers = Customer::whereHas('purchaseOrders', function ($q) {
+        $q->where('status', 'pending')
+          ->whereDoesntHave('deliveryNotes');
+    })->with('company:id,company_name')->orderBy('customer_name')->get();
 
-        if ($request->filled('from_date')) {
-            $query->whereDate('delivery_date', '>=', $request->from_date);
-        }
+    $query = PurchaseOrder::where('status', 'pending')
+        ->whereDoesntHave('deliveryNotes')
+        ->with('customer')
+        ->whereHas('customer');
 
-        if ($request->filled('to_date')) {
-            $query->whereDate('delivery_date', '<=', $request->to_date);
-        }
-
-        // ✅ Only show POs after a customer is selected
-        if ($request->has('customer_id') && $request->customer_id !== '') {
-            $query->where('customer_id', $request->customer_id);
-        } else {
-            $query->whereRaw('0=1'); // return empty if no customer chosen
-        }
-
-        $purchaseOrders = $query->latest()->get();
-        $vehicles = Vehicle::where('is_active', true)->orderBy('vehicle_no')->get();
-        $products = Product::where('is_active', true)->orderBy('name')->get();
-        $departments = Department::orderBy('name')->get();
-
-        return view('delivery_notes.create', compact('purchaseOrders', 'vehicles', 'products', 'departments', 'customers'));
+    if ($request->filled('from_date')) {
+        $query->whereDate('delivery_date', '>=', $request->from_date);
     }
+
+    if ($request->filled('to_date')) {
+        $query->whereDate('delivery_date', '<=', $request->to_date);
+    }
+
+    if ($request->filled('customer_id')) {
+        $query->where('customer_id', $request->customer_id);
+    } else {
+        $query->whereRaw('0=1'); // Only show POs after a customer is chosen
+    }
+
+    $purchaseOrders = $query->latest()->get();
+    $vehicles = Vehicle::where('is_active', true)->orderBy('vehicle_no')->get();
+    $products = Product::where('is_active', true)->orderBy('name')->get();
+    $departments = Department::orderBy('name')->get();
+
+    return view('delivery_notes.create', compact(
+        'purchaseOrders',
+        'vehicles',
+        'products',
+        'departments',
+        'allCustomers',
+        'companies'
+    ));
+}
+
 
 
 

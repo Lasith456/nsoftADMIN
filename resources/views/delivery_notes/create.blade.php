@@ -73,7 +73,7 @@
                            x-text="convert.departmentError"></p>
                     </div>
 
-                    <!-- Product (✅ show ALL products of department) -->
+                    <!-- Product -->
                     <div>
                         <label class="block text-sm font-medium">Product*</label>
                         <select x-model="convert.product_id"
@@ -184,6 +184,7 @@
             </div>
         </div>
     </div>
+
     <!-- === Main Delivery Note Form === -->
     <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
         <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
@@ -215,29 +216,60 @@
             <!-- Left Column -->
             <div class="lg:col-span-2 flex flex-col space-y-4">
                 <div>
-                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">1. Select POs & Details</h3>
-                    
-                    <!-- Date Filter -->
-                    <form action="{{ route('delivery-notes.create') }}" method="GET" class="mb-2 flex space-x-2">
-                        <input type="date" name="from_date" value="{{ request('from_date') }}" class="border rounded-md p-1">
-                        <input type="date" name="to_date" value="{{ request('to_date') }}" class="border rounded-md p-1">
-                        <button type="submit" class="px-3 py-1 bg-gray-800 text-white rounded-md text-xs">Filter</button>
-                        <a href="{{ route('delivery-notes.create') }}" class="px-3 py-1 bg-gray-200 rounded-md text-xs">Clear</a>
-                    </form>
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">1. Select Company, Customer & POs</h3>
 
-                    <!-- Customer Filter -->
-                    <form action="{{ route('delivery-notes.create') }}" method="GET" class="mb-2 flex space-x-2">
-                        <input type="hidden" name="from_date" value="{{ request('from_date') }}">
-                        <input type="hidden" name="to_date" value="{{ request('to_date') }}">
-                        <select name="customer_id" class="border rounded-md p-1 w-full" onchange="this.form.submit()">
-                            <option value="">Select Customer</option>
-                            @foreach($customers as $customer)
-                                <option value="{{ $customer->id }}" {{ request('customer_id') == $customer->id ? 'selected' : '' }}>
-                                    {{ $customer->customer_name }}
-                                </option>
+                    <!-- ✅ Company Selection -->
+                    <div>
+                        <label class="block text-sm font-medium">Company <span class="text-red-500">*</span></label>
+                        <select id="company_id"
+                                x-model="selectedCompany"
+                                @change="filterCustomersByCompany"
+                                class="mt-1 block w-full border rounded-md p-1 dark:bg-gray-900"
+                                required>
+                            <option value="">Select Company</option>
+                            @foreach($companies as $company)
+                                <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                             @endforeach
                         </select>
+                    </div>
+
+                    <!-- ✅ Customer Selection with datalist -->
+                    <div>
+                        <label class="block text-sm font-medium mt-2">Customer <span class="text-red-500">*</span></label>
+                        <input list="customers-list"
+                               id="customer_name"
+                               x-model="customerName"
+                               @change="setCustomerId"
+                               placeholder="Type customer name..."
+                               class="mt-1 block w-full border rounded-md p-1 dark:bg-gray-900"
+                               :disabled="!selectedCompany"
+                               required>
+                        <datalist id="customers-list">
+                            <template x-for="cust in filteredCustomers" :key="cust.id">
+                                <option :value="cust.customer_name" :data-id="cust.id"></option>
+                            </template>
+                        </datalist>
+                        <input type="hidden" name="customer_id" x-model="selectedCustomer">
+                        <p x-show="customerError" class="text-red-600 text-xs mt-1" x-text="customerError"></p>
+                    </div>
+
+                    <!-- Date Filter -->
+                    <form action="{{ route('delivery-notes.create') }}" method="GET" class="mt-3 mb-2 flex items-center space-x-1 text-xs">
+                        <input type="date" name="from_date" value="{{ request('from_date') }}"
+                            class="border rounded-md px-2 py-0.5 w-32 focus:ring-0 focus:border-gray-400 text-xs dark:bg-gray-900">
+                        <input type="date" name="to_date" value="{{ request('to_date') }}"
+                            class="border rounded-md px-2 py-0.5 w-32 focus:ring-0 focus:border-gray-400 text-xs dark:bg-gray-900">
+                        <input type="hidden" name="customer_id" :value="selectedCustomer">
+                        <button type="submit"
+                                class="px-2 py-1 bg-gray-800 text-white rounded-md text-xs hover:bg-gray-700 transition">
+                            Filter
+                        </button>
+                        <a href="{{ route('delivery-notes.create') }}"
+                        class="px-2 py-1 bg-gray-200 rounded-md text-xs text-gray-800 hover:bg-gray-300 transition">
+                            Clear
+                        </a>
                     </form>
+
 
                     <!-- PO List -->
                     <form id="deliveryForm" x-ref="deliveryForm"
@@ -351,17 +383,43 @@
 document.addEventListener('alpine:init', () => {
     Alpine.data('deliveryNoteForm', () => ({
         products: @json($products),
+        customers: @json($allCustomers),
+        selectedCompany: '',
+        filteredCustomers: [],
+        customerName: '',
+        selectedCustomer: '',
+        customerError: '',
+
         selectedPurchaseOrderIds: [],
         items: [],
-        agentSelections: {},   // ✅ required
+        agentSelections: {},
         isStockModalOpen: false,
         stockModalMessage: '',
         stockModalSuccess: false,
 
-        convert: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', quantity: 1 },
-        wastage: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', stock_type: 'clear', quantity: 1, reason: '' },
+        filterCustomersByCompany() {
+            if (!this.selectedCompany) {
+                this.filteredCustomers = [];
+                this.customerName = '';
+                this.selectedCustomer = '';
+                return;
+            }
+            this.filteredCustomers = this.customers.filter(c => c.company_id == this.selectedCompany);
+            this.customerName = '';
+            this.selectedCustomer = '';
+        },
 
-        // only products needing conversion
+        setCustomerId() {
+            const match = this.filteredCustomers.find(c => c.customer_name === this.customerName);
+            if (match) {
+                this.selectedCustomer = match.id;
+                this.customerError = '';
+            } else {
+                this.selectedCustomer = '';
+                this.customerError = 'Customer not found or not in this company';
+            }
+        },
+
         get convertibleItems() {
             return this.items.filter(item =>
                 item.clear_stock_shortage > 0 &&
@@ -369,7 +427,6 @@ document.addEventListener('alpine:init', () => {
             );
         },
 
-        // used for delivery note create button
         get isStockSufficient() {
             if (this.items.length === 0 && this.selectedPurchaseOrderIds.length > 0) return false;
             if (this.items.length === 0) return false;
@@ -409,6 +466,7 @@ document.addEventListener('alpine:init', () => {
                 body: JSON.stringify({ po_ids: this.selectedPurchaseOrderIds })
             }).then(res => res.json()).then(data => { this.items = data.items; });
         },
+
         submitForm() {
             if (!this.isStockSufficient) {
                 alert('Cannot create delivery note. Please resolve shortages.');
@@ -416,6 +474,7 @@ document.addEventListener('alpine:init', () => {
             }
             this.$refs.deliveryForm.submit();
         },
+
         convertStock() {
             this.stockModalMessage = '';
             fetch('{{ route("stock-management.api.convert") }}', {
@@ -448,7 +507,10 @@ document.addEventListener('alpine:init', () => {
                     setTimeout(() => { this.stockModalMessage = '' }, 3000);
                 }
             });
-        }
+        },
+
+        convert: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', quantity: 1 },
+        wastage: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', stock_type: 'clear', quantity: 1, reason: '' },
     }));
 });
 </script>
