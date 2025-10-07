@@ -49,6 +49,7 @@
                     <th class="border px-2 py-1 text-left">Commodity & Quantity</th>
                     <th class="border px-2 py-1 text-right">Rate</th>
                     <th class="border px-2 py-1 text-center">Unit</th>
+                    <th class="border px-2 py-1 text-right">VAT</th> {{-- NEW --}}
                     <th class="border px-2 py-1 text-right">Amount (Rs.)</th>
                 </tr>
             </thead>
@@ -58,7 +59,7 @@
                     @if($item->product && $item->product->department && $currentDept !== $item->product->department->name)
                         {{-- Department Header --}}
                         <tr class="bg-gray-100 font-bold uppercase">
-                            <td colspan="4" class="border px-2 py-1">
+                            <td colspan="5" class="border px-2 py-1">
                                 SUPPLY OF {{ str_replace('Department: ', '', $invoice->notes) }}
                             </td>
                         </tr>
@@ -67,7 +68,8 @@
                     <tr>
                         <td class="border px-2 py-1">{{ $item->description ?? $item->product->name }}</td>
                         <td class="border px-2 py-1 text-right">{{ number_format($item->unit_price, 2) }}</td>
-                        <td class="border px-2 py-1 text-center">{{ $item->product->unit ?? 'PCS' }}</td>
+                        <td class="border px-2 py-1 text-center">{{ $item->quantity ?? 0 }} {{ $item->product->unit_of_measure ?? 'PCS' }}</td>
+                        <td class="border px-2 py-1 text-right">{{ number_format($item->vat_amount ?? 0, 2) }}</td> {{-- NEW --}}
                         <td class="border px-2 py-1 text-right">{{ number_format($item->total, 2) }}</td>
                     </tr>
                 @endforeach
@@ -77,6 +79,8 @@
         {{-- Totals --}}
         <div class="flex justify-end mt-6">
             <div class="text-right space-y-1">
+                <p><strong>Sub Total:</strong> Rs. {{ number_format($invoice->sub_total, 2) }}</p>
+                <p><strong>VAT ({{ $invoice->vat_percentage }}%):</strong> Rs. {{ number_format($invoice->vat_amount, 2) }}</p>
                 <p><strong>Grand Total:</strong> Rs. {{ number_format($invoice->total_amount, 2) }}</p>
                 <p class="italic text-sm">
                     Amount in Words: {{ \App\Helpers\NumberToWords::convert($invoice->total_amount) }}

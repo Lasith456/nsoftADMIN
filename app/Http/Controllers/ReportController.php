@@ -161,49 +161,114 @@ class ReportController extends Controller
     
     // --- Operational Reports ---
 
-    public function purchaseOrderReport(Request $request): View
-    {
-        $query = PurchaseOrder::with(['customer', 'items.product']);
+   public function purchaseOrderReport(Request $request): View
+{
+    $query = PurchaseOrder::with(['customer.company', 'items.product']);
 
-        if ($request->filled('status')) $query->where('status', $request->status);
-        if ($request->filled('customer_id')) $query->where('customer_id', $request->customer_id);
-        if ($request->filled('start_date')) $query->whereDate('delivery_date', '>=', $request->start_date);
-        if ($request->filled('end_date')) $query->whereDate('delivery_date', '<=', $request->end_date);
-
-        $purchaseOrders = $query->latest()->paginate(15)->withQueryString();
-        $customers = Customer::orderBy('customer_name')->get();
-
-        return view('reports.purchase_order_report', compact('purchaseOrders', 'customers'));
+    // ✅ Filter by Company through related Customer
+    if ($request->filled('company_id')) {
+        $query->whereHas('customer', function ($q) use ($request) {
+            $q->where('company_id', $request->company_id);
+        });
     }
 
-    public function deliveryNoteReport(Request $request): View
-    {
-        $query = DeliveryNote::with('vehicle');
-        if ($request->filled('status')) $query->where('status', $request->status);
-        if ($request->filled('start_date')) $query->whereDate('delivery_date', '>=', $request->start_date);
-        if ($request->filled('end_date')) $query->whereDate('delivery_date', '<=', $request->end_date);
-        $deliveryNotes = $query->latest()->paginate(15)->withQueryString();
-        return view('reports.delivery_note_report', compact('deliveryNotes'));
+    // ✅ Other filters
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('customer_id')) {
+        $query->where('customer_id', $request->customer_id);
+    }
+    if ($request->filled('start_date')) {
+        $query->whereDate('delivery_date', '>=', $request->start_date);
+    }
+    if ($request->filled('end_date')) {
+        $query->whereDate('delivery_date', '<=', $request->end_date);
     }
 
-    public function receiveNoteReport(Request $request): View
-    {
-        $query = ReceiveNote::with(['deliveryNotes.purchaseOrders']); // eager load POs
+    $purchaseOrders = $query->latest()->paginate(15)->withQueryString();
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->filled('start_date')) {
-            $query->whereDate('received_date', '>=', $request->start_date);
-        }
-        if ($request->filled('end_date')) {
-            $query->whereDate('received_date', '<=', $request->end_date);
-        }
+    // ✅ Load Customers and Companies for filter dropdowns
+    $customers = Customer::orderBy('customer_name')->get();
+    $companies = Company::orderBy('company_name')->get();
 
-        $receiveNotes = $query->latest()->paginate(15)->withQueryString();
+    return view('reports.purchase_order_report', compact('purchaseOrders', 'customers', 'companies'));
+}
 
-        return view('reports.receive_note_report', compact('receiveNotes'));
+
+public function deliveryNoteReport(Request $request): View
+{
+    $query = DeliveryNote::with(['vehicle', 'purchaseOrders.customer.company']);
+
+    if ($request->filled('company_id')) {
+        $query->whereHas('purchaseOrders.customer', function ($q) use ($request) {
+            $q->where('company_id', $request->company_id);
+        });
     }
+
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+
+    if ($request->filled('start_date')) {
+        $query->whereDate('delivery_date', '>=', $request->start_date);
+    }
+
+    if ($request->filled('end_date')) {
+        $query->whereDate('delivery_date', '<=', $request->end_date);
+    }
+
+    $deliveryNotes = $query->latest()->paginate(15)->withQueryString();
+
+    // 👇 add this line to load all companies for filter dropdown
+    $companies = \App\Models\Company::orderBy('company_name')->get();
+
+    return view('reports.delivery_note_report', compact('deliveryNotes', 'companies'));
+}
+
+
+
+public function receiveNoteReport(Request $request): View
+{
+    // ✅ Eager load all nested relationships for reporting
+    $query = ReceiveNote::with([
+        'deliveryNotes.purchaseOrders.customer.company'
+    ]);
+
+    // ✅ Filter by company (nested)
+    if ($request->filled('company_id')) {
+        $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
+            $q->where('company_id', $request->company_id);
+        });
+    }
+
+    // ✅ Filter by status
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+
+    // ✅ Filter by start date
+    if ($request->filled('start_date')) {
+        $query->whereDate('received_date', '>=', $request->start_date);
+    }
+
+    // ✅ Filter by end date
+    if ($request->filled('end_date')) {
+        $query->whereDate('received_date', '<=', $request->end_date);
+    }
+
+    // ✅ Always include receive_note_id and prevent hidden field issues
+    $receiveNotes = $query
+        ->select('id', 'receive_note_id', 'received_date', 'status')
+        ->latest()
+        ->paginate(15)
+        ->withQueryString();
+
+    // ✅ Load companies for the dropdown filter in the view
+    $companies = \App\Models\Company::orderBy('company_name')->get();
+
+    return view('reports.receive_note_report', compact('receiveNotes', 'companies'));
+}
 
 
 
@@ -669,192 +734,263 @@ public function outstandingPayments(Request $request)
     }
 
     public function exportDeliveryNotesExcel(Request $request)
-    {
-        $query = DeliveryNote::with('vehicle');
+{
+    $query = DeliveryNote::with(['vehicle', 'purchaseOrders.customer.company']);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->filled('start_date')) {
-            $query->whereDate('delivery_date', '>=', $request->start_date);
-        }
-        if ($request->filled('end_date')) {
-            $query->whereDate('delivery_date', '<=', $request->end_date);
-        }
-
-        $deliveryNotes = $query->get();
-
-        return Excel::download(new class($deliveryNotes) implements 
-            \Maatwebsite\Excel\Concerns\FromCollection, 
-            \Maatwebsite\Excel\Concerns\WithHeadings 
-        {
-            private $deliveryNotes;
-            public function __construct($deliveryNotes) { $this->deliveryNotes = $deliveryNotes; }
-
-            public function collection() {
-                return $this->deliveryNotes->map(fn($dn) => [
-                    'DN ID'        => $dn->delivery_note_id,
-                    'Vehicle'      => $dn->vehicle->vehicle_no ?? 'N/A',
-                    'Driver Name'  => $dn->vehicle->driver_name ?? 'N/A',
-                    'Contact No'   => $dn->vehicle->driver_contact ?? 'N/A',
-                    'Delivery Date'=> $dn->delivery_date->format('Y-m-d'),
-                    'Status'       => ucfirst($dn->status),
-                ]);
-            }
-
-            public function headings(): array {
-                return ['DN ID', 'Vehicle', 'Driver Name', 'Contact No', 'Delivery Date', 'Status'];
-            }
-        }, 'delivery_note_report.xlsx');
+    // Apply filters
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('start_date')) {
+        $query->whereDate('delivery_date', '>=', $request->start_date);
+    }
+    if ($request->filled('end_date')) {
+        $query->whereDate('delivery_date', '<=', $request->end_date);
+    }
+    if ($request->filled('company_id')) {
+        $query->whereHas('purchaseOrders.customer', function ($q) use ($request) {
+            $q->where('company_id', $request->company_id);
+        });
     }
 
-    public function exportDeliveryNotesPdf(Request $request)
+    $deliveryNotes = $query->get();
+
+    return Excel::download(new class($deliveryNotes) implements 
+        \Maatwebsite\Excel\Concerns\FromCollection, 
+        \Maatwebsite\Excel\Concerns\WithHeadings 
     {
-        $query = DeliveryNote::with('vehicle');
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->filled('start_date')) {
-            $query->whereDate('delivery_date', '>=', $request->start_date);
-        }
-        if ($request->filled('end_date')) {
-            $query->whereDate('delivery_date', '<=', $request->end_date);
-        }
-
-        $deliveryNotes = $query->get();
-
-        $pdf = Pdf::loadView('reports.pdf.delivery_note_report', compact('deliveryNotes'))
-                ->setPaper('a4', 'landscape');
-
-        return $pdf->download('delivery_note_report.pdf');
-    }
-    public function exportReceiveNotesExcel(Request $request)
-    {
-        $query = ReceiveNote::with('deliveryNotes.purchaseOrders');
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->filled('start_date')) {
-            $query->whereDate('received_date', '>=', $request->start_date);
-        }
-        if ($request->filled('end_date')) {
-            $query->whereDate('received_date', '<=', $request->end_date);
-        }
-
-        $receiveNotes = $query->get();
-
-        return Excel::download(new class($receiveNotes) implements 
-            \Maatwebsite\Excel\Concerns\FromCollection, 
-            \Maatwebsite\Excel\Concerns\WithHeadings 
+        private $deliveryNotes;
+        public function __construct($deliveryNotes)
         {
-            private $receiveNotes;
-            public function __construct($receiveNotes) { $this->receiveNotes = $receiveNotes; }
+            $this->deliveryNotes = $deliveryNotes;
+        }
 
-            public function collection() {
-                return $this->receiveNotes->map(fn($rn) => [
+        public function collection()
+        {
+            return $this->deliveryNotes->map(fn($dn) => [
+                'DN ID'         => $dn->delivery_note_id,
+                'Company'       => $dn->company->company_name ?? 'N/A',
+                'Vehicle'       => $dn->vehicle->vehicle_no ?? 'N/A',
+                'Driver Name'   => $dn->driver_name ?? 'N/A',
+                'Contact No'    => $dn->driver_mobile ?? 'N/A',
+                'Delivery Date' => $dn->delivery_date?->format('Y-m-d') ?? 'N/A',
+                'Status'        => ucfirst($dn->status),
+            ]);
+        }
+
+        public function headings(): array
+        {
+            return ['DN ID', 'Company', 'Vehicle', 'Driver Name', 'Contact No', 'Delivery Date', 'Status'];
+        }
+    }, 'delivery_note_report.xlsx');
+}
+
+
+public function exportDeliveryNotesPdf(Request $request)
+{
+    $query = DeliveryNote::with(['vehicle', 'purchaseOrders.customer.company']);
+
+    // Apply filters
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('start_date')) {
+        $query->whereDate('delivery_date', '>=', $request->start_date);
+    }
+    if ($request->filled('end_date')) {
+        $query->whereDate('delivery_date', '<=', $request->end_date);
+    }
+    if ($request->filled('company_id')) {
+        $query->whereHas('purchaseOrders.customer', function ($q) use ($request) {
+            $q->where('company_id', $request->company_id);
+        });
+    }
+
+    $deliveryNotes = $query->get();
+
+    $pdf = Pdf::loadView('reports.pdf.delivery_note_report', compact('deliveryNotes'))
+        ->setPaper('a4', 'landscape');
+
+    return $pdf->download('delivery_note_report.pdf');
+}
+
+   public function exportReceiveNotesExcel(Request $request)
+{
+    $query = ReceiveNote::with(['deliveryNotes.purchaseOrders.customer.company']);
+
+    // ✅ Apply filters
+    if ($request->filled('company_id')) {
+        $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
+            $q->where('company_id', $request->company_id);
+        });
+    }
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('start_date')) {
+        $query->whereDate('received_date', '>=', $request->start_date);
+    }
+    if ($request->filled('end_date')) {
+        $query->whereDate('received_date', '<=', $request->end_date);
+    }
+
+    $receiveNotes = $query->get();
+
+    return Excel::download(new class($receiveNotes) implements 
+        \Maatwebsite\Excel\Concerns\FromCollection, 
+        \Maatwebsite\Excel\Concerns\WithHeadings 
+    {
+        private $receiveNotes;
+        public function __construct($receiveNotes) { $this->receiveNotes = $receiveNotes; }
+
+        public function collection() {
+            return $this->receiveNotes->map(function ($rn) {
+                // ✅ Collect data safely
+                $deliveryNotes = $rn->deliveryNotes->pluck('delivery_note_id')->implode(', ') ?: 'N/A';
+
+                $poList = $rn->deliveryNotes
+                    ->flatMap(function ($dn) {
+                        return $dn->purchaseOrders->pluck('purchase_order_id')
+                            ->merge($dn->purchaseOrders->pluck('po_id'));
+                    })
+                    ->filter()
+                    ->unique()
+                    ->implode(', ') ?: 'N/A';
+
+                $companyName = $rn->deliveryNotes
+                    ->flatMap(fn($dn) => $dn->purchaseOrders->pluck('customer.company.company_name'))
+                    ->filter()
+                    ->unique()
+                    ->implode(', ') ?: 'N/A';
+
+                return [
                     'RN ID'          => $rn->receive_note_id,
-                    'Associated DNs' => $rn->deliveryNotes->pluck('delivery_note_id')->implode(', '),
-                    'Assigned POs'   => $rn->deliveryNotes->flatMap->purchaseOrders->pluck('purchase_order_id')->implode(', '),
+                    'Associated DNs' => $deliveryNotes,
+                    'Assigned POs'   => $poList,
+                    'Company'        => $companyName,
                     'Received Date'  => $rn->received_date->format('Y-m-d'),
                     'Status'         => ucfirst($rn->status),
-                ]);
-            }
+                ];
+            });
+        }
 
-            public function headings(): array {
-                return ['RN ID', 'Associated DNs', 'Assigned POs', 'Received Date', 'Status'];
-            }
-        }, 'receive_note_report.xlsx');
+        public function headings(): array {
+            return ['RN ID', 'Associated DNs', 'Assigned POs', 'Company', 'Received Date', 'Status'];
+        }
+    }, 'receive_note_report.xlsx');
+}
+
+public function exportReceiveNotesPdf(Request $request)
+{
+    $query = ReceiveNote::with(['deliveryNotes.purchaseOrders.customer.company']);
+
+    // ✅ Apply filters
+    if ($request->filled('company_id')) {
+        $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
+            $q->where('company_id', $request->company_id);
+        });
+    }
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('start_date')) {
+        $query->whereDate('received_date', '>=', $request->start_date);
+    }
+    if ($request->filled('end_date')) {
+        $query->whereDate('received_date', '<=', $request->end_date);
     }
 
-    public function exportReceiveNotesPdf(Request $request)
+    $receiveNotes = $query->get();
+
+    // ✅ Export with updated PDF layout (includes Company)
+    $pdf = Pdf::loadView('reports.pdf.receive_note_report', compact('receiveNotes'))
+            ->setPaper('a4', 'landscape');
+
+    return $pdf->download('receive_note_report.pdf');
+}
+
+   public function exportPurchaseOrdersExcel(Request $request)
+{
+    $query = PurchaseOrder::with(['customer.company', 'items.product']);
+
+    // ✅ Filter by company through related customer
+    if ($request->filled('company_id')) {
+        $query->whereHas('customer', function ($q) use ($request) {
+            $q->where('company_id', $request->company_id);
+        });
+    }
+
+    // ✅ Other filters
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('customer_id')) {
+        $query->where('customer_id', $request->customer_id);
+    }
+    if ($request->filled('start_date')) {
+        $query->whereDate('delivery_date', '>=', $request->start_date);
+    }
+    if ($request->filled('end_date')) {
+        $query->whereDate('delivery_date', '<=', $request->end_date);
+    }
+
+    $purchaseOrders = $query->get();
+
+    return Excel::download(new class($purchaseOrders) implements 
+        \Maatwebsite\Excel\Concerns\FromCollection, 
+        \Maatwebsite\Excel\Concerns\WithHeadings 
     {
-        $query = ReceiveNote::with('deliveryNotes.purchaseOrders');
+        private $purchaseOrders;
+        public function __construct($purchaseOrders) { $this->purchaseOrders = $purchaseOrders; }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->filled('start_date')) {
-            $query->whereDate('received_date', '>=', $request->start_date);
-        }
-        if ($request->filled('end_date')) {
-            $query->whereDate('received_date', '<=', $request->end_date);
-        }
-
-        $receiveNotes = $query->get();
-
-        $pdf = Pdf::loadView('reports.pdf.receive_note_report', compact('receiveNotes'))
-                ->setPaper('a4', 'landscape');
-
-        return $pdf->download('receive_note_report.pdf');
-    }
-    public function exportPurchaseOrdersExcel(Request $request)
-    {
-        $query = PurchaseOrder::with(['customer', 'items.product']);
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->filled('customer_id')) {
-            $query->where('customer_id', $request->customer_id);
-        }
-        if ($request->filled('start_date')) {
-            $query->whereDate('delivery_date', '>=', $request->start_date);
-        }
-        if ($request->filled('end_date')) {
-            $query->whereDate('delivery_date', '<=', $request->end_date);
+        public function collection() {
+            return $this->purchaseOrders->map(fn($po) => [
+                'PO ID'          => $po->po_id,
+                'Company'        => $po->customer->company->company_name ?? 'N/A',
+                'Customer'       => $po->customer->customer_name ?? 'N/A',
+                'Delivery Date'  => $po->delivery_date?->format('Y-m-d') ?? 'N/A',
+                'Products'       => $po->items->pluck('product.name')->implode(', ') ?: 'N/A',
+                'Status'         => ucfirst($po->status),
+            ]);
         }
 
-        $purchaseOrders = $query->get();
+        public function headings(): array {
+            return ['PO ID', 'Company', 'Customer', 'Delivery Date', 'Products', 'Status'];
+        }
+    }, 'purchase_order_report.xlsx');
+}
 
-        return Excel::download(new class($purchaseOrders) implements 
-            \Maatwebsite\Excel\Concerns\FromCollection, 
-            \Maatwebsite\Excel\Concerns\WithHeadings 
-        {
-            private $purchaseOrders;
-            public function __construct($purchaseOrders) { $this->purchaseOrders = $purchaseOrders; }
+public function exportPurchaseOrdersPdf(Request $request)
+{
+    $query = PurchaseOrder::with(['customer.company', 'items.product']);
 
-            public function collection() {
-                return $this->purchaseOrders->map(fn($po) => [
-                    'PO ID'         => $po->po_id,
-                    'Customer'      => $po->customer->customer_name ?? 'N/A',
-                    'Delivery Date' => $po->delivery_date?->format('Y-m-d'),
-                    'Products'      => $po->items->pluck('product.name')->implode(', ') ?: 'N/A',
-                    'Status'        => ucfirst($po->status),
-                ]);
-            }
-
-            public function headings(): array {
-                return ['PO ID', 'Customer', 'Delivery Date', 'Products', 'Status'];
-            }
-        }, 'purchase_order_report.xlsx');
+    // ✅ Apply filters
+    if ($request->filled('company_id')) {
+        $query->whereHas('customer', function ($q) use ($request) {
+            $q->where('company_id', $request->company_id);
+        });
     }
 
-    public function exportPurchaseOrdersPdf(Request $request)
-    {
-        $query = PurchaseOrder::with(['customer', 'items.product']);
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->filled('customer_id')) {
-            $query->where('customer_id', $request->customer_id);
-        }
-        if ($request->filled('start_date')) {
-            $query->whereDate('delivery_date', '>=', $request->start_date);
-        }
-        if ($request->filled('end_date')) {
-            $query->whereDate('delivery_date', '<=', $request->end_date);
-        }
-
-        $purchaseOrders = $query->get();
-
-        $pdf = Pdf::loadView('reports.pdf.purchase_order_report', compact('purchaseOrders'))
-                ->setPaper('a4', 'landscape');
-
-        return $pdf->download('purchase_order_report.pdf');
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
     }
+    if ($request->filled('customer_id')) {
+        $query->where('customer_id', $request->customer_id);
+    }
+    if ($request->filled('start_date')) {
+        $query->whereDate('delivery_date', '>=', $request->start_date);
+    }
+    if ($request->filled('end_date')) {
+        $query->whereDate('delivery_date', '<=', $request->end_date);
+    }
+
+    $purchaseOrders = $query->get();
+
+    $pdf = Pdf::loadView('reports.pdf.purchase_order_report', compact('purchaseOrders'))
+            ->setPaper('a4', 'landscape');
+
+    return $pdf->download('purchase_order_report.pdf');
+}
 
     public function exportOrderFlowExcel(Request $request)
     {
