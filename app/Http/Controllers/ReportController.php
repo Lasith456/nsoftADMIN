@@ -1244,7 +1244,161 @@ public function exportCompanyPdf(Request $request)
 
     return $pdf->download('company_report.pdf');
 }
+public function companyOutstandingReport(Request $request)
+{
+    $companies = Company::orderBy('company_name')->get();
+    $selectedCompany = $request->company_id ? Company::find($request->company_id) : null;
+    $startDate = $request->start_date;
+    $endDate   = $request->end_date;
 
+    // Base query for all customers or company-specific
+    $query = Customer::with(['invoices.payments']);
+    if ($selectedCompany) {
+        $query->where('company_id', $selectedCompany->id);
+    }
+
+    $customers = $query->orderBy('customer_name')->get();
+
+    $reportData = [];
+    foreach ($customers as $customer) {
+        $invoices = $customer->invoices
+            ->when($startDate, fn($c) => $c->whereBetween('created_at', [$startDate, $endDate]))
+            ->values();
+
+        $totalAmount = $invoices->sum('total_amount');
+        $paidAmount  = $invoices->flatMap->payments->sum('amount');
+        $outstanding = $totalAmount - $paidAmount;
+
+        if ($totalAmount > 0 || $paidAmount > 0) {
+            $reportData[] = [
+                'company'     => $customer->company->company_name ?? '-',
+                'customer'    => $customer->customer_name,
+                'total'       => $totalAmount,
+                'paid'        => $paidAmount,
+                'outstanding' => $outstanding,
+            ];
+        }
+    }
+
+    // Calculate overall totals
+    $totals = [
+        'totalSum'       => collect($reportData)->sum('total'),
+        'paidSum'        => collect($reportData)->sum('paid'),
+        'outstandingSum' => collect($reportData)->sum('outstanding'),
+    ];
+
+    return view('reports.company_outstanding', compact(
+        'companies', 'selectedCompany', 'reportData', 'startDate', 'endDate', 'totals'
+    ));
+}
+
+
+public function exportCompanyOutstandingExcel(Request $request)
+{
+    $company = $request->company_id ? Company::find($request->company_id) : null;
+    $startDate = $request->start_date;
+    $endDate   = $request->end_date;
+
+    $query = Customer::with(['invoices.payments', 'company']);
+    if ($company) {
+        $query->where('company_id', $company->id);
+    }
+    $customers = $query->orderBy('customer_name')->get();
+
+    $rows = collect();
+
+    foreach ($customers as $customer) {
+        $invoices = $customer->invoices
+            ->when($startDate, fn($c) => $c->whereBetween('created_at', [$startDate, $endDate]))
+            ->values();
+
+        $totalAmount = $invoices->sum('total_amount');
+        $paidAmount  = $invoices->flatMap->payments->sum('amount');
+        $outstanding = $totalAmount - $paidAmount;
+
+        if ($totalAmount > 0 || $paidAmount > 0) {
+            $rows->push([
+                'Company'      => $customer->company->company_name ?? '-',
+                'Customer'     => $customer->customer_name,
+                'Total Amount' => number_format($totalAmount, 2),
+                'Paid Amount'  => number_format($paidAmount, 2),
+                'Outstanding'  => number_format($outstanding, 2),
+            ]);
+        }
+    }
+
+    // Add totals row
+    $rows->push([
+        'Company'      => 'TOTAL',
+        'Customer'     => '',
+        'Total Amount' => number_format($rows->sum(fn($r) => str_replace(',', '', $r['Total Amount'])), 2),
+        'Paid Amount'  => number_format($rows->sum(fn($r) => str_replace(',', '', $r['Paid Amount'])), 2),
+        'Outstanding'  => number_format($rows->sum(fn($r) => str_replace(',', '', $r['Outstanding'])), 2),
+    ]);
+
+    return Excel::download(new class($rows) implements 
+        \Maatwebsite\Excel\Concerns\FromCollection, 
+        \Maatwebsite\Excel\Concerns\WithHeadings 
+    {
+        private $rows;
+        public function __construct($rows) { $this->rows = $rows; }
+        public function collection() { return $this->rows; }
+        public function headings(): array {
+            return ['Company', 'Customer Name', 'Total Amount (LKR)', 'Paid Amount (LKR)', 'Outstanding (LKR)'];
+        }
+    }, 'customer_outstanding_report.xlsx');
+}
+
+
+public function exportCompanyOutstandingPdf(Request $request)
+{
+    $company = $request->company_id ? Company::find($request->company_id) : null;
+    $startDate = $request->start_date;
+    $endDate   = $request->end_date;
+
+    $query = Customer::with(['invoices.payments', 'company']);
+    if ($company) {
+        $query->where('company_id', $company->id);
+    }
+    $customers = $query->orderBy('customer_name')->get();
+
+    $reportData = [];
+    foreach ($customers as $customer) {
+        $invoices = $customer->invoices
+            ->when($startDate, fn($c) => $c->whereBetween('created_at', [$startDate, $endDate]))
+            ->values();
+
+        $totalAmount = $invoices->sum('total_amount');
+        $paidAmount  = $invoices->flatMap->payments->sum('amount');
+        $outstanding = $totalAmount - $paidAmount;
+
+        if ($totalAmount > 0 || $paidAmount > 0) {
+            $reportData[] = [
+                'company'     => $customer->company->company_name ?? '-',
+                'customer'    => $customer->customer_name,
+                'total'       => $totalAmount,
+                'paid'        => $paidAmount,
+                'outstanding' => $outstanding,
+            ];
+        }
+    }
+
+    $totals = [
+        'totalSum'       => collect($reportData)->sum('total'),
+        'paidSum'        => collect($reportData)->sum('paid'),
+        'outstandingSum' => collect($reportData)->sum('outstanding'),
+    ];
+
+    $pdf = Pdf::loadView('reports.pdf.company_outstanding', [
+        'company'    => $company,
+        'reportData' => $reportData,
+        'startDate'  => $startDate,
+        'endDate'    => $endDate,
+        'totals'     => $totals,
+    ])->setPaper('a4', 'landscape');
+
+    return $pdf->download('customer_outstanding_report.pdf');
+}
 
 
 }

@@ -251,5 +251,9 @@ Route::get('/reports/company/export/pdf', [ReportController::class, 'exportCompa
 
 Route::get('/reports/company/select', [ReportController::class, 'selectCompany'])
     ->name('reports.company.select');
+    Route::get('reports/company-outstanding', [ReportController::class, 'companyOutstandingReport'])->name('reports.companyOutstanding');
+Route::get('reports/company-outstanding/excel', [ReportController::class, 'exportCompanyOutstandingExcel'])->name('reports.companyOutstanding.exportExcel');
+Route::get('reports/company-outstanding/pdf', [ReportController::class, 'exportCompanyOutstandingPdf'])->name('reports.companyOutstanding.exportPdf');
+
 });
 
