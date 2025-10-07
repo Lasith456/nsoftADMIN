@@ -28,13 +28,12 @@ class InvoiceController extends Controller
         $this->middleware('permission:invoice-list|invoice-create|invoice-show', ['only' => ['index','show', 'print']]);
         $this->middleware('permission:invoice-create', ['only' => ['create', 'createFromPurchaseOrder', 'storeFromPurchaseOrder']]);
     }
-
     public function index(Request $request): View
     {
         $type = $request->query('type', 'all');
         $query = Invoice::with('invoiceable');
 
-        // ** THE FIX IS HERE: Filter by the selected invoice type **
+        // ✅ Filter by the selected invoice type
         switch ($type) {
             case 'customer':
                 $query->where('invoiceable_type', Customer::class);
@@ -47,26 +46,41 @@ class InvoiceController extends Controller
                 break;
         }
 
+        // ✅ Company filter (apply only for customer invoices)
+        if ($type === 'customer' && $request->filled('company_id')) {
+            $query->whereHasMorph('invoiceable', [Customer::class], function ($q) use ($request) {
+                $q->where('company_id', $request->company_id);
+            });
+        }
+
+        // ✅ Search filter
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('invoice_id', 'LIKE', "%{$search}%")
-                  ->orWhereHasMorph('invoiceable', [Customer::class, Supplier::class, Agent::class], function ($subQuery, $modelType) use ($search) {
-                      $nameColumn = match ($modelType) {
-                          Customer::class => 'customer_name',
-                          Supplier::class => 'supplier_name',
-                          Agent::class => 'name',
-                      };
-                      $subQuery->where($nameColumn, 'LIKE', "%{$search}%");
-                  });
+                ->orWhereHasMorph(
+                    'invoiceable',
+                    [Customer::class, Supplier::class, Agent::class],
+                    function ($subQuery, $modelType) use ($search) {
+                        $nameColumn = match ($modelType) {
+                            Customer::class => 'customer_name',
+                            Supplier::class => 'supplier_name',
+                            Agent::class    => 'name',
+                        };
+                        $subQuery->where($nameColumn, 'LIKE', "%{$search}%");
+                    }
+                );
             });
         }
 
+        // ✅ Fetch companies for dropdown
+        $companies = \App\Models\Company::orderBy('company_name')->get();
+
         $invoices = $query->latest()->paginate(15);
-        
-        // Pass the current type to the view to highlight the active tab
-        return view('invoices.index', compact('invoices', 'type'));
+
+        return view('invoices.index', compact('invoices', 'type', 'companies'));
     }
+
     public function show(Invoice $invoice): View
     {
         $invoice->load(['items', 'payments', 'invoiceable']);

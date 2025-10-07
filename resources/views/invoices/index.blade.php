@@ -77,20 +77,45 @@
         </nav>
     </div>
 
-    {{-- Search Form --}}
-    <form x-data x-ref="searchForm" action="{{ route('invoices.index') }}" method="GET" class="mb-4">
-        <div class="flex justify-end">
+    {{-- Filters + Search --}}
+    <form x-data x-ref="filterForm" action="{{ route('invoices.index') }}" method="GET" 
+        class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 
+                space-y-2 md:space-y-0 md:space-x-3">
+
+        {{-- Type Preservation --}}
+        <input type="hidden" name="type" value="{{ $type }}">
+
+        {{-- Company Filter (only for customer invoices) --}}
+        @if($type === 'customer')
             <div class="flex items-center">
-                <input type="hidden" name="type" value="{{ $type }}">
-                <label for="search" class="mr-2 text-sm text-black">Search:</label>
-                <input type="search" name="search" id="search" 
-                       class="border border-gray-300 rounded-md p-2 text-sm text-black" 
-                       value="{{ request('search') }}" 
-                       @input.debounce.300ms="$refs.searchForm.submit()" 
-                       placeholder="Invoice ID, Name...">
+                <label for="company_id" class="mr-2 text-sm text-black">Company:</label>
+                <select name="company_id" id="company_id"
+                        class="border border-gray-300 rounded-md p-2 text-sm text-black"
+                        onchange="this.form.submit()">
+                    <option value="">All Companies</option>
+                    @foreach($companies as $company)
+                        <option value="{{ $company->id }}" 
+                                {{ request('company_id') == $company->id ? 'selected' : '' }}>
+                            {{ $company->company_name }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
+        @endif
+
+        {{-- Search Box --}}
+        <div class="flex items-center">
+            <label for="search" class="mr-2 text-sm text-black">Search:</label>
+            <input type="search"
+                name="search"
+                id="search"
+                class="border border-gray-300 rounded-md p-2 text-sm text-black"
+                value="{{ request('search') }}"
+                placeholder="Invoice ID, Name..."
+                @input.debounce.500ms="$refs.filterForm.submit()">
         </div>
     </form>
+
 
     {{-- Invoices Table --}}
     <div class="overflow-x-auto">
