@@ -8,15 +8,32 @@
                 <h2 class="text-2xl font-bold text-black">Agent Report</h2>
                 <p class="text-sm text-gray-500">A summary of each agent's activity.</p>
             </div>
-            <button onclick="window.print()" class="mt-3 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</button>
+            <div class="flex space-x-2">
+                <a href="{{ route('reports.agents.export.excel', request()->query()) }}" 
+                   class="px-4 py-2 bg-green-600 text-white rounded-md text-xs uppercase font-semibold">Export Excel</a>
+                <a href="{{ route('reports.agents.export.pdf', request()->query()) }}" 
+                   class="px-4 py-2 bg-red-600 text-white rounded-md text-xs uppercase font-semibold">Export PDF</a>
+                <button onclick="window.print()" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</button>
+            </div>
         </div>
-        
+
+        <!-- Filters -->
         <form action="{{ route('reports.agents') }}" method="GET" class="mb-4 print:hidden flex items-center space-x-2">
+            <div>
+                <label for="start_date" class="text-sm">Start Date:</label>
+                <input type="date" name="start_date" id="start_date" value="{{ request('start_date') }}" class="border rounded-md p-1 text-sm">
+            </div>
+            <div>
+                <label for="end_date" class="text-sm">End Date:</label>
+                <input type="date" name="end_date" id="end_date" value="{{ request('end_date') }}" class="border rounded-md p-1 text-sm">
+            </div>
             <input type="search" name="search" value="{{ request('search') }}" placeholder="Search by agent name..." class="border rounded-md p-1 text-sm w-64">
             <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-md text-xs uppercase">Filter</button>
             <a href="{{ route('reports.agents') }}" class="px-4 py-2 bg-gray-200 text-black rounded-md text-xs uppercase">Clear</a>
         </form>
 
+        <!-- Table -->
         <div class="overflow-x-auto">
             <table class="w-full min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -29,9 +46,9 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                     @forelse ($agents as $agent)
                     <tr>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $agent->name }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-black text-right">{{ $agent->delivery_items_count }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-black text-right">{{ number_format($agent->invoices_sum_total_amount, 2) }}</td>
+                        <td class="px-4 py-2 text-sm">{{ $agent->name }}</td>
+                        <td class="px-4 py-2 text-sm text-right">{{ $agent->delivery_items_count }}</td>
+                        <td class="px-4 py-2 text-sm text-right">{{ number_format($agent->invoices_sum_total_amount, 2) }}</td>
                     </tr>
                     @empty
                     <tr>
@@ -41,6 +58,12 @@
                     </tr>
                     @endforelse
                 </tbody>
+                <tfoot class="bg-gray-50 font-bold">
+                    <tr>
+                        <td colspan="2" class="px-4 py-2 text-right">Total Payout Value (All Agents):</td>
+                        <td class="px-4 py-2 text-right">{{ number_format($totalInvoices, 2) }}</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
 
@@ -58,4 +81,3 @@
     }
 </style>
 @endsection
-

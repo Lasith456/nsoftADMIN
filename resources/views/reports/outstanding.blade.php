@@ -31,28 +31,33 @@
     </div>
 
     {{-- Filter Form --}}
-    <form action="{{ route('reports.outstanding') }}" method="GET" class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3 print:hidden">
-        <div>
-            <label for="type" class="block text-xs font-medium text-black">Type</label>
-            <select name="type" id="type" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs text-black">
-                <option value="all" {{ $type == 'all' ? 'selected' : '' }}>All</option>
-                <option value="customer" {{ $type == 'customer' ? 'selected' : '' }}>Customer</option>
-                <option value="supplier" {{ $type == 'supplier' ? 'selected' : '' }}>Supplier</option>
-                <option value="agent" {{ $type == 'agent' ? 'selected' : '' }}>Agent</option>
-            </select>
-        </div>
-        <div>
-            <label for="from" class="block text-xs font-medium text-black">From</label>
-            <input type="date" name="from" id="from" value="{{ $from }}" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs text-black">
-        </div>
-        <div>
-            <label for="to" class="block text-xs font-medium text-black">To</label>
-            <input type="date" name="to" id="to" value="{{ $to }}" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs text-black">
-        </div>
-        <div class="flex items-end">
-            <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded-md w-full text-xs">Filter</button>
-        </div>
-    </form>
+<form action="{{ route('reports.outstanding') }}" method="GET" class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3 print:hidden">
+    <div>
+        <label for="type" class="block text-xs font-medium text-black">Type</label>
+        <select name="type" id="type" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs text-black">
+            <option value="all" {{ $type == 'all' ? 'selected' : '' }}>All</option>
+            <option value="customer" {{ $type == 'customer' ? 'selected' : '' }}>Customer</option>
+            <option value="supplier" {{ $type == 'supplier' ? 'selected' : '' }}>Supplier</option>
+            <option value="agent" {{ $type == 'agent' ? 'selected' : '' }}>Agent</option>
+        </select>
+    </div>
+    <div>
+        <label for="from" class="block text-xs font-medium text-black">From</label>
+        <input type="date" name="from" id="from" value="{{ $from }}" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs text-black">
+    </div>
+    <div>
+        <label for="to" class="block text-xs font-medium text-black">To</label>
+        <input type="date" name="to" id="to" value="{{ $to }}" class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs text-black">
+    </div>
+    <div class="flex items-end space-x-2">
+        <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded-md text-xs">Filter</button>
+        <a href="{{ route('reports.outstanding.export.excel', request()->all()) }}" 
+           class="px-3 py-1 bg-green-600 text-white rounded-md text-xs">Export Excel</a>
+        <a href="{{ route('reports.outstanding.export.pdf', request()->all()) }}" 
+           class="px-3 py-1 bg-red-600 text-white rounded-md text-xs">Export PDF</a>
+    </div>
+</form>
+
 
     {{-- Outstanding Payments Table --}}
     <div class="overflow-x-auto" id="printArea">

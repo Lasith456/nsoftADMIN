@@ -177,5 +177,79 @@ Route::get('/receive-notes/{id}/popup', [ReceiveNoteController::class, 'popup'])
 Route::get('payments/customer/{customerId}', [PaymentController::class, 'customerPayments'])
      ->name('payments.history.customerInvocies');
 
+
+
+     // routes/web.php
+Route::get('/reports/customers/export-excel', [ReportController::class, 'exportCustomerExcel'])
+    ->name('reports.customers.export.excel');
+
+Route::get('/reports/customers/export-pdf', [ReportController::class, 'exportCustomerPdf'])
+    ->name('reports.customers.export.pdf');
+
+Route::get('/reports/sales/export-excel', [ReportController::class, 'exportSalesExcel'])
+    ->name('reports.sales.export.excel');
+
+Route::get('/reports/sales/export-pdf', [ReportController::class, 'exportSalesPdf'])
+    ->name('reports.sales.export.pdf');
+
+Route::get('/reports/stock-level/export-excel', [ReportController::class, 'exportStockLevelExcel'])
+    ->name('reports.stock_level.export.excel');
+
+Route::get('/reports/stock-level/export-pdf', [ReportController::class, 'exportStockLevelPdf'])
+    ->name('reports.stock_level.export.pdf');
+
+Route::get('/reports/suppliers/export-excel', [ReportController::class, 'exportSupplierExcel'])
+    ->name('reports.suppliers.export.excel');
+
+Route::get('/reports/suppliers/export-pdf', [ReportController::class, 'exportSupplierPdf'])
+    ->name('reports.suppliers.export.pdf');
+
+Route::get('/reports/agents/export-excel', [ReportController::class, 'exportAgentExcel'])
+    ->name('reports.agents.export.excel');
+
+Route::get('/reports/agents/export-pdf', [ReportController::class, 'exportAgentPdf'])
+    ->name('reports.agents.export.pdf');
+
+Route::get('/reports/delivery-notes/export-excel', [ReportController::class, 'exportDeliveryNotesExcel'])
+    ->name('reports.delivery_notes.export.excel');
+
+Route::get('/reports/delivery-notes/export-pdf', [ReportController::class, 'exportDeliveryNotesPdf'])
+    ->name('reports.delivery_notes.export.pdf');
+
+Route::get('/reports/receive-notes/export-excel', [ReportController::class, 'exportReceiveNotesExcel'])
+    ->name('reports.receive_notes.export.excel');
+
+Route::get('/reports/receive-notes/export-pdf', [ReportController::class, 'exportReceiveNotesPdf'])
+    ->name('reports.receive_notes.export.pdf');
+
+Route::get('/reports/purchase-orders/export-excel', [ReportController::class, 'exportPurchaseOrdersExcel'])
+    ->name('reports.purchase_orders.export.excel');
+
+Route::get('/reports/purchase-orders/export-pdf', [ReportController::class, 'exportPurchaseOrdersPdf'])
+    ->name('reports.purchase_orders.export.pdf');
+
+Route::get('/reports/order-flow/export-excel', [ReportController::class, 'exportOrderFlowExcel'])
+    ->name('reports.order_flow.export.excel');
+
+Route::get('/reports/order-flow/export-pdf', [ReportController::class, 'exportOrderFlowPdf'])
+    ->name('reports.order_flow.export.pdf');
+
+Route::get('/reports/outstanding/export-excel', [ReportController::class, 'exportOutstandingExcel'])
+    ->name('reports.outstanding.export.excel');
+
+Route::get('/reports/outstanding/export-pdf', [ReportController::class, 'exportOutstandingPdf'])
+    ->name('reports.outstanding.export.pdf');
+
+Route::get('/reports/company', [ReportController::class, 'companyReport'])
+        ->name('reports.company');
+
+Route::get('/reports/company/export/excel', [ReportController::class, 'exportCompanyExcel'])
+        ->name('reports.company.export.excel');
+
+Route::get('/reports/company/export/pdf', [ReportController::class, 'exportCompanyPdf'])
+        ->name('reports.company.export.pdf');
+
+Route::get('/reports/company/select', [ReportController::class, 'selectCompany'])
+    ->name('reports.company.select');
 });
 

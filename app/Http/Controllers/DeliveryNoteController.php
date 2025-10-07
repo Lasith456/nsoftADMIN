@@ -236,7 +236,7 @@ public function checkStock(Request $request)
 
         $deliveryNote->update(['status' => $request->status]);
 
-        return redirect()->route('delivery-notes.manage')->with('success', 'Delivery Note status updated successfully.');
+        return redirect()->back()->with('success', 'Delivery Note status updated successfully.');
     }
 
     public function destroy(DeliveryNote $deliveryNote): RedirectResponse

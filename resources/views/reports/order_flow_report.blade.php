@@ -16,7 +16,7 @@
                 <label for="start_date" class="text-sm">From:</label>
                 <input type="date" name="start_date" id="start_date" value="{{ request('start_date') }}" class="border rounded-md p-1 text-sm">
             </div>
-             <div>
+            <div>
                 <label for="end_date" class="text-sm">To:</label>
                 <input type="date" name="end_date" id="end_date" value="{{ request('end_date') }}" class="border rounded-md p-1 text-sm">
             </div>
@@ -28,9 +28,16 @@
                     @endforeach
                 </select>
             </div>
-             <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-md text-xs uppercase">Filter</button>
-             <a href="{{ route('reports.order_flow') }}" class="px-4 py-2 bg-gray-200 text-black rounded-md text-xs uppercase">Clear</a>
+            <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-md text-xs uppercase">Filter</button>
+            <a href="{{ route('reports.order_flow') }}" class="px-4 py-2 bg-gray-200 text-black rounded-md text-xs uppercase">Clear</a>
+
+            {{-- Export Buttons --}}
+            <a href="{{ route('reports.order_flow.export.excel', request()->all()) }}" 
+            class="px-4 py-2 bg-green-600 text-white rounded-md text-xs uppercase">Export Excel</a>
+            <a href="{{ route('reports.order_flow.export.pdf', request()->all()) }}" 
+            class="px-4 py-2 bg-red-600 text-white rounded-md text-xs uppercase">Export PDF</a>
         </form>
+
 
         <div class="space-y-6">
             @forelse ($purchaseOrders as $po)

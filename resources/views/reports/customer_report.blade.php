@@ -8,14 +8,33 @@
                 <h2 class="text-2xl font-bold text-black">Customer Report</h2>
                 <p class="text-sm text-gray-500">A summary of each customer's activity.</p>
             </div>
-            <button onclick="window.print()" class="mt-3 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</button>
+            <div class="flex space-x-2">
+                    <a href="{{ route('reports.customers.export.excel', request()->query()) }}" 
+                    class="px-4 py-2 bg-green-600 text-white rounded-md text-xs uppercase font-semibold">Export Excel</a>
+                    <a href="{{ route('reports.customers.export.pdf', request()->query()) }}" 
+                    class="px-4 py-2 bg-red-600 text-white rounded-md text-xs uppercase font-semibold">Export PDF</a>
+                    <button onclick="window.print()" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</button>
+            </div>
         </div>
         
         <form action="{{ route('reports.customers') }}" method="GET" class="mb-4 print:hidden flex items-center space-x-2">
-            <input type="search" name="search" value="{{ request('search') }}" placeholder="Search by customer name..." class="border rounded-md p-1 text-sm w-64">
+            <div>
+                <label for="start_date" class="text-sm">Start Date:</label>
+                <input type="date" name="start_date" id="start_date" value="{{ request('start_date') }}" 
+                    class="border rounded-md p-1 text-sm">
+            </div>
+            <div>
+                <label for="end_date" class="text-sm">End Date:</label>
+                <input type="date" name="end_date" id="end_date" value="{{ request('end_date') }}" 
+                    class="border rounded-md p-1 text-sm">
+            </div>
+            <input type="search" name="search" value="{{ request('search') }}" 
+                placeholder="Search by customer name..." class="border rounded-md p-1 text-sm w-64">
             <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-md text-xs uppercase">Filter</button>
             <a href="{{ route('reports.customers') }}" class="px-4 py-2 bg-gray-200 text-black rounded-md text-xs uppercase">Clear</a>
         </form>
+
 
         <div class="overflow-x-auto">
             <table class="w-full min-w-full divide-y divide-gray-200">

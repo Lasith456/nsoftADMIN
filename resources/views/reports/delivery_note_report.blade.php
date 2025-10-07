@@ -8,7 +8,14 @@
                 <h2 class="text-2xl font-bold text-black">Delivery Note Report</h2>
                 <p class="text-sm text-gray-500">A detailed list of all delivery notes.</p>
             </div>
-            <button onclick="window.print()" class="mt-3 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</button>
+            <div class="flex space-x-2">
+                <a href="{{ route('reports.delivery_notes.export.excel', request()->query()) }}" 
+                   class="px-4 py-2 bg-green-600 text-white rounded-md text-xs uppercase font-semibold">Export Excel</a>
+                <a href="{{ route('reports.delivery_notes.export.pdf', request()->query()) }}" 
+                   class="px-4 py-2 bg-red-600 text-white rounded-md text-xs uppercase font-semibold">Export PDF</a>
+                <button onclick="window.print()" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</button>
+            </div>
         </div>
         
         <form action="{{ route('reports.delivery_notes') }}" method="GET" class="mb-4 print:hidden flex flex-wrap items-center gap-4">
@@ -40,6 +47,8 @@
                     <tr>
                         <th class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">DN ID</th>
                         <th class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Vehicle</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Driver</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Contact No</th>
                         <th class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Delivery Date</th>
                         <th class="px-4 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Status</th>
                     </tr>
@@ -49,6 +58,8 @@
                     <tr>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $dn->delivery_note_id }}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $dn->vehicle->vehicle_no ?? 'N/A' }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $dn->driver_name ?? 'N/A' }}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $dn->driver_mobile ?? 'N/A' }}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-black">{{ $dn->delivery_date->format('Y-m-d') }}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
@@ -67,7 +78,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="4" class="px-4 py-2 text-center text-sm text-gray-500">
+                        <td colspan="6" class="px-4 py-2 text-center text-sm text-gray-500">
                             No delivery notes found for the selected filters.
                         </td>
                     </tr>
@@ -90,4 +101,3 @@
     }
 </style>
 @endsection
-

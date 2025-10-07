@@ -3,14 +3,37 @@
 @section('content')
 <div class="bg-white shadow-md rounded-lg p-4">
     <div id="report-content">
+
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 pb-3 border-b print:hidden">
             <div>
                 <h2 class="text-2xl font-bold text-black">Stock Level Report</h2>
                 <p class="text-sm text-gray-500">A real-time overview of all product stock levels.</p>
             </div>
-            <button onclick="window.print()" class="mt-3 md:mt-0 px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</button>
+            <div class="flex space-x-2">
+                <a href="{{ route('reports.stock_level.export.excel', request()->query()) }}" 
+                class="px-4 py-2 bg-green-600 text-white rounded-md text-xs uppercase font-semibold">Export Excel</a>
+                <a href="{{ route('reports.stock_level.export.pdf', request()->query()) }}" 
+                class="px-4 py-2 bg-red-600 text-white rounded-md text-xs uppercase font-semibold">Export PDF</a>
+                <button onclick="window.print()" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold">Print</button>
+            </div>
         </div>
-        
+        <!-- Department Filter -->
+        <form action="{{ route('reports.stock_levels') }}" method="GET" class="mb-4 print:hidden flex items-center space-x-2">
+            <div>
+                <label for="department_id" class="text-sm">Department:</label>
+                <select name="department_id" id="department_id" class="border rounded-md p-1 text-sm">
+                    <option value="">-- All Departments --</option>
+                    @foreach ($departments as $dept)
+                        <option value="{{ $dept->id }}" {{ request('department_id') == $dept->id ? 'selected' : '' }}>
+                            {{ $dept->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-md text-xs uppercase">Filter</button>
+            <a href="{{ route('reports.stock_levels') }}" class="px-4 py-2 bg-gray-200 text-black rounded-md text-xs uppercase">Clear</a>
+        </form>
         <div class="overflow-x-auto">
             <table class="w-full min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
