@@ -36,28 +36,50 @@
                     <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">
                         1. Select Delivery Notes
                     </h3>
-                    
+
                     <!-- Filters -->
                     <form action="{{ route('receive-notes.create') }}" method="GET"
-                          class="mb-2 p-2 bg-gray-50 dark:bg-gray-700 rounded-md flex flex-wrap gap-2 items-center text-sm">
+                          class="mb-2 p-2 bg-gray-50 dark:bg-gray-700 rounded-md flex flex-wrap gap-2 items-center text-xs">
+
+                        <!-- Company -->
+                        <div class="w-full">
+                            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200">Company <span class="text-red-500">*</span></label>
+                            <select id="company_id"
+                                    x-model="selectedCompany"
+                                    @change="filterCustomersByCompany"
+                                    class="mt-1 block w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md py-1 px-2">
+                                <option value="">Select Company</option>
+                                @foreach($companies as $company)
+                                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Customer -->
+                        <div class="w-full">
+                            <label class="block text-sm font-medium text-gray-800 dark:text-gray-200">Customer <span class="text-red-500">*</span></label>
+                            <input list="customers-list"
+                                   x-model="customerName"
+                                   @change="setCustomerId"
+                                   placeholder="Type customer name..."
+                                   class="mt-1 block w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md py-1 px-2"
+                                   :disabled="!selectedCompany">
+                            <datalist id="customers-list">
+                                <template x-for="cust in filteredCustomers" :key="cust.id">
+                                    <option :value="cust.customer_name" :data-id="cust.id"></option>
+                                </template>
+                            </datalist>
+                            <input type="hidden" name="customer_id" x-model="selectedCustomer">
+                            <p x-show="customerError" class="text-red-600 text-xs mt-1" x-text="customerError"></p>
+                        </div>
+
+                        <!-- Dates -->
                         <input type="date" name="from_date" value="{{ request('from_date') }}"
-                               class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md p-1">
+                               class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md px-2 py-0.5 w-32 text-xs">
                         <input type="date" name="to_date" value="{{ request('to_date') }}"
-                               class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md p-1">
-                        <button type="submit" class="px-3 py-1 bg-gray-800 text-white rounded-md text-xs">Filter</button>
-                        <a href="{{ route('receive-notes.create') }}" class="px-3 py-1 bg-gray-200 text-black rounded-md text-xs">Clear</a>
-                        <select name="customer_id"
-                                class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md p-1 w-full"
-                                onchange="this.form.submit()">
-                            <option value="">Select Customer</option>
-                            @foreach($customers as $customer)
-                                <option value="{{ $customer->id }}" {{ request('customer_id') == $customer->id ? 'selected' : '' }}>
-                                    {{ $customer->customer_name }}
-                                </option>
-                            @endforeach
-                        </select>
-
-
+                               class="border border-gray-300 dark:border-gray-600 dark:bg-gray-900 rounded-md px-2 py-0.5 w-32 text-xs">
+                        <button type="submit" class="px-2 py-1 bg-gray-800 text-white rounded-md text-xs hover:bg-gray-700 transition">Filter</button>
+                        <a href="{{ route('receive-notes.create') }}" class="px-2 py-1 bg-gray-200 text-gray-800 rounded-md text-xs hover:bg-gray-300 transition">Clear</a>
                     </form>
 
                     <!-- Delivery Notes -->
@@ -116,7 +138,7 @@
                     <table class="w-full min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0">
                             <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium uppercase  w-64">Product</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium uppercase w-64">Product</th>
                                 <th class="px-4 py-2 text-right text-xs font-medium uppercase">Expected</th>
                                 <th class="px-4 py-2 text-right text-xs font-medium uppercase">Received</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium uppercase">Discrepancy Reason</th>
@@ -163,8 +185,38 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('receiveNoteForm', () => ({
+        selectedCompany: '',
+        customerName: '',
+        selectedCustomer: '',
+        filteredCustomers: [],
+        customerError: '',
+        customers: @json($allCustomers),
+
         selectedDeliveryNoteIds: [],
         items: [],
+
+        filterCustomersByCompany() {
+            if (!this.selectedCompany) {
+                this.filteredCustomers = [];
+                this.customerName = '';
+                this.selectedCustomer = '';
+                return;
+            }
+            this.filteredCustomers = this.customers.filter(c => c.company_id == this.selectedCompany);
+            this.customerName = '';
+            this.selectedCustomer = '';
+        },
+
+        setCustomerId() {
+            const match = this.filteredCustomers.find(c => c.customer_name === this.customerName);
+            if (match) {
+                this.selectedCustomer = match.id;
+                this.customerError = '';
+            } else {
+                this.selectedCustomer = '';
+                this.customerError = 'Customer not found or not in this company';
+            }
+        },
 
         fetchItems() {
             if (this.selectedDeliveryNoteIds.length === 0) {

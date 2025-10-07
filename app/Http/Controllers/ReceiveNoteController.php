@@ -30,39 +30,42 @@ class ReceiveNoteController extends Controller
     }
 
 
-    public function create(Request $request): View
-    {
-        $deliveryNotes = collect(); // empty by default
+public function create(Request $request): View
+{
+    $companies = \App\Models\Company::orderBy('company_name')->get();
 
-        if ($request->filled('customer_id')) {
-            $query = DeliveryNote::where('status', 'delivered')
-                ->whereDoesntHave('receiveNotes')
-                ->with(['purchaseOrders.customer']);
+    $deliveryNotes = collect(); // Empty by default
 
-            // Date filters
-            if ($request->filled('from_date')) {
-                $query->whereDate('delivery_date', '>=', $request->from_date);
-            }
-            if ($request->filled('to_date')) {
-                $query->whereDate('delivery_date', '<=', $request->to_date);
-            }
+    if ($request->filled('customer_id')) {
+        $query = DeliveryNote::where('status', 'delivered')
+            ->whereDoesntHave('receiveNotes')
+            ->with(['purchaseOrders.customer']);
 
-            // Customer filter
-            $query->whereHas('purchaseOrders', function ($q) use ($request) {
-                $q->where('customer_id', $request->customer_id);
-            });
-
-            $deliveryNotes = $query->latest()->get();
+        if ($request->filled('from_date')) {
+            $query->whereDate('delivery_date', '>=', $request->from_date);
+        }
+        if ($request->filled('to_date')) {
+            $query->whereDate('delivery_date', '<=', $request->to_date);
         }
 
-        // Always load customers who have eligible delivery notes
-        $customers = Customer::whereHas('purchaseOrders.deliveryNotes', function ($q) {
-            $q->where('status', 'delivered')
-            ->whereDoesntHave('receiveNotes');
-        })->orderBy('customer_name')->get();
+        $query->whereHas('purchaseOrders', function ($q) use ($request) {
+            $q->where('customer_id', $request->customer_id);
+        });
 
-        return view('receive_notes.create', compact('deliveryNotes', 'customers'));
+        $deliveryNotes = $query->latest()->get();
     }
+
+    // Load all customers with eligible delivery notes and their company
+    $allCustomers = Customer::whereHas('purchaseOrders.deliveryNotes', function ($q) {
+            $q->where('status', 'delivered')
+              ->whereDoesntHave('receiveNotes');
+        })
+        ->with('company:id,company_name')
+        ->orderBy('customer_name')
+        ->get();
+
+    return view('receive_notes.create', compact('deliveryNotes', 'allCustomers', 'companies'));
+}
 
 
 
