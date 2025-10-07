@@ -27,11 +27,38 @@ class DeliveryNoteController extends Controller
         $this->middleware('permission:delivery-note-delete', ['only' => ['destroy']]);
     }
     
-    public function index(): View
+    public function index(Request $request): View
     {
-        $deliveryNotes = DeliveryNote::with('vehicle')->latest()->paginate(10);
-        return view('delivery_notes.index', compact('deliveryNotes'));
+        // Base query with relationships
+        $query = DeliveryNote::with(['vehicle', 'purchaseOrders.customer.company']);
+
+        // ✅ Filter by company
+        if ($request->filled('company_id')) {
+            $query->whereHas('purchaseOrders.customer', function ($q) use ($request) {
+                $q->where('company_id', $request->company_id);
+            });
+        }
+
+        // ✅ Search filter (by DN ID or Vehicle)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('delivery_note_id', 'LIKE', "%{$search}%")
+                ->orWhereHas('vehicle', function ($q2) use ($search) {
+                    $q2->where('vehicle_no', 'LIKE', "%{$search}%");
+                });
+            });
+        }
+
+        // ✅ Fetch companies for dropdown
+        $companies = \App\Models\Company::orderBy('company_name')->get();
+
+        // ✅ Paginate with all filters
+        $deliveryNotes = $query->latest()->paginate(10);
+
+        return view('delivery_notes.index', compact('deliveryNotes', 'companies'));
     }
+
 
 public function create(Request $request): View
 {
