@@ -23,10 +23,39 @@ class ReceiveNoteController extends Controller
         $this->middleware('permission:receive-note-delete', ['only' => ['destroy']]);
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        $receiveNotes = ReceiveNote::with(['deliveryNotes', 'invoices'])->latest()->paginate(10);
-        return view('receive_notes.index', compact('receiveNotes'));
+        // Base query with all relationships
+        $query = ReceiveNote::with([
+            'deliveryNotes.purchaseOrders.customer.company', // ✅ To get customer + company
+            'invoices'
+        ]);
+
+        // ✅ Filter by company
+        if ($request->filled('company_id')) {
+            $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
+                $q->where('company_id', $request->company_id);
+            });
+        }
+
+        // ✅ Search filter (by RN ID or DN ID)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('receive_note_id', 'LIKE', "%{$search}%")
+                ->orWhereHas('deliveryNotes', function ($q2) use ($search) {
+                    $q2->where('delivery_note_id', 'LIKE', "%{$search}%");
+                });
+            });
+        }
+
+        // ✅ Fetch companies for dropdown
+        $companies = \App\Models\Company::orderBy('company_name')->get();
+
+        // ✅ Paginate
+        $receiveNotes = $query->latest()->paginate(10);
+
+        return view('receive_notes.index', compact('receiveNotes', 'companies'));
     }
 
 
