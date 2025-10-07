@@ -209,38 +209,62 @@ class InvoiceController extends Controller
             return back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
     }
-    public function createCustomerInvoice(): View
-    {
-        // ** THE FIX IS HERE: Create a clean data structure for the view. **
+    public function createCustomerInvoice(Request $request): View
+{
+    // Load all companies
+    $companies = \App\Models\Company::orderBy('company_name')->get();
 
-        // 1. Get all uninvoiced receive notes that have a customer.
-        $receiveNotes = ReceiveNote::where('status', '!=', 'invoiced')
-            ->whereHas('deliveryNotes.purchaseOrders.customer')
-            ->with('deliveryNotes.purchaseOrders.customer')
-            ->get();
+    // Base query for uninvoiced receive notes
+    $query = ReceiveNote::where('status', '!=', 'invoiced')
+        ->whereHas('deliveryNotes.purchaseOrders.customer')
+        ->with('deliveryNotes.purchaseOrders.customer');
 
-        // 2. Group these notes by their customer's ID.
-        $groupedByCustomer = $receiveNotes->groupBy(function ($rn) {
-            return $rn->deliveryNotes->first()?->purchaseOrders->first()?->customer?->id;
-        })->filter(); // Use filter() to remove any notes that failed to group (e.g., null customer ID).
-
-        // 3. Map the grouped data into a simple array for the view. This avoids model serialization issues.
-        $customersWithInvoices = $groupedByCustomer->map(function ($notes, $customerId) {
-            $customer = $notes->first()->deliveryNotes->first()->purchaseOrders->first()->customer;
-            return [
-                'id' => $customer->id,
-                'customer_name' => $customer->customer_name,
-                'customer_id' => $customer->customer_id,
-                'uninvoiced_receive_notes' => $notes->map(fn($rn) => [
-                    'id' => $rn->id,
-                    'receive_note_id' => $rn->receive_note_id,
-                    'received_date' => $rn->received_date,
-                ])->values()->all(),
-            ];
-        })->sortBy('customer_name')->values();
-
-        return view('invoices.create_customer_invoice', compact('customersWithInvoices'));
+    // Apply company filter
+    if ($request->filled('company_id')) {
+        $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
+            $q->where('company_id', $request->company_id);
+        });
     }
+
+    // Apply customer filter (if user already selected a customer)
+    if ($request->filled('customer_id')) {
+        $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
+            $q->where('id', $request->customer_id);
+        });
+    }
+
+    // Fetch filtered receive notes
+    $receiveNotes = $query->get();
+
+    // Group by customer ID
+    $groupedByCustomer = $receiveNotes->groupBy(function ($rn) {
+        return $rn->deliveryNotes->first()?->purchaseOrders->first()?->customer?->id;
+    })->filter();
+
+    // Create simplified structure
+    $customersWithInvoices = $groupedByCustomer->map(function ($notes, $customerId) {
+        $customer = $notes->first()->deliveryNotes->first()->purchaseOrders->first()->customer;
+        return [
+            'id' => $customer->id,
+            'customer_name' => $customer->customer_name,
+            'customer_id' => $customer->customer_id,
+            'company_id' => $customer->company_id,
+            'uninvoiced_receive_notes' => $notes->map(fn($rn) => [
+                'id' => $rn->id,
+                'receive_note_id' => $rn->receive_note_id,
+                'received_date' => $rn->received_date,
+            ])->values()->all(),
+        ];
+    })->sortBy('customer_name')->values();
+
+    // Fetch all customers with eligible receive notes
+    $allCustomers = \App\Models\Customer::whereHas('purchaseOrders.deliveryNotes.receiveNotes', function ($q) {
+        $q->where('status', '!=', 'invoiced');
+    })->orderBy('customer_name')->get();
+
+    return view('invoices.create_customer_invoice', compact('companies', 'allCustomers', 'customersWithInvoices'));
+}
+
 
 // public function storeCustomerInvoice(Request $request): RedirectResponse
 // {

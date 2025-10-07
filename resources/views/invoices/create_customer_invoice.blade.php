@@ -19,15 +19,11 @@
                        class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">
                         Cancel
                     </a>
-
-                    <!-- Blue button -->
                     <button type="submit" 
                             @click="mode = 'invoice'"
                             class="inline-flex items-center px-4 py-2 bg-blue-600 border rounded-md font-semibold text-xs text-white uppercase hover:bg-blue-700">
                         Generate Invoice
                     </button>
-
-                    <!-- Yellow button -->
                     @if(session('html_error'))
                         <button type="submit" 
                                 @click="mode = 'invoice_po'"
@@ -55,38 +51,56 @@
                 </div>
             @endif
 
-            <!-- Inline Alert -->
             <div x-show="showAlert" 
                  class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded">
-                Please select a customer and at least one receive note before proceeding.
+                Please select a company, customer, and at least one receive note before proceeding.
             </div>
 
-            <!-- Form Body -->
+            <!-- Main Form -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                <!-- Customer Dropdown -->
+                <!-- Company + Customer -->
                 <div>
-                    <h3 class="text-lg font-bold mb-2 text-gray-800 dark:text-gray-200">1. Select Customer</h3>
-                    <select x-model="selectedCustomerId" @change="setCustomer" 
-                            class="mt-1 block w-full border rounded-md dark:bg-gray-900 py-2 px-3">
-                        <option value="">-- Select Customer --</option>
-                        <template x-for="cust in customers" :key="cust.id">
-                            <option :value="cust.id" 
-                                    x-text="`${cust.customer_name} (${cust.customer_id})`"></option>
-                        </template>
+                    <h3 class="text-lg font-bold mb-2 text-gray-800 dark:text-gray-200">1. Select Company & Customer</h3>
+
+                    <!-- Company -->
+                    <select x-model="selectedCompany" @change="filterCustomersByCompany"
+                            class="block w-full border rounded-md dark:bg-gray-900 py-2 px-3 mb-2 text-sm">
+                        <option value="">-- Select Company --</option>
+                        @foreach($companies as $company)
+                            <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                        @endforeach
                     </select>
-                    <input type="hidden" name="customer_id" :value="selectedCustomerId">
+
+                    <!-- Customer -->
+                    <input list="customers-list"
+                           x-model="customerName"
+                           @change="setCustomerId"
+                           placeholder="Type customer name..."
+                           class="block w-full border rounded-md dark:bg-gray-900 py-2 px-3 text-sm"
+                           :disabled="!selectedCompany">
+                    <datalist id="customers-list">
+                        <template x-for="cust in filteredCustomers" :key="cust.id">
+                            <option :value="cust.customer_name" :data-id="cust.id"></option>
+                        </template>
+                    </datalist>
+                    <input type="hidden" name="customer_id" x-model="selectedCustomer">
+                    <p x-show="customerError" class="text-red-600 text-xs mt-1" x-text="customerError"></p>
                 </div>
 
                 <!-- Receive Notes -->
-                <div x-show="selectedCustomerId" x-cloak>
+                <div x-show="selectedCustomer" x-cloak>
                     <h3 class="text-lg font-bold mb-2 text-gray-800 dark:text-gray-200">2. Select Receive Notes</h3>
 
-                    <!-- Date Filter -->
-                    <div class="flex space-x-2 mb-2">
-                        <input type="date" x-model="dateFrom" class="border rounded p-1 text-sm">
-                        <input type="date" x-model="dateTo" class="border rounded p-1 text-sm">
-                        <button type="button" class="px-3 py-1 bg-gray-200 rounded text-xs" @click="applyDateFilter">Filter</button>
+                    <!-- Compact Date Filter -->
+                    <div class="flex space-x-1 mb-2 items-center text-xs">
+                        <input type="date" x-model="dateFrom"
+                               class="border rounded-md px-2 py-0.5 w-32 text-xs dark:bg-gray-900">
+                        <input type="date" x-model="dateTo"
+                               class="border rounded-md px-2 py-0.5 w-32 text-xs dark:bg-gray-900">
+                        <button type="button" class="px-2 py-1 bg-gray-800 text-white rounded-md text-xs hover:bg-gray-700"
+                                @click="applyDateFilter">Filter</button>
+                        <button type="button" class="px-2 py-1 bg-gray-200 text-gray-800 rounded-md text-xs hover:bg-gray-300"
+                                @click="clearDateFilter">Clear</button>
                     </div>
 
                     <!-- Select All -->
@@ -101,12 +115,9 @@
                             <template x-for="rn in filteredReceiveNotes" :key="rn.id">
                                 <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
                                     <input type="checkbox" :value="rn.id" x-model="selectedReceiveNotes">
-
-                                    <!-- RN clickable for popup -->
                                     <span class="ml-3 text-sm text-blue-600 underline cursor-pointer"
                                           @click.prevent="openRnPopup(rn.id)"
                                           x-text="`${rn.receive_note_id}`"></span>
-
                                     <span class="ml-2 text-gray-500 text-xs"
                                           x-text="new Date(rn.received_date).toLocaleDateString()"></span>
                                 </label>
@@ -119,17 +130,15 @@
                 </div>
             </div>
 
-            <!-- Hidden sync for selected notes -->
+            <!-- Hidden fields -->
             <template x-for="id in selectedReceiveNotes" :key="id">
                 <input type="hidden" name="receive_note_ids[]" :value="id">
             </template>
-
-            <!-- Hidden mode input -->
             <input type="hidden" name="create_po" :value="mode === 'invoice_po' ? 1 : ''">
         </form>
     </div>
 
-    <!-- Popup Modal with iframe -->
+    <!-- Popup -->
     <div x-show="isRnPopupOpen" 
          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
          @click.away="isRnPopupOpen = false"
@@ -144,66 +153,89 @@
     </div>
 </div>
 
-<!-- Alpine.js Script -->
+<!-- Alpine.js -->
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('customerInvoiceForm', () => ({
-        customers: @json($customersWithInvoices),
+        companies: @json($companies),
+        customers: @json($allCustomers),
+        selectedCompany: '',
+        filteredCustomers: [],
+        customerName: '',
+        selectedCustomer: '',
+        customerError: '',
+
+        customersWithInvoices: @json($customersWithInvoices),
         selectedCustomerId: '',
-        selectedCustomer: null,
         selectedReceiveNotes: [],
         dateFrom: '',
         dateTo: '',
         showAlert: false,
         mode: 'invoice',
 
-        // popup state
         isRnPopupOpen: false,
         rnPopupUrl: '',
 
-        get availableReceiveNotes() {
-            return this.selectedCustomer ? this.selectedCustomer.uninvoiced_receive_notes : [];
+        filterCustomersByCompany() {
+            if (!this.selectedCompany) {
+                this.filteredCustomers = [];
+                this.customerName = '';
+                this.selectedCustomer = '';
+                return;
+            }
+            this.filteredCustomers = this.customers.filter(c => c.company_id == this.selectedCompany);
+            this.customerName = '';
+            this.selectedCustomer = '';
         },
-        get filteredReceiveNotes() {
-            if (!this.dateFrom && !this.dateTo) return this.availableReceiveNotes;
-            return this.availableReceiveNotes.filter(rn => {
-                let date = new Date(rn.received_date);
-                let from = this.dateFrom ? new Date(this.dateFrom) : null;
-                let to = this.dateTo ? new Date(this.dateTo) : null;
-                return (!from || date >= from) && (!to || date <= to);
-            });
-        },
-        setCustomer() {
-            this.selectedCustomer = this.customers.find(c => c.id == this.selectedCustomerId) || null;
-            this.selectedReceiveNotes = [];
-        },
-        toggleSelectAll(event) {
-            if (event.target.checked) {
-                this.selectedReceiveNotes = this.filteredReceiveNotes.map(rn => rn.id);
+
+        setCustomerId() {
+            const match = this.filteredCustomers.find(c => c.customer_name === this.customerName);
+            if (match) {
+                this.selectedCustomer = match.id;
+                this.selectedCustomerId = match.id;
+                this.customerError = '';
             } else {
-                this.selectedReceiveNotes = [];
+                this.selectedCustomer = '';
+                this.customerError = 'Customer not found or not in this company';
             }
         },
-        applyDateFilter() {
-            this.selectedReceiveNotes = [];
+
+        get selectedCustomerData() {
+            return this.customersWithInvoices.find(c => c.id == this.selectedCustomer) || null;
         },
+        get filteredReceiveNotes() {
+            if (!this.selectedCustomerData) return [];
+            let notes = this.selectedCustomerData.uninvoiced_receive_notes;
+            if (!this.dateFrom && !this.dateTo) return notes;
+            return notes.filter(rn => {
+                let d = new Date(rn.received_date);
+                let from = this.dateFrom ? new Date(this.dateFrom) : null;
+                let to = this.dateTo ? new Date(this.dateTo) : null;
+                return (!from || d >= from) && (!to || d <= to);
+            });
+        },
+
+        toggleSelectAll(event) {
+            this.selectedReceiveNotes = event.target.checked
+                ? this.filteredReceiveNotes.map(rn => rn.id)
+                : [];
+        },
+        applyDateFilter() { this.selectedReceiveNotes = []; },
+        clearDateFilter() { this.dateFrom = ''; this.dateTo = ''; this.selectedReceiveNotes = []; },
+
         handleSubmit(e) {
-            if (!this.selectedCustomerId || this.selectedReceiveNotes.length === 0) {
+            if (!this.selectedCustomer || this.selectedReceiveNotes.length === 0) {
                 this.showAlert = true;
                 return;
             }
             this.showAlert = false;
             e.target.submit();
         },
-
-        // ✅ show RN full page (with sidebar) inside iframe
-        openRnPopup(rnId) {
-            this.rnPopupUrl = `/receive-notes/${rnId}/popup`; // 👈 clean view without navbar
+        openRnPopup(id) {
+            this.rnPopupUrl = `/receive-notes/${id}/popup`;
             this.isRnPopupOpen = true;
-        }
-
+        },
     }));
 });
 </script>
-
 @endsection
