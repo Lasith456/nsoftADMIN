@@ -45,16 +45,19 @@ class PurchaseOrderController extends Controller
 
 public function create(Request $request): View
 {
+    $companies   = \App\Models\Company::orderBy('company_name')->get();
     $customers   = Customer::where('is_active', true)->orderBy('customer_name')->get();
     $products    = Product::where('is_active', true)->orderBy('name')->get();
     $departments = \App\Models\Department::orderBy('name')->get();
 
-    // Prefill from discrepancy link
     $prefillCustomerId = $request->query('customer_id');
     $shortages = $request->query('shortages', []);
 
-    return view('purchase_orders.create', compact('customers', 'products', 'departments', 'prefillCustomerId', 'shortages'));
+    return view('purchase_orders.create', compact(
+        'companies', 'customers', 'products', 'departments', 'prefillCustomerId', 'shortages'
+    ));
 }
+
 
 
     public function store(Request $request): RedirectResponse

@@ -30,26 +30,46 @@
 
             <!-- Main PO Details -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <!-- Company -->
+                <div>
+                    <label for="company_id" class="block text-sm font-medium">Company <span class="text-red-500">*</span></label>
+                    <select id="company_id" name="company_id"
+                            x-model="selectedCompany"
+                            @change="filterCustomersByCompany"
+                            class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3"
+                            required>
+                        <option value="">Select Company</option>
+                        @foreach($companies as $company)
+                            <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Customer -->
                 <div>
                     <label for="customer_name" class="block text-sm font-medium">Customer <span class="text-red-500">*</span></label>
                     <input list="customers-list"
                            id="customer_name"
+                           x-model="customerName"
+                           @change="setCustomerId"
+                           placeholder="Type customer name..."
                            class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3"
-                           value="{{ isset($prefillCustomerId) ? optional($customers->firstWhere('id',$prefillCustomerId))->customer_name : '' }}"
-                           {{ isset($prefillCustomerId) ? 'readonly' : '' }} {{-- Lock customer if prefilled --}}
-                           required>
+                           required
+                           :disabled="!selectedCompany">
                     <datalist id="customers-list">
-                        @foreach($customers as $customer)
-                            <option value="{{ $customer->customer_name }}" data-id="{{ $customer->id }}"></option>
-                        @endforeach
+                        <template x-for="cust in filteredCustomers" :key="cust.id">
+                            <option :value="cust.customer_name" :data-id="cust.id"></option>
+                        </template>
                     </datalist>
-                    <input type="hidden" name="customer_id" id="customer_id" value="{{ $prefillCustomerId ?? '' }}">
+                    <input type="hidden" name="customer_id" x-model="selectedCustomer">
+                    <p x-show="customerError" class="text-red-600 text-xs mt-1" x-text="customerError"></p>
                 </div>
+            </div>
 
-                <div>
-                    <label for="delivery_date" class="block text-sm font-medium">Delivery Date <span class="text-red-500">*</span></label>
-                    <input type="date" name="delivery_date" id="delivery_date" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
-                </div>
+            <!-- Delivery Date -->
+            <div class="mb-4">
+                <label for="delivery_date" class="block text-sm font-medium">Delivery Date <span class="text-red-500">*</span></label>
+                <input type="date" name="delivery_date" id="delivery_date" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
             </div>
 
             <!-- Prefilled shortages from discrepancy -->
@@ -176,46 +196,50 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('simplifiedPoForm', () => ({
         items: [],
         products: @json($products),
+        customers: @json($customers),
+        selectedCompany: '',
+        customerName: '',
+        selectedCustomer: '',
+        filteredCustomers: [],
+        customerError: '',
         selectedDepartment: '',
         departmentName: '',
         departmentError: '',
         currentItem: { product_id: '', product_name: '' },
         quantity: 1,
-        
+
         get filteredProducts() {
             if (!this.selectedDepartment) return [];
             return this.products.filter(p => p.department_id == this.selectedDepartment);
         },
 
-        init() {
-            const customerInput = document.getElementById('customer_name');
-            const customerIdInput = document.getElementById('customer_id');
-            if (customerInput.value) {
-                const options = document.getElementById('customers-list').options;
-                for (let i=0;i<options.length;i++) {
-                    if (options[i].value === customerInput.value) {
-                        customerIdInput.value = options[i].dataset.id;
-                        break;
-                    }
-                }
+        filterCustomersByCompany() {
+            if (!this.selectedCompany) {
+                this.filteredCustomers = [];
+                this.customerName = '';
+                this.selectedCustomer = '';
+                return;
             }
-            customerInput.addEventListener('change', function() {
-                let cid = '';
-                const options = document.getElementById('customers-list').options;
-                for (let i=0;i<options.length;i++) {
-                    if (options[i].value === this.value) {
-                        cid = options[i].dataset.id;
-                        break;
-                    }
-                }
-                customerIdInput.value = cid;
-            });
+            this.filteredCustomers = this.customers.filter(c => c.company_id == this.selectedCompany);
+            this.customerName = '';
+            this.selectedCustomer = '';
+        },
+
+        setCustomerId() {
+            const match = this.filteredCustomers.find(c => c.customer_name === this.customerName);
+            if (match) {
+                this.selectedCustomer = match.id;
+                this.customerError = '';
+            } else {
+                this.selectedCustomer = '';
+                this.customerError = 'Customer not found or not in this company';
+            }
         },
 
         departmentChangedByName() {
             const options = document.getElementById('departments-list').options;
             let deptId = '';
-            for (let i=0;i<options.length;i++) {
+            for (let i = 0; i < options.length; i++) {
                 if (options[i].value === this.departmentName) {
                     deptId = options[i].dataset.id;
                     break;
