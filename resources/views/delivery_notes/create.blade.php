@@ -24,6 +24,7 @@
                         <thead class="bg-gray-100 dark:bg-gray-700">
                             <tr>
                                 <th class="px-3 py-2 text-left">Product</th>
+                                <th class="px-3 py-2 text-left">Department</th> 
                                 <th class="px-3 py-2 text-right">Clear Stock</th>
                                 <th class="px-3 py-2 text-right">Non-Clear Stock</th>
                                 <th class="px-3 py-2 text-right">Requested</th>
@@ -34,6 +35,7 @@
                             <template x-for="item in convertibleItems" :key="item.product_id">
                                 <tr>
                                     <td class="px-3 py-2" x-text="item.product_name"></td>
+                                    <td class="px-3 py-2" x-text="item.department_name || 'N/A'"></td>
                                     <td class="px-3 py-2 text-right" x-text="item.clear_stock"></td>
                                     <td class="px-3 py-2 text-right" x-text="item.non_clear_stock"></td>
                                     <td class="px-3 py-2 text-right" x-text="item.requested"></td>
