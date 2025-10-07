@@ -108,13 +108,22 @@ class PaymentController extends Controller
     }
 public function createBulk(Request $request, Customer $customer = null): View
 {
-    $allCustomers = Customer::whereHas('invoices', function ($query) {
-        $query->whereIn('status', ['unpaid', 'partially-paid']);
-    })->orderBy('customer_name')->get();
+    // Load all companies
+    $companies = \App\Models\Company::orderBy('company_name')->get();
 
+    // Load all customers that have unpaid or partially-paid invoices
+    $allCustomers = Customer::whereHas('invoices', function ($query) {
+            $query->whereIn('status', ['unpaid', 'partially-paid']);
+        })
+        ->with('company:id,company_name')
+        ->orderBy('customer_name')
+        ->get();
+
+    // Active banks
     $banks = Bank::where('is_active', true)->orderBy('name')->get();
 
     return view('payments.create_bulk', [
+        'companies' => $companies,
         'customers' => $allCustomers,
         'selectedCustomerId' => $customer?->id,
         'banks' => $banks,
