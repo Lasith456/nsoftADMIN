@@ -53,15 +53,37 @@
         </div>
     @endif
 
-    {{-- Search Form --}}
-    <form x-data x-ref="searchForm" action="{{ route('purchase-orders.index') }}" method="GET" class="mb-4">
-        <div class="flex justify-end">
-            <div class="flex items-center">
-                <label for="search" class="mr-2 text-sm text-black">Search:</label>
-                <input type="search" name="search" id="search" class="border border-gray-300 rounded-md p-2 text-sm text-black" value="{{ request('search') }}" @input.debounce.600ms="$refs.searchForm.submit()" placeholder="PO ID, Customer...">
-            </div>
+    {{-- Filter + Search --}}
+    <form x-data x-ref="filterForm" action="{{ route('purchase-orders.index') }}" method="GET" class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 space-y-2 md:space-y-0 md:space-x-3">
+
+        {{-- Company Filter --}}
+        <div class="flex items-center">
+            <label for="company_id" class="mr-2 text-sm text-black">Company:</label>
+            <select name="company_id" id="company_id"
+                    class="border border-gray-300 rounded-md p-2 text-sm text-black"
+                    onchange="this.form.submit()">
+                <option value="">All Companies</option>
+                @foreach($companies as $company)
+                    <option value="{{ $company->id }}" {{ request('company_id') == $company->id ? 'selected' : '' }}>
+                        {{ $company->company_name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        {{-- Search Box --}}
+        <div class="flex items-center">
+            <label for="search" class="mr-2 text-sm text-black">Search:</label>
+            <input type="search"
+                name="search"
+                id="search"
+                class="border border-gray-300 rounded-md p-2 text-sm text-black"
+                value="{{ request('search') }}"
+                placeholder="PO ID, Customer..."
+                @input.debounce.600ms="$refs.filterForm.submit()">
         </div>
     </form>
+
 
     {{-- Purchase Orders Table --}}
     <div class="overflow-x-auto">

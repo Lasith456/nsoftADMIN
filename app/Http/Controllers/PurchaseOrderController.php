@@ -28,19 +28,33 @@ class PurchaseOrderController extends Controller
 
     public function index(Request $request): View
     {
-        $query = PurchaseOrder::with('customer');
+        // Base query with customer and company relationships
+        $query = PurchaseOrder::with(['customer.company']);
 
-        // Handle the search functionality
-        if ($request->has('search') && $request->search != '') {
-            $search = $request->search;
-            $query->where('po_id', 'LIKE', "%{$search}%")
-                  ->orWhereHas('customer', function ($q) use ($search) {
-                      $q->where('customer_name', 'LIKE', "%{$search}%");
-                  });
+        // ✅ Filter by company
+        if ($request->filled('company_id')) {
+            $query->whereHas('customer', function ($q) use ($request) {
+                $q->where('company_id', $request->company_id);
+            });
         }
 
+        // ✅ Search filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('po_id', 'LIKE', "%{$search}%")
+                ->orWhereHas('customer', function ($q2) use ($search) {
+                    $q2->where('customer_name', 'LIKE', "%{$search}%");
+                });
+            });
+        }
+
+        // Fetch all companies for dropdown
+        $companies = \App\Models\Company::orderBy('company_name')->get();
+
         $purchaseOrders = $query->latest()->paginate(10);
-        return view('purchase_orders.index', compact('purchaseOrders'));
+
+        return view('purchase_orders.index', compact('purchaseOrders', 'companies'));
     }
 
 public function create(Request $request): View
