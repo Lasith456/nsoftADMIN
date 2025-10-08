@@ -43,7 +43,7 @@
         <thead>
             <tr>
                 <th>RN ID</th>
-                <th>Company</th>
+                <th>Customer Name</th>
                 <th>Associated DNs</th>
                 <th>Assigned POs</th>
                 <th>Received Date</th>
@@ -64,16 +64,17 @@
                         ->implode(', ');
 
                     // 🟢 Collect all companies related to these POs
-                    $companyNames = $rn->deliveryNotes
-                        ->flatMap(fn($dn) => $dn->purchaseOrders->pluck('customer.company.company_name'))
+                    $customerName = $rn->deliveryNotes
+                        ->flatMap(fn($dn) => $dn->purchaseOrders->pluck('customer.customer_name'))
                         ->filter()
                         ->unique()
                         ->implode(', ');
+
                 @endphp
 
                 <tr>
                     <td>{{ $rn->receive_note_id }}</td>
-                    <td>{{ $companyNames ?: 'N/A' }}</td>
+                    <td>{{ $customerName ?: 'N/A' }}</td>
                     <td>{{ $rn->deliveryNotes->pluck('delivery_note_id')->implode(', ') ?: 'N/A' }}</td>
                     <td>{{ $poIds ?: 'N/A' }}</td>
                     <td>{{ $rn->received_date?->format('Y-m-d') ?? 'N/A' }}</td>

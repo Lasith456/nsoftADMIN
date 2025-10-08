@@ -61,7 +61,7 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">DN ID</th>
-                        <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Company</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Customer Name</th>
                         <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Vehicle</th>
                         <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Driver</th>
                         <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Contact No</th>
@@ -73,7 +73,15 @@
                     @forelse ($deliveryNotes as $dn)
                         <tr>
                             <td class="px-3 py-2 text-sm text-black">{{ $dn->delivery_note_id }}</td>
-                            <td class="px-3 py-2 text-sm text-black">{{ $dn->company->company_name ?? 'N/A' }}</td>
+                            @php
+                                $customerNames = $dn->purchaseOrders
+                                    ->pluck('customer.customer_name')
+                                    ->filter()
+                                    ->unique()
+                                    ->implode(', ');
+                            @endphp
+
+                            <td class="px-3 py-2 text-sm text-black">{{ $customerNames ?: 'N/A' }}</td>
                             <td class="px-3 py-2 text-sm text-black">{{ $dn->vehicle->vehicle_no ?? 'N/A' }}</td>
                             <td class="px-3 py-2 text-sm text-black">{{ $dn->driver_name ?? 'N/A' }}</td>
                             <td class="px-3 py-2 text-sm text-black">{{ $dn->driver_mobile ?? 'N/A' }}</td>

@@ -65,7 +65,7 @@
         <thead>
             <tr>
                 <th>DN ID</th>
-                <th>Company</th>
+                <th>Customer</th>
                 <th>Vehicle</th>
                 <th>Driver Name</th>
                 <th>Contact No</th>
@@ -75,9 +75,17 @@
         </thead>
         <tbody>
             @forelse ($deliveryNotes as $dn)
+                @php
+                    // Collect unique customer names from associated purchase orders
+                    $customerNames = $dn->purchaseOrders
+                        ->pluck('customer.customer_name')
+                        ->filter()
+                        ->unique()
+                        ->implode(', ');
+                @endphp
                 <tr>
                     <td>{{ $dn->delivery_note_id }}</td>
-                    <td>{{ $dn->company->company_name ?? 'N/A' }}</td>
+                    <td>{{ $customerNames ?: 'N/A' }}</td>
                     <td>{{ $dn->vehicle->vehicle_no ?? 'N/A' }}</td>
                     <td>{{ $dn->driver_name ?? 'N/A' }}</td>
                     <td>{{ $dn->driver_mobile ?? 'N/A' }}</td>

@@ -192,8 +192,11 @@
         <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Create Delivery Note</h2>
             <div class="flex items-center space-x-2">
-                <a href="{{ route('delivery-notes.index') }}"
+                                <a href="{{ route('delivery-notes.index') }}"
                    class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-xs uppercase font-semibold">Back</a>
+                  <a href="{{ route('agents.create') }}"
+                   class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-xs uppercase font-semibold">Create Agent</a>
+
                 <button type="submit"
                         form="deliveryForm"
                         class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold"

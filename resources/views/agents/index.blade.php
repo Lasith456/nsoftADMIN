@@ -16,13 +16,33 @@
                 </ol>
             </nav>
         </div>
-        {{-- Add Agent Button --}}
-        @can('agent-create')
-            <a class="mt-3 md:mt-0 inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 active:bg-gray-900" href="{{ route('agents.create') }}">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                Add Agent
-            </a>
-        @endcan
+
+        {{-- Action Buttons --}}
+        <div class="flex items-center space-x-2">
+            @can('delivery-note-create')
+                <a href="{{ route('delivery-notes.create') }}"
+                class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    Create DN
+                </a>
+            @endcan
+
+            @can('agent-create')
+                <a href="{{ route('agents.create') }}"
+                class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 6v6m0 0v6m-6-6h12M6 12h12"/>
+                    </svg>
+                    Add Agent
+                </a>
+            @endcan
+        </div>
+
+        
     </div>
 
     {{-- Success Message --}}

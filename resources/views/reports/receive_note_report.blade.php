@@ -75,7 +75,7 @@
                         <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">RN ID</th>
                         <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Associated DN(s)</th>
                         <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Assigned PO(s)</th>
-                        <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Company</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Customer Name</th>
                         <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Received Date</th>
                         <th class="px-3 py-2 text-left text-xs font-medium text-black uppercase tracking-wider">Status</th>
                     </tr>
@@ -93,18 +93,19 @@
                                 ->unique()
                                 ->implode(', ');
 
-                            $companyName = $rn->deliveryNotes
-                                ->flatMap(fn($dn) => $dn->purchaseOrders->pluck('customer.company.company_name'))
+                           $customerName = $rn->deliveryNotes
+                                ->flatMap(fn($dn) => $dn->purchaseOrders->pluck('customer.customer_name'))
                                 ->filter()
                                 ->unique()
                                 ->implode(', ');
+
                         @endphp
 
                         <tr>
                             <td class="px-3 py-2 text-sm text-black">{{ $rn->receive_note_id }}</td>
                             <td class="px-3 py-2 text-sm text-black">{{ $dnList ?: 'N/A' }}</td>
                             <td class="px-3 py-2 text-sm text-black">{{ $poList ?: 'N/A' }}</td>
-                            <td class="px-3 py-2 text-sm text-black">{{ $companyName ?: 'N/A' }}</td>
+                            <td class="px-3 py-2 text-sm text-black">{{ $customerName ?: 'N/A' }}</td>
                             <td class="px-3 py-2 text-sm text-black">{{ $rn->received_date->format('Y-m-d') }}</td>
                             <td class="px-3 py-2 text-sm">
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
