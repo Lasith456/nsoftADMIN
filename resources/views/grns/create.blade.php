@@ -252,27 +252,90 @@ document.addEventListener('alpine:init', () => {
             is_free_issue: false,
             free_issue_qty: 0,
         },
+init() {
+    const supplierInput = document.getElementById('supplier_name');
+    const supplierIdInput = document.getElementById('supplier_id');
 
-        init() {
-            const supplierInput = document.getElementById('supplier_name');
-            const supplierIdInput = document.getElementById('supplier_id');
-            supplierInput.addEventListener('change', function () {
-                const supplierName = this.value;
-                let supplierId = '';
-                const options = document.getElementById('suppliers-list').options;
-                for (let i = 0; i < options.length; i++) {
-                    if (options[i].value === supplierName) {
-                        supplierId = options[i].dataset.id;
-                        break;
-                    }
-                }
-                supplierIdInput.value = supplierId || '';
-                if (!supplierId) {
-                    alert('Supplier not found. Please select a valid supplier from the list.');
-                    this.value = '';
-                }
-            });
-        },
+    // === SUPPLIER HANDLER ===
+    supplierInput.addEventListener('change', function () {
+        const supplierName = this.value;
+        const options = document.querySelectorAll('#suppliers-list option');
+        const matched = Array.from(options).find(opt => opt.value === supplierName);
+        if (matched) {
+            supplierIdInput.value = matched.dataset.id;
+        } else {
+            supplierIdInput.value = '';
+            alert('Supplier not found. Please select a valid supplier from the list.');
+            this.value = '';
+        }
+    });
+
+    // === PREFILL FROM URL PARAMETERS ===
+    const params = new URLSearchParams(window.location.search);
+    const supplierId = params.get('supplier_id');
+    const departmentId = params.get('department_id');
+    const productId = params.get('product_id');
+    const shortage = params.get('shortage');
+    const productName = params.get('product_name');
+
+    // ✅ Prefill Supplier
+    if (supplierId) {
+        const match = Array.from(document.querySelectorAll('#suppliers-list option'))
+            .find(opt => opt.dataset.id == supplierId);
+        if (match) {
+            supplierInput.value = match.value;
+            supplierIdInput.value = supplierId;
+        }
+    }
+
+    // ✅ Wait a tick so Alpine data is ready before setting department
+    this.$nextTick(() => {
+        const deptMatch = Array.from(document.querySelectorAll('#departments-list option'))
+            .find(opt => opt.dataset.id == departmentId);
+
+        if (deptMatch) {
+            // Show department name
+            this.departmentName = deptMatch.value;
+            // Set selected ID
+            this.selectedDepartment = parseInt(departmentId);
+            // Reset any old error
+            this.departmentError = '';
+        } else if (departmentId) {
+            // Only show error if ID was passed but not found
+            this.departmentError = `Department ID ${departmentId} not found in list`;
+        }
+
+        // ✅ Prefill Product (after department known)
+        if (productId) {
+            const prod = this.products.find(p => p.id == productId);
+            if (prod) {
+                this.currentItem.product_id = prod.id;
+                this.currentItem.product_name = prod.name;
+                this.currentItem.cost_price = parseFloat(prod.cost_price);
+                this.currentItem.selling_price = parseFloat(prod.selling_price);
+                this.currentItem.units_per_case = prod.units_per_case || 1;
+                this.currentItem.stock_type = prod.is_clear ? 'clear' : 'non-clear';
+            }
+        }
+
+        // ✅ Prefill Shortage quantity
+        if (shortage) {
+            this.currentItem.quantity = parseFloat(shortage);
+        }
+
+        // ✅ Highlight product input for visual focus
+        setTimeout(() => {
+            const productInput = document.querySelector('input[list="products-list"]');
+            if (productInput) {
+                productInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                productInput.classList.add('ring', 'ring-blue-400');
+                setTimeout(() => productInput.classList.remove('ring', 'ring-blue-400'), 2000);
+            }
+        }, 600);
+    });
+},
+
+
 
         get filteredProducts() {
             if (!this.selectedDepartment) return [];

@@ -265,6 +265,7 @@ public function checkStock(Request $request)
         $response[] = [
             'product_id' => $product->id,
             'product_name' => $product->name,
+            'department_id' => $product->department->id ?? null, 
             'department_name' => $product->department->name ?? 'N/A', // ✅ Added department name safely
             'requested' => $item->total_quantity,
             'clear_stock' => $product->clear_stock_quantity,

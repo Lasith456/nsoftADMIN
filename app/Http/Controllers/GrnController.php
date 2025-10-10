@@ -47,14 +47,39 @@ class GrnController extends Controller
         return view('grns.index', compact('grns'));
     }
 
-    public function create(): View
+        public function create(Request $request): View
     {
-        $suppliers = Supplier::where('is_active', true)->orderBy('supplier_name')->get();
-        $products = Product::where('is_active', true)->orderBy('name')->get();
+        // Fetch base data
+        $suppliers = Supplier::where('is_active', true)
+            ->orderBy('supplier_name')
+            ->get();
+
+        $products = Product::where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
         $departments = Department::orderBy('name')->get();
 
-        return view('grns.create', compact('suppliers', 'products', 'departments'));
+        // ✅ Capture query parameters (passed from Delivery Note Create page)
+        $selectedSupplierId = $request->query('supplier_id');
+        $selectedProductId = $request->query('product_id');
+        $selectedDepartmentId = $request->query('department_id');
+        $shortage = $request->query('shortage');
+        $productName = $request->query('product_name');
+
+        // ✅ Pass all variables to view
+        return view('grns.create', compact(
+            'suppliers',
+            'products',
+            'departments',
+            'selectedSupplierId',
+            'selectedProductId',
+            'selectedDepartmentId',
+            'shortage',
+            'productName'
+        ));
     }
+
 
     public function store(Request $request): RedirectResponse
     {

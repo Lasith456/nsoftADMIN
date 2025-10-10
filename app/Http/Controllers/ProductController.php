@@ -148,7 +148,8 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'appear_name' => 'required|string|max:255',
             'department_id' => 'required|exists:departments,id',
-            'units_per_case' => 'integer|min:1',
+            'product_type' => 'required|in:pack,case',
+            'units_per_case' => 'nullable|integer|min:1',
             'unit_of_measure' => 'required|string|max:255',
             'reorder_qty' => 'required|integer|min:0',
             'company_prices' => 'nullable|array',
@@ -157,13 +158,22 @@ class ProductController extends Controller
             'customer_prices.*.selling_price' => 'nullable|numeric|min:0',
         ]);
 
-        DB::transaction(function () use ($request, $product) {
-            // Update product info
+        // ✅ Handle missing or null units_per_case safely
+        $unitsPerCase = $request->product_type === 'pack'
+            ? 1
+            : (int) $request->input('units_per_case', 1);
+
+        if ($unitsPerCase < 1) {
+            $unitsPerCase = 1;
+        }
+
+        DB::transaction(function () use ($request, $product, $unitsPerCase) {
+            // ✅ Update product details
             $product->update([
                 'name' => $request->name,
                 'appear_name' => $request->appear_name,
                 'department_id' => $request->department_id,
-                'units_per_case' => $request->units_per_case,
+                'units_per_case' => $unitsPerCase, // always at least 1
                 'unit_of_measure' => $request->unit_of_measure,
                 'reorder_qty' => $request->reorder_qty,
                 'is_active' => $request->has('is_active'),
@@ -173,7 +183,7 @@ class ProductController extends Controller
                 'discount' => $request->filled('discount') ? $request->discount : 0.00,
             ]);
 
-            // Update company prices
+            // ✅ Update or create company prices
             foreach ((array) $request->company_prices as $companyId => $prices) {
                 $product->companyPrices()->updateOrCreate(
                     ['company_id' => $companyId],
@@ -184,7 +194,7 @@ class ProductController extends Controller
                 );
             }
 
-            // Update or create customer overrides
+            // ✅ Update or create customer-specific overrides
             foreach ((array) $request->customer_prices as $customerId => $prices) {
                 $product->customerPrices()->updateOrCreate(
                     ['customer_id' => $customerId],

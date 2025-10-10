@@ -44,7 +44,7 @@
                                 </tr>
                             </template>
                             <tr x-show="convertibleItems.length === 0">
-                                <td colspan="5" class="px-3 py-4 text-center text-gray-500">
+                                <td colspan="6" class="px-3 py-4 text-center text-gray-500">
                                     No products require conversion.
                                 </td>
                             </tr>
@@ -57,9 +57,10 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <!-- Convert Stock Form -->
                 <form @submit.prevent="convertStock" class="space-y-4">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-200 border-b pb-2">Convert Stock</h3>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-200 border-b pb-2">
+                        Convert Stock
+                    </h3>
 
-                    <!-- Department -->
                     <div>
                         <label class="block text-sm font-medium">Department*</label>
                         <select x-model="convert.selectedDepartment"
@@ -75,7 +76,6 @@
                            x-text="convert.departmentError"></p>
                     </div>
 
-                    <!-- Product -->
                     <div>
                         <label class="block text-sm font-medium">Product*</label>
                         <select x-model="convert.product_id"
@@ -88,7 +88,6 @@
                         </select>
                     </div>
 
-                    <!-- Quantity -->
                     <div>
                         <label class="block text-sm font-medium">Quantity to Convert</label>
                         <input type="number"
@@ -110,7 +109,6 @@
                 <form @submit.prevent="logWastage" class="space-y-4">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-200 border-b pb-2">Log Wastage</h3>
 
-                    <!-- Department -->
                     <div>
                         <label class="block text-sm font-medium">Department*</label>
                         <select x-model="wastage.selectedDepartment"
@@ -126,7 +124,6 @@
                            x-text="wastage.departmentError"></p>
                     </div>
 
-                    <!-- Product -->
                     <div>
                         <label class="block text-sm font-medium">Product*</label>
                         <select x-model="wastage.product_id"
@@ -139,7 +136,6 @@
                         </select>
                     </div>
 
-                    <!-- Stock Type -->
                     <div>
                         <label class="block text-sm font-medium">Stock Type</label>
                         <select x-model="wastage.stock_type"
@@ -149,7 +145,6 @@
                         </select>
                     </div>
 
-                    <!-- Quantity -->
                     <div>
                         <label class="block text-sm font-medium">Wastage Quantity</label>
                         <input type="number"
@@ -159,7 +154,6 @@
                                required>
                     </div>
 
-                    <!-- Reason -->
                     <div>
                         <label class="block text-sm font-medium">Reason</label>
                         <input type="text"
@@ -176,7 +170,6 @@
                 </form>
             </div>
 
-            <!-- Close Button -->
             <div class="text-right mt-4">
                 <button type="button"
                         @click="isStockModalOpen = false"
@@ -216,14 +209,14 @@
             </ul>
         </div>
         @endif
-
         <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <!-- Left Column -->
             <div class="lg:col-span-2 flex flex-col space-y-4">
                 <div>
-                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">1. Select Company, Customer & POs</h3>
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">
+                        1. Select Company, Customer & POs
+                    </h3>
 
-                    <!-- ✅ Company Selection -->
                     <div>
                         <label class="block text-sm font-medium">Company <span class="text-red-500">*</span></label>
                         <select id="company_id"
@@ -238,7 +231,6 @@
                         </select>
                     </div>
 
-                    <!-- ✅ Customer Selection with datalist -->
                     <div>
                         <label class="block text-sm font-medium mt-2">Customer <span class="text-red-500">*</span></label>
                         <input list="customers-list"
@@ -258,24 +250,21 @@
                         <p x-show="customerError" class="text-red-600 text-xs mt-1" x-text="customerError"></p>
                     </div>
 
-                    <!-- Date Filter -->
                     <form action="{{ route('delivery-notes.create') }}" method="GET" class="mt-3 mb-2 flex items-center space-x-1 text-xs">
                         <input type="date" name="from_date" value="{{ request('from_date') }}"
-                            class="border rounded-md px-2 py-0.5 w-32 focus:ring-0 focus:border-gray-400 text-xs dark:bg-gray-900">
+                            class="border rounded-md px-2 py-0.5 w-32 dark:bg-gray-900">
                         <input type="date" name="to_date" value="{{ request('to_date') }}"
-                            class="border rounded-md px-2 py-0.5 w-32 focus:ring-0 focus:border-gray-400 text-xs dark:bg-gray-900">
+                            class="border rounded-md px-2 py-0.5 w-32 dark:bg-gray-900">
                         <input type="hidden" name="customer_id" :value="selectedCustomer">
-                        <button type="submit"
-                                class="px-2 py-1 bg-gray-800 text-white rounded-md text-xs hover:bg-gray-700 transition">
+                        <button type="submit" class="px-2 py-1 bg-gray-800 text-white rounded-md text-xs hover:bg-gray-700">
                             Filter
                         </button>
                         <a href="{{ route('delivery-notes.create') }}"
-                        class="px-2 py-1 bg-gray-200 rounded-md text-xs text-gray-800 hover:bg-gray-300 transition">
+                           class="px-2 py-1 bg-gray-200 rounded-md text-xs text-gray-800 hover:bg-gray-300">
                             Clear
                         </a>
                     </form>
 
-                    <!-- PO List -->
                     <form id="deliveryForm" x-ref="deliveryForm"
                           action="{{ route('delivery-notes.store') }}"
                           method="POST" class="space-y-4"
@@ -314,23 +303,28 @@
 
                         <div>
                             <label class="block text-sm font-medium">Driver Name (Override)</label>
-                            <input type="text" name="driver_name" placeholder="Leave empty to use vehicle default" class="mt-1 block w-full border rounded-md p-2">
+                            <input type="text" name="driver_name" placeholder="Leave empty to use vehicle default"
+                                   class="mt-1 block w-full border rounded-md p-2">
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium">Driver Mobile (Override)</label>
-                            <input type="text" name="driver_mobile" placeholder="Leave empty to use vehicle default" class="mt-1 block w-full border rounded-md p-2">
+                            <input type="text" name="driver_mobile" placeholder="Leave empty to use vehicle default"
+                                   class="mt-1 block w-full border rounded-md p-2">
                         </div>
 
-                        <!-- ✅ Added Assistant Fields -->
                         <div>
                             <label class="block text-sm font-medium">Helper Name (Override)</label>
-                            <input type="text" name="assistant_name" placeholder="Leave empty to use vehicle default" class="mt-1 block w-full border rounded-md p-2">
+                            <input type="text" name="assistant_name"
+                                   placeholder="Leave empty to use vehicle default"
+                                   class="mt-1 block w-full border rounded-md p-2">
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium">Helper Mobile (Override)</label>
-                            <input type="text" name="assistant_mobile" placeholder="Leave empty to use vehicle default" class="mt-1 block w-full border rounded-md p-2">
+                            <input type="text" name="assistant_mobile"
+                                   placeholder="Leave empty to use vehicle default"
+                                   class="mt-1 block w-full border rounded-md p-2">
                         </div>
 
                         <button type="button"
@@ -339,6 +333,7 @@
                             Manage Stock
                         </button>
 
+                        <!-- Hidden agent selections -->
                         <template x-for="(agentId, productId) in agentSelections">
                             <input type="hidden" :name="`agent_selections[${productId}]`" :value="agentId">
                         </template>
@@ -372,8 +367,23 @@
                                         :class="item.clear_stock_shortage > 0 ? 'text-red-500' : 'text-green-500'"
                                         x-text="item.clear_stock_shortage"></td>
                                     <td class="px-2 py-2 text-sm">
-                                        <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock >= item.clear_stock_shortage" class="text-xs text-orange-500">Convert Stock</div>
-                                        <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock < item.clear_stock_shortage">
+                                        <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock >= item.clear_stock_shortage"
+                                             class="text-xs text-orange-500">Convert Stock</div>
+
+                                        <!-- Fulfilment selector -->
+                                        <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock < item.clear_stock_shortage"
+                                             class="mb-2">
+                                            <select
+                                                x-model="stockFulfillment[item.product_id] ? stockFulfillment[item.product_id].type : ''"
+                                                @change="handleFulfillmentTypeChange(item.product_id, $event.target.value)"
+                                                class="block w-full rounded-md border p-1 text-sm">
+                                                <option value="">Select Fulfilment</option>
+                                                <option value="agent">Agent</option>
+                                                <option value="supplier">Supplier</option>
+                                            </select>
+                                        </div>
+
+                                        <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock < item.clear_stock_shortage && stockFulfillment[item.product_id]?.type === 'agent'">
                                             <select x-model="agentSelections[item.product_id]" class="block w-full rounded-md border p-1 text-sm">
                                                 <option value="">Select Agent</option>
                                                 <template x-for="agent in item.agents" :key="agent.id">
@@ -381,11 +391,24 @@
                                                 </template>
                                             </select>
                                         </div>
+
+                                        <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock < item.clear_stock_shortage && stockFulfillment[item.product_id]?.type === 'supplier'"
+                                             class="mt-2 text-center">
+                                            <button type="button"
+                                                    @click="createNewGRN(item)"
+                                                    class="px-3 py-1 bg-green-600 text-white rounded-md text-xs font-semibold hover:bg-green-700">
+                                                Create GRN for Supplier
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             </template>
-                            <tr x-show="items.length === 0 && selectedPurchaseOrderIds.length > 0"><td colspan="6" class="text-center py-4 text-sm">Loading items...</td></tr>
-                            <tr x-show="items.length === 0 && selectedPurchaseOrderIds.length === 0"><td colspan="6" class="text-center py-4 text-sm">Select a customer and PO above.</td></tr>
+                            <tr x-show="items.length === 0 && selectedPurchaseOrderIds.length > 0">
+                                <td colspan="6" class="text-center py-4 text-sm">Loading items...</td>
+                            </tr>
+                            <tr x-show="items.length === 0 && selectedPurchaseOrderIds.length === 0">
+                                <td colspan="6" class="text-center py-4 text-sm">Select a customer and PO above.</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -410,6 +433,8 @@ document.addEventListener('alpine:init', () => {
         isStockModalOpen: false,
         stockModalMessage: '',
         stockModalSuccess: false,
+        stockFulfillment: {},
+
         filterCustomersByCompany() {
             if (!this.selectedCompany) {
                 this.filteredCustomers = [];
@@ -423,19 +448,11 @@ document.addEventListener('alpine:init', () => {
         },
         setCustomerId() {
             const match = this.filteredCustomers.find(c => c.customer_name === this.customerName);
-            if (match) {
-                this.selectedCustomer = match.id;
-                this.customerError = '';
-            } else {
-                this.selectedCustomer = '';
-                this.customerError = 'Customer not found or not in this company';
-            }
+            if (match) { this.selectedCustomer = match.id; this.customerError = ''; }
+            else { this.selectedCustomer = ''; this.customerError = 'Customer not found or not in this company'; }
         },
         get convertibleItems() {
-            return this.items.filter(item =>
-                item.clear_stock_shortage > 0 &&
-                item.non_clear_stock >= item.clear_stock_shortage
-            );
+            return this.items.filter(item => item.clear_stock_shortage > 0 && item.non_clear_stock >= item.clear_stock_shortage);
         },
         get isStockSufficient() {
             if (this.items.length === 0 && this.selectedPurchaseOrderIds.length > 0) return false;
@@ -443,6 +460,8 @@ document.addEventListener('alpine:init', () => {
             return this.items.every(item => {
                 if (item.clear_stock_shortage > 0) {
                     if (item.non_clear_stock >= item.clear_stock_shortage) return false;
+                    const fulfill = this.stockFulfillment[item.product_id];
+                    if (fulfill && fulfill.type === 'supplier') return false; // 🚫 block supplier path
                     const agentSelected = this.agentSelections[item.product_id] && this.agentSelections[item.product_id] !== '';
                     return agentSelected;
                 }
@@ -457,15 +476,11 @@ document.addEventListener('alpine:init', () => {
             const form = this[formType];
             if (form.selectedDepartment) {
                 form.departmentError = '';
-                form.department_name = this.products.find(
-                    p => p.department_id == form.selectedDepartment
-                )?.department_name || '';
-            } else {
-                form.departmentError = 'Please select a department';
-            }
+                form.department_name = this.products.find(p => p.department_id == form.selectedDepartment)?.department_name || '';
+            } else form.departmentError = 'Please select a department';
         },
         checkStock() {
-            this.agentSelections = {};
+            this.agentSelections = {}; this.stockFulfillment = {};
             if (this.selectedPurchaseOrderIds.length === 0) { this.items = []; return; }
             fetch('{{ route("delivery-notes.checkStock") }}', {
                 method: 'POST',
@@ -475,7 +490,7 @@ document.addEventListener('alpine:init', () => {
         },
         submitForm() {
             if (!this.isStockSufficient) {
-                alert('Cannot create delivery note. Please resolve shortages.');
+                alert('Cannot create delivery note. Supplier fulfilments must have GRNs created first.');
                 return;
             }
             this.$refs.deliveryForm.submit();
@@ -487,13 +502,8 @@ document.addEventListener('alpine:init', () => {
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 body: JSON.stringify(this.convert)
             }).then(res => res.json()).then(data => {
-                this.stockModalSuccess = data.success;
-                this.stockModalMessage = data.message;
-                if (data.success) {
-                    this.convert = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', quantity: 1 };
-                    this.checkStock();
-                    setTimeout(() => { this.stockModalMessage = '' }, 3000);
-                }
+                this.stockModalSuccess = data.success; this.stockModalMessage = data.message;
+                if (data.success) { this.convert = { department_name:'',selectedDepartment:'',departmentError:'',product_id:'',quantity:1 }; this.checkStock(); setTimeout(()=>{this.stockModalMessage=''},3000); }
             });
         },
         logWastage() {
@@ -503,17 +513,18 @@ document.addEventListener('alpine:init', () => {
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 body: JSON.stringify(this.wastage)
             }).then(res => res.json()).then(data => {
-                this.stockModalSuccess = data.success;
-                this.stockModalMessage = data.message;
-                if (data.success) {
-                    this.wastage = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', stock_type: 'clear', quantity: 1, reason: '' };
-                    this.checkStock();
-                    setTimeout(() => { this.stockModalMessage = '' }, 3000);
-                }
+                this.stockModalSuccess = data.success; this.stockModalMessage = data.message;
+                if (data.success) { this.wastage = { department_name:'',selectedDepartment:'',departmentError:'',product_id:'',stock_type:'clear',quantity:1,reason:'' }; this.checkStock(); setTimeout(()=>{this.stockModalMessage=''},3000); }
             });
         },
-        convert: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', quantity: 1 },
-        wastage: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', stock_type: 'clear', quantity: 1, reason: '' },
+        handleFulfillmentTypeChange(productId, value) { this.stockFulfillment[productId] = { type: value }; },
+        createNewGRN(item) {
+            const url = `/grns/create?supplier_id=${item.supplier_id}&department_id=${item.department_id}&product_id=${item.product_id}&product_name=${encodeURIComponent(item.product_name)}&shortage=${item.clear_stock_shortage}`;
+            window.location.href = url;
+        },
+
+        convert:{department_name:'',selectedDepartment:'',departmentError:'',product_id:'',quantity:1},
+        wastage:{department_name:'',selectedDepartment:'',departmentError:'',product_id:'',stock_type:'clear',quantity:1,reason:''},
     }));
 });
 </script>
