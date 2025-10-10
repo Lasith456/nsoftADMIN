@@ -192,9 +192,9 @@
         <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Create Delivery Note</h2>
             <div class="flex items-center space-x-2">
-                                <a href="{{ route('delivery-notes.index') }}"
+                <a href="{{ route('delivery-notes.index') }}"
                    class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-xs uppercase font-semibold">Back</a>
-                  <a href="{{ route('agents.create') }}"
+                <a href="{{ route('agents.create') }}"
                    class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-xs uppercase font-semibold">Create Agent</a>
 
                 <button type="submit"
@@ -275,7 +275,6 @@
                         </a>
                     </form>
 
-
                     <!-- PO List -->
                     <form id="deliveryForm" x-ref="deliveryForm"
                           action="{{ route('delivery-notes.store') }}"
@@ -321,6 +320,17 @@
                         <div>
                             <label class="block text-sm font-medium">Driver Mobile (Override)</label>
                             <input type="text" name="driver_mobile" placeholder="Leave empty to use vehicle default" class="mt-1 block w-full border rounded-md p-2">
+                        </div>
+
+                        <!-- ✅ Added Assistant Fields -->
+                        <div>
+                            <label class="block text-sm font-medium">Helper Name (Override)</label>
+                            <input type="text" name="assistant_name" placeholder="Leave empty to use vehicle default" class="mt-1 block w-full border rounded-md p-2">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium">Helper Mobile (Override)</label>
+                            <input type="text" name="assistant_mobile" placeholder="Leave empty to use vehicle default" class="mt-1 block w-full border rounded-md p-2">
                         </div>
 
                         <button type="button"
@@ -394,14 +404,12 @@ document.addEventListener('alpine:init', () => {
         customerName: '',
         selectedCustomer: '',
         customerError: '',
-
         selectedPurchaseOrderIds: [],
         items: [],
         agentSelections: {},
         isStockModalOpen: false,
         stockModalMessage: '',
         stockModalSuccess: false,
-
         filterCustomersByCompany() {
             if (!this.selectedCompany) {
                 this.filteredCustomers = [];
@@ -413,7 +421,6 @@ document.addEventListener('alpine:init', () => {
             this.customerName = '';
             this.selectedCustomer = '';
         },
-
         setCustomerId() {
             const match = this.filteredCustomers.find(c => c.customer_name === this.customerName);
             if (match) {
@@ -424,14 +431,12 @@ document.addEventListener('alpine:init', () => {
                 this.customerError = 'Customer not found or not in this company';
             }
         },
-
         get convertibleItems() {
             return this.items.filter(item =>
                 item.clear_stock_shortage > 0 &&
                 item.non_clear_stock >= item.clear_stock_shortage
             );
         },
-
         get isStockSufficient() {
             if (this.items.length === 0 && this.selectedPurchaseOrderIds.length > 0) return false;
             if (this.items.length === 0) return false;
@@ -444,12 +449,10 @@ document.addEventListener('alpine:init', () => {
                 return true;
             });
         },
-
         filteredProducts(deptId) {
             if (!deptId) return [];
             return this.products.filter(p => p.department_id == deptId);
         },
-
         updateDepartmentName(formType) {
             const form = this[formType];
             if (form.selectedDepartment) {
@@ -461,7 +464,6 @@ document.addEventListener('alpine:init', () => {
                 form.departmentError = 'Please select a department';
             }
         },
-
         checkStock() {
             this.agentSelections = {};
             if (this.selectedPurchaseOrderIds.length === 0) { this.items = []; return; }
@@ -471,7 +473,6 @@ document.addEventListener('alpine:init', () => {
                 body: JSON.stringify({ po_ids: this.selectedPurchaseOrderIds })
             }).then(res => res.json()).then(data => { this.items = data.items; });
         },
-
         submitForm() {
             if (!this.isStockSufficient) {
                 alert('Cannot create delivery note. Please resolve shortages.');
@@ -479,7 +480,6 @@ document.addEventListener('alpine:init', () => {
             }
             this.$refs.deliveryForm.submit();
         },
-
         convertStock() {
             this.stockModalMessage = '';
             fetch('{{ route("stock-management.api.convert") }}', {
@@ -496,7 +496,6 @@ document.addEventListener('alpine:init', () => {
                 }
             });
         },
-
         logWastage() {
             this.stockModalMessage = '';
             fetch('{{ route("stock-management.api.wastage") }}', {
@@ -513,7 +512,6 @@ document.addEventListener('alpine:init', () => {
                 }
             });
         },
-
         convert: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', quantity: 1 },
         wastage: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', stock_type: 'clear', quantity: 1, reason: '' },
     }));

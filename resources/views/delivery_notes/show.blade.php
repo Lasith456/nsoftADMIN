@@ -48,12 +48,26 @@
                     @endif
                 </p>
                 <p><strong>Driver:</strong> {{ $deliveryNote->driver_name }} ({{ $deliveryNote->driver_mobile }})</p>
+
             </div>
             <div>
                 <strong>Status:</strong>
-                <span class="px-2 inline-flex text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                <span class="px-2 inline-flex text-xs font-semibold rounded-full 
+                            @if($deliveryNote->status === 'delivered') bg-green-100 text-green-800 
+                            @elseif($deliveryNote->status === 'cancelled') bg-red-100 text-red-800 
+                            @else bg-yellow-100 text-yellow-800 @endif">
                     {{ ucfirst($deliveryNote->status ?? 'Pending') }}
                 </span>
+
+                {{-- ✅ Added Assistant Details --}}
+                @if($deliveryNote->assistant_name || $deliveryNote->assistant_mobile)
+                    <p><strong>Helper:</strong>
+                        {{ $deliveryNote->assistant_name ?? 'N/A' }}
+                        @if($deliveryNote->assistant_mobile)
+                            ({{ $deliveryNote->assistant_mobile }})
+                        @endif
+                    </p>
+                @endif
             </div>
         </div>
 
@@ -159,18 +173,13 @@
         @page {
             margin: 20mm;
             size: A4 portrait;
-
-            /* 🔥 Hide browser title & footer URL */
             @top-left, @top-center, @top-right,
             @bottom-left, @bottom-center, @bottom-right {
                 content: none;
             }
         }
-
-        /* Only print the delivery note area */
         body * { visibility: hidden !important; }
         #delivery-note-details, #delivery-note-details * { visibility: visible !important; }
-
         #delivery-note-details {
             position: absolute;
             left: 0; top: 0;
@@ -180,7 +189,6 @@
             border: none;
             box-shadow: none;
         }
-
         .print\:hidden { display: none !important; }
     }
 </style>

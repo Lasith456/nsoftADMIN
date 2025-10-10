@@ -131,6 +131,8 @@ public function store(Request $request): RedirectResponse
         'delivery_date' => 'required|date',
         'driver_name' => 'nullable|string|max:255',
         'driver_mobile' => 'nullable|string|max:255',
+        'assistant_name' => 'nullable|string|max:255',
+        'assistant_mobile' => 'nullable|string|max:255',
         'agent_selections' => 'nullable|array',
         'agent_selections.*' => 'nullable|exists:agents,id',
     ]);
@@ -140,28 +142,37 @@ public function store(Request $request): RedirectResponse
         $po_ids = $request->purchase_order_ids;
         $vehicle = Vehicle::findOrFail($request->vehicle_id);
 
-        // ✅ use override if given, else fallback to vehicle defaults
+        // ✅ Use override if given, else fallback to vehicle defaults
         $driverName = $request->driver_name ?: $vehicle->driver_name;
         $driverMobile = $request->driver_mobile ?: $vehicle->driver_mobile;
+        $assistantName = $request->assistant_name ?: $vehicle->assistant_name;
+        $assistantMobile = $request->assistant_mobile ?: $vehicle->assistant_mobile;
 
+        // ✅ Create Delivery Note with assistant info
         $deliveryNote = DeliveryNote::create([
-            'vehicle_id'    => $vehicle->id,
-            'delivery_date' => $request->delivery_date,
-            'status'        => 'processing',
-            'driver_name'   => $driverName,
-            'driver_mobile' => $driverMobile,
+            'vehicle_id'        => $vehicle->id,
+            'delivery_date'     => $request->delivery_date,
+            'status'            => 'processing',
+            'driver_name'       => $driverName,
+            'driver_mobile'     => $driverMobile,
+            'assistant_name'    => $assistantName,
+            'assistant_mobile'  => $assistantMobile,
         ]);
 
         $deliveryNote->purchaseOrders()->attach($po_ids);
 
-        // handle stock + items same as before...
+        // ✅ Handle stock + items (same as before)
         $purchaseOrders = PurchaseOrder::with('items.product')->whereIn('id', $po_ids)->get();
         $requestedItems = [];
+
         foreach ($purchaseOrders as $po) {
             foreach ($po->items as $item) {
                 $productId = $item->product_id;
                 if (!isset($requestedItems[$productId])) {
-                    $requestedItems[$productId] = ['product_name' => $item->product_name, 'total_quantity' => 0];
+                    $requestedItems[$productId] = [
+                        'product_name' => $item->product_name,
+                        'total_quantity' => 0,
+                    ];
                 }
                 $requestedItems[$productId]['total_quantity'] += $item->quantity;
             }

@@ -19,7 +19,9 @@ class DeliveryNote extends Model
         'delivery_date',
         'status',
         'driver_name',
-        'driver_mobile'
+        'driver_mobile',
+        'assistant_name', 
+        'assistant_mobile',
     ];
 
     protected function casts(): array

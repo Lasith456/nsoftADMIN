@@ -316,11 +316,13 @@ document.addEventListener('alpine:init', () => {
             fetch(`/companies/${company.id}/customers`)
                 .then(res => res.json())
                 .then(data => {
-                    company.customers = data.map(c => ({
-                        id: c.id,
-                        customer_name: c.customer_name,
-                        selling_price: company.selling_price
-                    }));
+                    company.customers = data
+                        .sort((a, b) => a.customer_name.localeCompare(b.customer_name, 'en', { sensitivity: 'base' }))
+                        .map(c => ({
+                            id: c.id,
+                            customer_name: c.customer_name,
+                            selling_price: company.selling_price
+                        }));
                 })
                 .catch(() => {
                     company.customers = [];
