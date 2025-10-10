@@ -59,6 +59,10 @@ class Product extends Model
     {
         return $this->belongsTo(Supplier::class);
     }
+    public function customerPrices()
+    {
+        return $this->hasMany(CustomerProductPrice::class);
+    }
 
     protected static function boot()
     {

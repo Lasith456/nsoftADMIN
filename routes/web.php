@@ -255,5 +255,17 @@ Route::get('/reports/company/select', [ReportController::class, 'selectCompany']
 Route::get('reports/company-outstanding/excel', [ReportController::class, 'exportCompanyOutstandingExcel'])->name('reports.companyOutstanding.exportExcel');
 Route::get('reports/company-outstanding/pdf', [ReportController::class, 'exportCompanyOutstandingPdf'])->name('reports.companyOutstanding.exportPdf');
 
+// 👇 add this anywhere inside your authenticated group in web.php
+Route::get('/companies/{company}/customers', function (\App\Models\Company $company) {
+    return response()->json(
+        $company->customers()->select('id', 'customer_name')->get()
+    );
+})->name('companies.customers.list');
+Route::get('/companies/{company}/customers', function (\App\Models\Company $company) {
+    return response()->json(
+        $company->customers()->select('id', 'customer_name')->get()
+    );
+})->name('companies.customers');
+
 });
 

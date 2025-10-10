@@ -4,12 +4,11 @@
 <div class="container mx-auto" 
      x-data="productForm({ departments: {{ json_encode($departments) }} })">
      
-    <!-- Add New Modal -->
+    <!-- ==================== Add Department Modal ==================== -->
     <div x-show="isModalOpen" 
          class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" 
          @click.away="isModalOpen = false" 
          x-cloak>
-         
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4" x-text="modalTitle"></h2>
             <div x-show="modalMessage" 
@@ -38,11 +37,13 @@
             </form>
         </div>
     </div>
-    
-    <!-- Main Product Form -->
+
+    <!-- ==================== Main Product Form ==================== -->
     <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
         <form id="product-form" action="{{ route('products.store') }}" method="POST">
             @csrf
+
+            <!-- Header -->
             <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
                 <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">Add New Product</h2>
                 <div class="flex items-center space-x-2">
@@ -60,13 +61,15 @@
             @if ($errors->any())
             <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
                 <ul class="list-disc pl-5 mt-2">
-                    @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
                 </ul>
             </div>
             @endif
 
+            <!-- Basic Product Info -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <!-- Product Name -->
                 <div>
                     <label for="name" class="block text-sm font-medium">Name*</label>
                     <input type="text" name="name" id="name" x-model="mainForm.name" 
@@ -75,7 +78,6 @@
                            rounded-md py-2 px-3" required>
                 </div>
 
-                <!-- Appear Name -->
                 <div>
                     <label for="appear_name" class="block text-sm font-medium">Appear Name*</label>
                     <input type="text" name="appear_name" id="appear_name" x-model="mainForm.appear_name" 
@@ -83,7 +85,6 @@
                            rounded-md py-2 px-3" required>
                 </div>
                 
-                <!-- Department -->
                 <div>
                     <label for="department_name" class="block text-sm font-medium">Department*</label>
                     <div class="flex items-center space-x-2">
@@ -102,7 +103,6 @@
                     <input type="hidden" name="department_id" id="department_id" x-model="mainForm.department_id">
                 </div>
 
-                <!-- Product Type -->
                 <div>
                     <label class="block text-sm font-medium">Product Type*</label>
                     <div class="mt-2 flex items-center space-x-6">
@@ -117,7 +117,6 @@
                     </div>
                 </div>
 
-                <!-- Units Per Case -->
                 <div>
                     <label for="units_per_case" class="block text-sm font-medium">Units Per Case*</label>
                     <input type="number" name="units_per_case" id="units_per_case" x-model.number="mainForm.units_per_case" 
@@ -125,10 +124,10 @@
                            rounded-md py-2 px-3" :disabled="mainForm.product_type === 'pack'" required>
                 </div>
 
-                <!-- Unit of Measure -->
                 <div>
                     <label for="unit_of_measure" class="block text-sm font-medium">Unit of Measure*</label>
-                    <input list="units" name="unit_of_measure" id="unit_of_measure" value="{{ old('unit_of_measure') }}" 
+                    <input list="units" name="unit_of_measure" id="unit_of_measure" 
+                           value="{{ old('unit_of_measure') }}" 
                            class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 
                            rounded-md py-2 px-3" required>
                     <datalist id="units">
@@ -141,7 +140,6 @@
                     </datalist>
                 </div>
 
-                <!-- Reorder Qty -->
                 <div>
                     <label for="reorder_qty" class="block text-sm font-medium">Reorder Level*</label>
                     <input type="number" name="reorder_qty" id="reorder_qty" value="{{ old('reorder_qty', 0) }}" 
@@ -150,51 +148,67 @@
                 </div>
             </div>
 
-            <!-- Company Wise Prices -->
+            <!-- ==================== Company & Customer Prices ==================== -->
             @isset($companies)
             <div class="lg:col-span-3 mt-6" 
-                 x-data="companyPricesHandler({ companies: {{ json_encode($companies) }} })" x-init="init()">
+                 x-data="companyCustomerPriceHandler({ companies: {{ json_encode($companies) }} })" 
+                 x-init="init()">
 
-                <h3 class="text-lg font-semibold mb-2">Company Wise Prices</h3>
+                <h3 class="text-lg font-semibold mb-2">Company and Customer Prices</h3>
 
-                <!-- Same Price Checkbox -->
-                <div class="mb-3">
-                    <label class="inline-flex items-center">
-                        <input type="checkbox" x-model="samePriceEnabled" class="h-4 w-4 text-indigo-600 rounded">
-                        <span class="ml-2 text-sm">Use Same Price for All Companies</span>
-                    </label>
-                </div>
+                <template x-for="company in companyPrices" :key="company.id">
+                    <div class="border border-gray-300 rounded-md mb-4 bg-gray-50 p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-semibold text-gray-700" x-text="company.company_name"></h4>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" x-model="company.showCustomers" @change="loadCustomers(company)"
+                                       class="h-4 w-4 text-indigo-600 rounded">
+                                <span class="ml-2 text-sm">Show customer-specific prices</span>
+                            </label>
+                        </div>
 
-                <table class="w-full border border-gray-300 rounded-md">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <th class="p-2 text-left">Company</th>
-                            <th class="p-2 text-left">Cost Price</th>
-                            <th class="p-2 text-left">Selling Price</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="company in companyPrices" :key="company.id">
-                            <tr>
-                                <td class="p-2" x-text="company.company_name"></td>
-                                <td class="p-2">
-                                    <input type="number" step="0.01"
-                                           :name="`company_prices[${company.id}][cost_price]`"
-                                           class="w-full border rounded-md px-2 py-1"
-                                           x-model="company.cost_price"
-                                           @input="applySamePrice('cost_price', company.cost_price)">
-                                </td>
-                                <td class="p-2">
-                                    <input type="number" step="0.01"
-                                           :name="`company_prices[${company.id}][selling_price]`"
-                                           class="w-full border rounded-md px-2 py-1"
-                                           x-model="company.selling_price"
-                                           @input="applySamePrice('selling_price', company.selling_price)">
-                                </td>
-                            </tr>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">Default Selling Price</label>
+                            <input type="number" step="0.01"
+                                   :name="`company_prices[${company.id}][selling_price]`"
+                                   x-model="company.selling_price"
+                                   class="mt-1 block w-full border rounded-md px-2 py-1">
+                        </div>
+
+                        <template x-if="company.showCustomers">
+                            <div class="mt-3">
+                                <template x-if="company.customers.length === 0">
+                                    <p class="text-sm text-gray-500 italic">Loading customers...</p>
+                                </template>
+
+                                <template x-if="company.customers.length > 0">
+                                    <table class="w-full border border-gray-200 rounded-md mt-2">
+                                        <thead class="bg-gray-100">
+                                            <tr>
+                                                <th class="p-2 text-left text-sm">Customer</th>
+                                                <th class="p-2 text-left text-sm">Selling Price</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template x-for="cust in company.customers" :key="cust.id">
+                                                <tr>
+                                                    <td class="p-2" x-text="cust.customer_name"></td>
+                                                    <td class="p-2">
+                                                        <input type="number" step="0.01"
+                                                               :name="`customer_prices[${cust.id}][selling_price]`"
+                                                               x-model="cust.selling_price"
+                                                               placeholder="Same as company price"
+                                                               class="border rounded-md px-2 py-1 w-full">
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </template>
+                            </div>
                         </template>
-                    </tbody>
-                </table>
+                    </div>
+                </template>
             </div>
             @endisset
 
@@ -217,93 +231,102 @@
     </div>
 </div>
 
+<!-- ==================== Alpine Scripts ==================== -->
 <script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('productForm', (initialData) => ({
-            isModalOpen: false,
-            modalType: '',
-            modalTitle: '',
-            modalMessage: '',
-            modalSuccess: false,
-            departments: initialData.departments,
-            mainForm: {
-                name: '{{ old('name') }}',
-                appear_name: '{{ old('appear_name') }}',
-                department_id: '{{ old('department_id') }}',
-                department_name: '',
-                product_type: '{{ old('product_type', 'pack') }}',
-                units_per_case: '{{ old('units_per_case', 1) }}',
-            },
-            newDepartment: { name: '' },
-            
-            init() {
-                this.$watch('mainForm.product_type', (value) => {
-                    if (value === 'pack') this.mainForm.units_per_case = 1;
-                });
+document.addEventListener('alpine:init', () => {
 
-                if (this.mainForm.department_id) {
-                    const dept = this.departments.find(d => d.id == this.mainForm.department_id);
-                    if (dept) this.mainForm.department_name = dept.name;
+    Alpine.data('productForm', (initialData) => ({
+        isModalOpen: false,
+        modalType: '',
+        modalTitle: '',
+        modalMessage: '',
+        modalSuccess: false,
+        departments: initialData.departments,
+        mainForm: {
+            name: '{{ old('name') }}',
+            appear_name: '{{ old('appear_name') }}',
+            department_id: '{{ old('department_id') }}',
+            department_name: '',
+            product_type: '{{ old('product_type', 'pack') }}',
+            units_per_case: '{{ old('units_per_case', 1) }}',
+        },
+        newDepartment: { name: '' },
+
+        init() {
+            this.$watch('mainForm.product_type', (value) => {
+                if (value === 'pack') this.mainForm.units_per_case = 1;
+            });
+            if (this.mainForm.department_id) {
+                const dept = this.departments.find(d => d.id == this.mainForm.department_id);
+                if (dept) this.mainForm.department_name = dept.name;
+            }
+        },
+
+        openModal(type) {
+            this.isModalOpen = true;
+            this.modalType = type;
+            this.modalMessage = '';
+            this.modalSuccess = false;
+            if (type === 'department') this.modalTitle = 'Add New Department';
+        },
+
+        updateDepartmentId() {
+            const options = document.getElementById('departments-list').options;
+            const selected = Array.from(options).find(opt => opt.value === this.mainForm.department_name);
+            this.mainForm.department_id = selected ? selected.dataset.id : '';
+        },
+
+        storeDepartment() {
+            fetch('{{ route("departments.api.store") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                body: JSON.stringify(this.newDepartment)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.id) {
+                    this.departments.push(data);
+                    this.mainForm.department_name = data.name;
+                    this.mainForm.department_id = data.id;
+                    this.isModalOpen = false;
+                    this.newDepartment.name = '';
+                } else {
+                    this.modalMessage = 'Failed to create department.';
+                    this.modalSuccess = false;
                 }
-            },
+            });
+        }
+    }));
 
-            openModal(type) {
-                this.isModalOpen = true;
-                this.modalType = type;
-                this.modalMessage = '';
-                this.modalSuccess = false;
-                if (type === 'department') {
-                    this.modalTitle = 'Add New Department';
-                }
-            },
+    Alpine.data('companyCustomerPriceHandler', (initialData) => ({
+        companyPrices: [],
 
-            updateDepartmentId() {
-                const options = document.getElementById('departments-list').options;
-                const selected = Array.from(options).find(opt => opt.value === this.mainForm.department_name);
-                this.mainForm.department_id = selected ? selected.dataset.id : '';
-            },
+        init() {
+            this.companyPrices = initialData.companies.map(c => ({
+                id: c.id,
+                company_name: c.company_name,
+                selling_price: '',
+                showCustomers: false,
+                customers: []
+            }));
+        },
 
-            storeDepartment() {
-                fetch('{{ route("departments.api.store") }}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: JSON.stringify(this.newDepartment)
-                })
+        loadCustomers(company) {
+            if (!company.showCustomers) return;
+            fetch(`/companies/${company.id}/customers`)
                 .then(res => res.json())
                 .then(data => {
-                    if (data.id) {
-                        this.departments.push(data);
-                        this.mainForm.department_name = data.name;
-                        this.mainForm.department_id = data.id;
-                        this.isModalOpen = false;
-                        this.newDepartment.name = '';
-                    } else {
-                        this.modalMessage = 'Failed to create department. It might already exist.';
-                        this.modalSuccess = false;
-                    }
+                    company.customers = data.map(c => ({
+                        id: c.id,
+                        customer_name: c.customer_name,
+                        selling_price: company.selling_price
+                    }));
+                })
+                .catch(() => {
+                    company.customers = [];
                 });
-            }
-        }));
-
-        Alpine.data('companyPricesHandler', (initialData) => ({
-            companyPrices: [],
-            samePriceEnabled: false,
-
-            init() {
-                this.companyPrices = initialData.companies.map(c => ({
-                    id: c.id,
-                    company_name: c.company_name,
-                    cost_price: '',
-                    selling_price: ''
-                }));
-            },
-
-            applySamePrice(field, value) {
-                if (this.samePriceEnabled) {
-                    this.companyPrices.forEach(c => { c[field] = value; });
-                }
-            }
-        }));
-    });
+        },
+    }));
+});
 </script>
 @endsection

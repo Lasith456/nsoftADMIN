@@ -72,6 +72,11 @@ class Customer extends Model
     {
         return $this->morphMany(Invoice::class, 'invoiceable');
     }
+    public function productPrices()
+    {
+        return $this->hasMany(CustomerProductPrice::class);
+    }
+
     public function company(): BelongsTo
         {
             return $this->belongsTo(Company::class);
