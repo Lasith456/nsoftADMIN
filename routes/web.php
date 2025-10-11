@@ -273,9 +273,11 @@ Route::get('/companies/{company}/customers', function (\App\Models\Company $comp
 Route::prefix('return-notes')->group(function () {
     Route::get('/', [ReturnNoteController::class, 'index'])->name('return-notes.index');
     Route::post('/store-ajax', [ReturnNoteController::class, 'storeAjax'])->name('return-notes.store.ajax');
+    Route::get('/{returnNote}', [ReturnNoteController::class, 'show'])->name('return-notes.show');
 });
-Route::post('/stock-management/wastage-from-rn', [StockManagementController::class, 'apiWastageFromReceiveNote'])
-    ->name('stock-management.api.wastageFromRN');
+Route::post('/stock-management/wastage-from-rn', [StockManagementController::class, 'apiWastageFromReceiveNote'])->name('stock-management.api.wastageFromRN');
+Route::post('/return-notes/{returnNote}/status', [ReturnNoteController::class, 'changeStatus'])->name('return-notes.changeStatus');
+Route::post('/return-notes/{returnNote}/create-po',[ReturnNoteController::class, 'createPO'])->name('return-notes.create-po');
 
 
 });

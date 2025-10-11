@@ -284,7 +284,6 @@ document.addEventListener('alpine:init', () => {
                 const diff = Math.abs(item.difference);
                 if (diff === 0) continue;
 
-                // 🟢 UPDATED: Handle agent and mixed stock return logic
                 if (item.actionType === 'return') {
                     await fetch('{{ route("return-notes.store.ajax") }}', {
                         method: 'POST',
@@ -293,7 +292,9 @@ document.addEventListener('alpine:init', () => {
                             reason: item.reason || 'Return due to mismatch',
                             company_id: this.selectedCompany,
                             customer_id: this.selectedCustomer,
-                            agent_id: null
+                            agent_id: null,
+                            product_id: item.product_id,
+                            quantity: diff
                         })
                     });
 
