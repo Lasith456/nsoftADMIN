@@ -81,8 +81,11 @@
                             <template x-for="rn in filteredReceiveNotes" :key="rn.id">
                                 <label class="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
                                     <input type="checkbox" :value="rn.id" x-model="selectedReceiveNotes" @change="loadProducts">
-                                    <span class="ml-3 text-sm text-blue-600 underline" x-text="rn.receive_note_id"></span>
-                                    <span class="ml-2 text-gray-500 text-xs" x-text="new Date(rn.received_date).toLocaleDateString()"></span>
+                                    <span class="ml-3 text-sm text-blue-600 underline cursor-pointer"
+                                          @click.prevent="openRnPopup(rn.id)"
+                                          x-text="rn.receive_note_id"></span>
+                                    <span class="ml-2 text-gray-500 text-xs"
+                                          x-text="new Date(rn.received_date).toLocaleDateString()"></span>
                                 </label>
                             </template>
                         </template>
@@ -140,6 +143,21 @@
             </template>
         </form>
     </div>
+
+    {{-- POPUP --}}
+    <div x-show="isRnPopupOpen" 
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+         @click.away="isRnPopupOpen = false"
+         x-cloak>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-5xl h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-3 border-b dark:border-gray-700">
+                <h2 class="text-lg font-bold text-gray-800 dark:text-gray-200">Receive Note Details</h2>
+                <button @click="isRnPopupOpen = false" 
+                        class="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">&times;</button>
+            </div>
+            <iframe :src="rnPopupUrl" class="flex-1 w-full border-0"></iframe>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -155,6 +173,9 @@ document.addEventListener('alpine:init', () => {
         selectedCustomer: '',
         selectedReceiveNotes: [],
         productList: [],
+
+        isRnPopupOpen: false,
+        rnPopupUrl: '',
 
         filterCustomersByCompany() {
             this.filteredCustomers = this.customers.filter(c => c.company_id == this.selectedCompany);
@@ -189,22 +210,36 @@ document.addEventListener('alpine:init', () => {
                 this.productList = [];
                 return;
             }
+
             const res = await fetch("{{ route('receive-notes.products') }}", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').content
+                    "X-CSRF-TOKEN": document.querySelector('meta[name=\"csrf-token\"]').content
                 },
-                body: JSON.stringify({ receive_note_ids: this.selectedReceiveNotes })
+                body: JSON.stringify({
+                    receive_note_ids: this.selectedReceiveNotes,
+                    customer_id: this.selectedCustomer // ✅ added
+                })
             });
             const data = await res.json();
-            this.productList = data.map(d => ({
-                product_id: d.product_id,
-                name: d.product_name,
-                quantity: d.quantity_received,
-                default_price: parseFloat(d.default_price),
-                updated_price: parseFloat(d.default_price),
-            }));
+
+            // ✅ match each product with customer's prices
+            const currentCustomer = this.customersWithInvoices.find(c => c.id == this.selectedCustomer);
+            const customerPrices = currentCustomer ? currentCustomer.product_prices || [] : [];
+
+            this.productList = data.map(d => {
+                const matched = customerPrices.find(p => p.product_id === d.product_id);
+                const price = matched ? matched.selling_price : parseFloat(d.default_price);
+
+                return {
+                    product_id: d.product_id,
+                    name: d.product_name,
+                    quantity: d.quantity_received,
+                    default_price: price,
+                    updated_price: price,
+                };
+            });
         },
 
         handleSubmit(e) {
@@ -213,6 +248,11 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
             e.target.submit();
+        },
+
+        openRnPopup(id) {
+            this.rnPopupUrl = `/receive-notes/${id}/popup`;
+            this.isRnPopupOpen = true;
         },
     }));
 });

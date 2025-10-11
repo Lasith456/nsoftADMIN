@@ -49,31 +49,68 @@
                     <th class="border px-2 py-1 text-left">Commodity & Quantity</th>
                     <th class="border px-2 py-1 text-right">Rate</th>
                     <th class="border px-2 py-1 text-center">Unit</th>
-                    <th class="border px-2 py-1 text-right">VAT</th> {{-- NEW --}}
+                    <th class="border px-2 py-1 text-right">VAT</th>
                     <th class="border px-2 py-1 text-right">Amount (Rs.)</th>
                 </tr>
             </thead>
-            <tbody>
-                @php $currentDept = null; @endphp
-                @foreach($invoice->items as $item)
-                    @if($item->product && $item->product->department && $currentDept !== $item->product->department->name)
-                        {{-- Department Header --}}
-                        <tr class="bg-gray-100 font-bold uppercase">
-                            <td colspan="5" class="border px-2 py-1">
-                                SUPPLY OF {{ str_replace('Department: ', '', $invoice->notes) }}
-                            </td>
-                        </tr>
-                        @php $currentDept = $item->product->department->name; @endphp
-                    @endif
-                    <tr>
-                        <td class="border px-2 py-1">{{ $item->description ?? $item->product->name }}</td>
-                        <td class="border px-2 py-1 text-right">{{ number_format($item->unit_price, 2) }}</td>
-                        <td class="border px-2 py-1 text-center">{{ $item->quantity ?? 0 }} {{ $item->product->unit_of_measure ?? 'PCS' }}</td>
-                        <td class="border px-2 py-1 text-right">{{ number_format($item->vat_amount ?? 0, 2) }}</td> {{-- NEW --}}
-                        <td class="border px-2 py-1 text-right">{{ number_format($item->total, 2) }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
+<tbody>
+    @php 
+        $currentHeader = null; 
+    @endphp
+
+    @foreach($invoice->items as $item)
+        @php
+            $product = $item->product;
+
+            // --- Find the related purchase order ---
+            $purchaseOrder = optional(
+                $item->invoice?->receiveNotes?->first()?->deliveryNotes?->first()?->purchaseOrders?->first()
+            );
+
+            $isCategorized = $purchaseOrder?->is_categorized;
+            $categoryName = null;
+            $displayName = null;
+
+            if ($isCategorized) {
+                // ✅ If categorized → category name
+                $categoryName = $purchaseOrder?->category?->name ?? 'CATEGORY';
+                $displayName = strtoupper("SUPPLY OF {$categoryName}");
+            } else {
+                // ✅ If not categorized → department logic
+                $department = $product?->department;
+                $departmentName = $department?->name ?? 'DEPARTMENT';
+                $companyId = $invoice->invoiceable?->company_id ?? null;
+
+                // Check if a custom appear name exists in CompanyDepartmentName
+                $appearName = \App\Models\CompanyDepartmentName::where('company_id', $companyId)
+                    ->where('department_id', $department?->id)
+                    ->value('appear_name');
+
+                $finalName = $appearName ?: $departmentName;
+                $displayName = strtoupper("SUPPLY OF {$finalName}");
+            }
+        @endphp
+
+        {{-- Header changes only when different from previous --}}
+        @if($currentHeader !== $displayName)
+            <tr class="bg-gray-100 font-bold uppercase">
+                <td colspan="5" class="border px-2 py-1">{{ $displayName }}</td>
+            </tr>
+            @php $currentHeader = $displayName; @endphp
+        @endif
+
+        {{-- Item Row --}}
+        <tr>
+            <td class="border px-2 py-1">{{ $item->description ?? $product->name }}</td>
+            <td class="border px-2 py-1 text-right">{{ number_format($item->unit_price, 2) }}</td>
+            <td class="border px-2 py-1 text-center">{{ $item->quantity ?? 0 }} {{ $product->unit_of_measure ?? 'PCS' }}</td>
+            <td class="border px-2 py-1 text-right">{{ number_format($item->vat_amount ?? 0, 2) }}</td>
+            <td class="border px-2 py-1 text-right">{{ number_format($item->total, 2) }}</td>
+        </tr>
+    @endforeach
+</tbody>
+
+
         </table>
 
         {{-- Totals --}}

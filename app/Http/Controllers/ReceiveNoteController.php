@@ -143,7 +143,6 @@ public function create(Request $request): View
             }
 
             if ($hasDiscrepancy) {
-                // ✅ If all differences are wastage only → mark completed
                 if ($request->has('has_wastage') && $request->has_wastage == '1') {
                     $receiveNote->update(['status' => 'completed']);
                 } else {
@@ -162,8 +161,6 @@ public function create(Request $request): View
                     'token' => $request->session_token,
                     'updated_rows' => $updated
                 ]);
-
-                // ✅ Clean up session tokens after linking
                 \App\Models\ReturnNote::where('receive_note_id', $receiveNote->id)
                     ->update(['session_token' => null]);
             }
@@ -179,7 +176,7 @@ public function create(Request $request): View
     public function show(ReceiveNote $receiveNote): View
     {
         $receiveNote->load([
-            'deliveryNotes.purchaseOrders.customer', // ✅ add this
+            'deliveryNotes.purchaseOrders.customer', 
             'items.product'
         ]);
 

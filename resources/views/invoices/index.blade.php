@@ -171,17 +171,23 @@
                     </td>
                     <td class="px-4 py-2 text-right text-sm font-medium">
                         <div class="flex justify-end items-center space-x-2">
+
+                            {{-- Voucher & Bill Buttons — only show if company is Navy --}}
+                            @if($invoice->invoiceable_type === \App\Models\Customer::class 
+                                && $invoice->invoiceable 
+                                && strtolower(optional($invoice->invoiceable->company)->company_name) === 'navy')
+                                <a href="{{ route('invoices.showopt2', $invoice->id) }}" 
+                                class="px-4 py-2 bg-purple-600 text-white rounded-md text-xs font-semibold">
+                                    Voucher
+                                </a>
+                                <a href="{{ route('invoices.opt3', $invoice->id) }}" target="_blank" 
+                                class="inline-flex items-center px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
+                                    Bill
+                                </a>
+                            @endif
                             <a href="{{ route('invoices.print', $invoice->id) }}" target="_blank" 
                                class="inline-flex items-center px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
                                 Invoice
-                            </a>
-                            <a href="{{ route('invoices.showopt2', $invoice->id) }}" 
-                               class="px-4 py-2 bg-purple-600 text-white rounded-md text-xs font-semibold">
-                                Voucher
-                            </a>
-                            <a href="{{ route('invoices.opt3', $invoice->id) }}" target="_blank" 
-                               class="inline-flex items-center px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
-                                Bill
                             </a>
                             {{-- Delete Button --}}
                             @can('invoice-delete')
