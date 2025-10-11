@@ -143,11 +143,30 @@ public function create(Request $request): View
             }
 
             if ($hasDiscrepancy) {
-                $receiveNote->update(['status' => 'discrepancy']);
+                // ✅ If all differences are wastage only → mark completed
+                if ($request->has('has_wastage') && $request->has_wastage == '1') {
+                    $receiveNote->update(['status' => 'completed']);
+                } else {
+                    $receiveNote->update(['status' => 'discrepancy']);
+                }
             }
+
             
             DeliveryNote::whereIn('id', $deliveryNoteIds)->update(['status' => 'received']);
+            if ($request->filled('session_token')) {
+                $updated = \App\Models\ReturnNote::where('session_token', $request->session_token)
+                    ->whereNull('receive_note_id')
+                    ->update(['receive_note_id' => $receiveNote->id]);
 
+                \Log::info('Linked Return Notes:', [
+                    'token' => $request->session_token,
+                    'updated_rows' => $updated
+                ]);
+
+                // ✅ Clean up session tokens after linking
+                \App\Models\ReturnNote::where('receive_note_id', $receiveNote->id)
+                    ->update(['session_token' => null]);
+            }
             DB::commit();
             return redirect()->route('receive-notes.show', $receiveNote->id)
                              ->with('success', 'Receive Note created successfully.');

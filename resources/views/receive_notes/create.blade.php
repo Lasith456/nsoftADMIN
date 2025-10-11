@@ -38,7 +38,7 @@
                 {{-- Filters --}}
                 <form action="{{ route('receive-notes.create') }}" method="GET"
                       class="mb-2 p-2 bg-gray-50 dark:bg-gray-700 rounded-md flex flex-wrap gap-2 items-center text-xs">
-                    <div class="w-full">
+                      <div class="w-full">
                         <label class="block text-sm font-medium">Company*</label>
                         <select x-model="selectedCompany" @change="filterCustomersByCompany"
                             class="w-full border rounded-md py-1 px-2">
@@ -85,6 +85,7 @@
                 {{-- DELIVERY NOTES --}}
                 <form id="receive-note-form" action="{{ route('receive-notes.store') }}" method="POST">
                     @csrf
+                    <input type="hidden" name="session_token" x-model="sessionToken">
                     <div class="space-y-2 max-h-48 overflow-y-auto border rounded-md p-2">
                         @if(!request('customer_id'))
                             <p class="text-sm text-gray-500">Select a customer to see Delivery Notes.</p>
@@ -213,6 +214,7 @@
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('receiveNoteForm', () => ({
+        sessionToken: '{{ \Illuminate\Support\Str::uuid() }}',
         selectedCompany: '{{ $selectedCompanyId ?? '' }}',
         customerName: '{{ $selectedCustomerName ?? '' }}',
         selectedCustomer: '{{ $selectedCustomerId ?? '' }}',
@@ -294,7 +296,9 @@ document.addEventListener('alpine:init', () => {
                             customer_id: this.selectedCustomer,
                             agent_id: null,
                             product_id: item.product_id,
-                            quantity: diff
+                            quantity: diff,
+                            session_token: this.sessionToken,
+
                         })
                     });
 
@@ -320,7 +324,9 @@ document.addEventListener('alpine:init', () => {
                             customer_id: this.selectedCustomer,
                             agent_id: item.agent_id, // 🟢 agent linked
                             product_id: item.product_id,
-                            quantity: diff
+                            quantity: diff,
+                            session_token: this.sessionToken,
+
                         })
                     });
                 }
@@ -338,6 +344,30 @@ document.addEventListener('alpine:init', () => {
                     });
                 }
             }
+            this.items.forEach((it, index) => {
+                    const matched = this.discrepancyItems.find(d => d.product_id === it.product_id);
+                    if (matched) {
+                        const inputName = `items[${index}][discrepancy_reason]`;
+                        let hiddenInput = document.querySelector(`input[name="${inputName}"]`);
+                        if (!hiddenInput) {
+                            hiddenInput = document.createElement('input');
+                            hiddenInput.type = 'hidden';
+                            hiddenInput.name = inputName;
+                            document.getElementById('receive-note-form').appendChild(hiddenInput);
+                        }
+                        hiddenInput.value = matched.reason || '';
+                    }
+                });
+                // ✅ Add a hidden input to mark that wastage exists
+                const wastageSelected = this.discrepancyItems.some(i => i.actionType === 'wastage');
+                let hiddenFlag = document.querySelector('input[name="has_wastage"]');
+                if (!hiddenFlag) {
+                    hiddenFlag = document.createElement('input');
+                    hiddenFlag.type = 'hidden';
+                    hiddenFlag.name = 'has_wastage';
+                    document.getElementById('receive-note-form').appendChild(hiddenFlag);
+                }
+                hiddenFlag.value = wastageSelected ? '1' : '0';
 
             alert('✅ All discrepancies handled successfully.');
             this.showDiscrepancyModal = false;

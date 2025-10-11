@@ -16,10 +16,12 @@ class ReturnNote extends Model
         'agent_id', 
         'reason', 
         'return_date', 
+        'receive_note_id',
         'status', 
         'product_id', 
         'quantity', 
-        'created_by'
+        'created_by',
+        'session_token'
     ];
 
     protected static function booted()

@@ -225,37 +225,37 @@ class InvoiceController extends Controller
     }
     public function createCustomerInvoice(Request $request): View
 {
-    // Load all companies
+    // ✅ Load all companies
     $companies = \App\Models\Company::orderBy('company_name')->get();
 
-    // Base query for uninvoiced receive notes
-    $query = ReceiveNote::where('status', '!=', 'invoiced')
+    // ✅ Base query: Only Receive Notes with status 'completed' (not invoiced)
+    $query = ReceiveNote::where('status', 'completed')
         ->whereHas('deliveryNotes.purchaseOrders.customer')
         ->with('deliveryNotes.purchaseOrders.customer');
 
-    // Apply company filter
+    // ✅ Optional: filter by company
     if ($request->filled('company_id')) {
         $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
             $q->where('company_id', $request->company_id);
         });
     }
 
-    // Apply customer filter (if user already selected a customer)
+    // ✅ Optional: filter by customer
     if ($request->filled('customer_id')) {
         $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
             $q->where('id', $request->customer_id);
         });
     }
 
-    // Fetch filtered receive notes
+    // ✅ Fetch completed receive notes
     $receiveNotes = $query->get();
 
-    // Group by customer ID
+    // ✅ Group receive notes by customer
     $groupedByCustomer = $receiveNotes->groupBy(function ($rn) {
         return $rn->deliveryNotes->first()?->purchaseOrders->first()?->customer?->id;
     })->filter();
 
-    // Create simplified structure
+    // ✅ Build customer + RN data structure
     $customersWithInvoices = $groupedByCustomer->map(function ($notes, $customerId) {
         $customer = $notes->first()->deliveryNotes->first()->purchaseOrders->first()->customer;
         return [
@@ -271,13 +271,15 @@ class InvoiceController extends Controller
         ];
     })->sortBy('customer_name')->values();
 
-    // Fetch all customers with eligible receive notes
+    // ✅ Fetch all customers who have completed (not invoiced) RNs
     $allCustomers = \App\Models\Customer::whereHas('purchaseOrders.deliveryNotes.receiveNotes', function ($q) {
-        $q->where('status', '!=', 'invoiced');
+        $q->where('status', 'completed');
     })->orderBy('customer_name')->get();
 
+    // ✅ Return view with data
     return view('invoices.create_customer_invoice', compact('companies', 'allCustomers', 'customersWithInvoices'));
 }
+
 
 
 // public function storeCustomerInvoice(Request $request): RedirectResponse
@@ -728,343 +730,138 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
         'customer_id'        => ['required', 'exists:customers,id'],
         'receive_note_ids'   => ['required', 'array', 'min:1'],
         'receive_note_ids.*' => ['integer', 'exists:receive_notes,id'],
+        'updated_prices'     => ['nullable', 'array'],
     ]);
 
     $customer = Customer::findOrFail($validated['customer_id']);
 
-    // Load Receive Notes with items + Delivery Notes
-    $receiveNotes = ReceiveNote::with(['items.product', 'deliveryNotes.items.agent', 'deliveryNotes.items.product'])
+    // Decode edited prices coming from front-end
+    $updatedPrices = collect($request->input('updated_prices', []))
+        ->map(fn($p) => json_decode($p, true))
+        ->keyBy('product_id');
+
+    // Load Receive Notes with product info
+    $receiveNotes = ReceiveNote::with(['items.product'])
         ->whereIn('id', $validated['receive_note_ids'])
         ->get();
 
-    $discrepancies = collect();
-    $shortages = [];
+    // Prepare invoice line data
+    $invoiceLines = collect();
 
     foreach ($receiveNotes as $rn) {
-        if ($rn->status === 'discrepancy') {
-            $deliveryNote = $rn->deliveryNotes->first();
-            $discrepancies->push([
-                'rn' => $rn->receive_note_id,
-                'dn' => $deliveryNote?->delivery_note_id ?? 'N/A',
-            ]);
+        foreach ($rn->items as $item) {
+            if (!$item->product) continue;
 
-            foreach ($rn->items as $rnItem) {
-                $dnItem = $rn->deliveryNotes
-                    ->flatMap->items
-                    ->firstWhere('product_id', $rnItem->product_id);
+            $product = $item->product;
+            $qty     = (float) ($item->quantity_received ?? 0);
+            if ($qty <= 0) continue;
 
-                $expected = (float)($dnItem?->quantity_requested ?? 0);
-                if ($expected === 0) {
-                    $expected = (float)(($dnItem?->quantity_from_stock ?? 0) + ($dnItem?->quantity_from_agent ?? 0));
-                }
+            // Use updated price if available
+            $editedPrice = $updatedPrices->has($product->id)
+                ? (float) $updatedPrices[$product->id]['updated_price']
+                : (float) ($product->selling_price ?? 0);
 
-                $received = (float)($rnItem->quantity_received ?? 0);
-
-                if ($expected > $received) {
-                    $shortages[] = [
-                        'product_id' => $rnItem->product_id,
-                        'qty'        => $expected - $received,
-                    ];
-                }
-            }
-        }
-    }
-
-    // --------------------------------------
-    // 🟡 YELLOW BUTTON (create PO + invoice)
-    // --------------------------------------
-    $shortageMap = [];
-    $poCode = null;
-
-    if ($request->filled('create_po')) {
-        if (empty($shortages)) {
-            return back()->withErrors(['error' => 'No shortages found to create a Purchase Order.']);
-        }
-
-        $merged = collect($shortages)->groupBy('product_id')->map(fn($rows) => [
-            'product_id' => $rows->first()['product_id'],
-            'qty'        => collect($rows)->sum('qty'),
-        ])->values();
-
-        DB::beginTransaction();
-        try {
-            $last = PurchaseOrder::orderByRaw("CAST(SUBSTRING(po_id, 4) AS UNSIGNED) DESC")->first();
-            $next = $last ? intval(substr($last->po_id, 3)) + 1 : 1;
-            $poCode = 'PO-' . str_pad($next, 4, '0', STR_PAD_LEFT);
-
-            $po = PurchaseOrder::create([
-                'po_id'         => $poCode,
-                'customer_id'   => $customer->id,
-                'status'        => 'pending',
-                'delivery_date' => now()->addDays(7),
-                'notes'         => 'Auto-created for shortages from discrepancy RNs',
-            ]);
-
-            foreach ($merged as $s) {
-                $product = Product::find($s['product_id']);
-                if (!$product) continue;
-
-                PurchaseOrderItem::create([
-                    'purchase_order_id' => $po->id,
-                    'product_id'        => $s['product_id'],
-                    'product_name'      => $product->name,
-                    'quantity'          => $s['qty'],
-                    'unit_price'        => (float)$product->selling_price,
-                ]);
-            }
-
-            $shortageMap = collect($merged)->pluck('qty', 'product_id')->toArray();
-
-            DB::commit();
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return back()->withErrors(['error' => 'Failed to create PO: ' . $e->getMessage()]);
-        }
-    }
-
-    // --------------------------------------
-    // 🔵 BLUE BUTTON (block if discrepancy)
-    // --------------------------------------
-    if ($discrepancies->isNotEmpty() && !$request->filled('create_po')) {
-        $messages = $discrepancies
-            ->map(fn($d) => "Receive Note: {$d['rn']}, Delivery Note: {$d['dn']}")
-            ->implode('<br>');
-
-        $html = "
-            Cannot generate invoice because some notes have discrepancies:<br>
-            {$messages}<br><br>
-            Please use the yellow 'Generate Invoice & Create PO' button.
-        ";
-
-        return back()->withInput()->with('html_error', $html);
-    }
-
-    // --------------------------------------
-    // ✅ CUSTOMER INVOICE CREATION
-    // --------------------------------------
-    $rawLines = collect();
-
-    foreach ($receiveNotes as $rn) {
-        foreach ($rn->items as $it) {
-            if (!$it->product) continue;
-
-            $receivedQty = (float)($it->quantity_received ?? 0);
-            if ($receivedQty <= 0) continue;
-
-            $p = $it->product;
-
-            $companyPrice = $p->companyPrices()->where('company_id', $customer->company_id)->first();
-            $unitPrice = (float)($companyPrice->selling_price ?? $p->selling_price);
-            $costPrice = (float)($companyPrice->cost_price ?? $p->cost_price);
-
-            $companyDept = $p->companyDepartments()->where('company_id', $customer->company_id)->first();
-            $deptName = $companyDept?->appear_name ?? optional($p->department)->name;
-
-            $shortageNote = '';
-            if (isset($shortageMap[$p->id]) && $poCode) {
-                $shortageNote = " [{$shortageMap[$p->id]} qty moved to {$poCode}]";
-            }
-
-            $rawLines->push([
-                'product_id'      => $p->id,
-                'product_name'    => ($p->appear_name ?: $p->name) . $shortageNote,
-                'department_key'  => $deptName,
-                'department_name' => $deptName,
-                'is_vat'          => (bool)$p->is_vat,
-                'quantity'        => $receivedQty,
-                'unit_price'      => $unitPrice,
-                'cost_price'      => $costPrice,
+            $invoiceLines->push([
+                'product_id'   => $product->id,
+                'description'  => $product->name,
+                'quantity'     => $qty,
+                'unit_price'   => $editedPrice,
+                'cost_price'   => $product->cost_price ?? 0,
+                'is_vat'       => (bool) $product->is_vat,
             ]);
         }
     }
 
-    if ($rawLines->isEmpty()) {
-        return back()->withErrors(['items' => 'No products found to invoice.']);
+    if ($invoiceLines->isEmpty()) {
+        return back()->withErrors(['items' => 'No valid products found for invoice.']);
     }
 
-    $aggregated = $rawLines->groupBy('product_id')->map(function ($rows) {
+    // Merge duplicates (same product in multiple RNs)
+    $groupedLines = $invoiceLines->groupBy('product_id')->map(function ($rows) {
         $first = $rows->first();
         return [
-            'product_id'      => $first['product_id'],
-            'product_name'    => $first['product_name'],
-            'department_key'  => $first['department_key'],
-            'department_name' => $first['department_name'],
-            'is_vat'          => $first['is_vat'],
-            'quantity'        => collect($rows)->sum('quantity'),
-            'unit_price'      => (float)$first['unit_price'],
-            'cost_price'      => (float)$first['cost_price'],
+            'product_id'  => $first['product_id'],
+            'description' => $first['description'],
+            'quantity'    => collect($rows)->sum('quantity'),
+            'unit_price'  => (float) $first['unit_price'],
+            'cost_price'  => (float) $first['cost_price'],
+            'is_vat'      => $first['is_vat'],
         ];
     })->values();
 
-    $groups = $customer->separate_department_invoice
-        ? $aggregated->groupBy(fn($l) => $l['department_key'] ?? 'none')
-        : collect(['all' => $aggregated]);
-
-    $createdInvoiceIds = [];
+    // VAT rate
     $vatRate = (float)(Setting::where('key', 'vat_rate')->value('value') ?? 0);
 
-    DB::transaction(function () use ($groups, $customer, $vatRate, $receiveNotes, &$createdInvoiceIds) {
-        foreach ($groups as $deptKey => $lines) {
-            $isVatInvoice = $lines->contains(fn($l) => $l['is_vat']);
+    // Generate custom Invoice ID (first letter of customer + company)
+    $custInitial = strtoupper(substr($customer->customer_name, 0, 1));
+    $compInitial = strtoupper(substr(optional($customer->company)->company_name ?? 'C', 0, 1));
+    $invoiceCode = "INV-CUST-{$custInitial}{$compInitial}-" . strtoupper(Str::random(5));
 
-            $invoice = new Invoice([
-                'invoice_id'     => 'INV-CUST-' . strtoupper(Str::random(6)),
-                'status'         => 'unpaid',
-                'notes'          => ($deptKey !== 'all' && $deptKey !== 'none')
-                    ? 'Department: ' . ($lines->first()['department_name'] ?? '')
-                    : null,
-                'sub_total'      => 0,
-                'vat_percentage' => $vatRate,
-                'vat_amount'     => 0,
-                'total_amount'   => 0,
-                'amount_paid'    => 0,
-                'due_date'       => now()->addDays(30),
-                'is_vat_invoice' => $isVatInvoice,
-            ]);
-            $invoice->invoiceable()->associate($customer);
-            $invoice->save();
+    DB::beginTransaction();
+    try {
+        $isVatInvoice = $groupedLines->contains(fn($l) => $l['is_vat']);
 
-            $subTotal = 0;
-            $totalVat = 0;
+        // Create Invoice
+        $invoice = new Invoice([
+            'invoice_id'     => $invoiceCode,
+            'status'         => 'unpaid',
+            'due_date'       => now()->addDays(30),
+            'is_vat_invoice' => $isVatInvoice,
+            'sub_total'      => 0,
+            'vat_percentage' => $vatRate,
+            'vat_amount'     => 0,
+            'total_amount'   => 0,
+            'amount_paid'    => 0,
+        ]);
+        $invoice->invoiceable()->associate($customer);
+        $invoice->save();
 
-            foreach ($lines as $l) {
-                $lineSub = round($l['quantity'] * $l['unit_price'], 2);
-                $lineVat = $l['is_vat'] ? round($lineSub * ($vatRate / 100), 2) : 0;
+        // Add line items
+        $subTotal = 0;
+        $vatTotal = 0;
 
-                $invoice->items()->create([
-                    'product_id'  => $l['product_id'],
-                    'description' => $l['product_name'],
-                    'quantity'    => $l['quantity'],
-                    'unit_price'  => $l['unit_price'],
-                    'cost_price'  => $l['cost_price'],
-                    'total'       => $lineSub + $lineVat,
-                    'vat_amount'  => $lineVat,
-                ]);
+        foreach ($groupedLines as $line) {
+            $lineSub = round($line['quantity'] * $line['unit_price'], 2);
+            $lineVat = $line['is_vat'] ? round($lineSub * ($vatRate / 100), 2) : 0;
 
-                $subTotal += $lineSub;
-                $totalVat += $lineVat;
-            }
-
-            $invoice->update([
-                'sub_total'    => round($subTotal, 2),
-                'vat_amount'   => round($totalVat, 2),
-                'total_amount' => round($subTotal + $totalVat, 2),
+            $invoice->items()->create([
+                'product_id'  => $line['product_id'],
+                'description' => $line['description'],
+                'quantity'    => $line['quantity'],
+                'unit_price'  => $line['unit_price'],
+                'cost_price'  => $line['cost_price'],
+                'total'       => $lineSub + $lineVat,
+                'vat_amount'  => $lineVat,
             ]);
 
-            if (method_exists($invoice, 'receiveNotes')) {
-                $invoice->receiveNotes()->attach($receiveNotes->pluck('id'));
-            }
-
-            $createdInvoiceIds[] = $invoice->invoice_id;
+            $subTotal += $lineSub;
+            $vatTotal += $lineVat;
         }
 
+        // Update invoice totals
+        $invoice->update([
+            'sub_total'    => round($subTotal, 2),
+            'vat_amount'   => round($vatTotal, 2),
+            'total_amount' => round($subTotal + $vatTotal, 2),
+        ]);
+
+        // Link RNs and mark them as invoiced
+        if (method_exists($invoice, 'receiveNotes')) {
+            $invoice->receiveNotes()->attach($receiveNotes->pluck('id'));
+        }
         $receiveNotes->each->update(['status' => 'invoiced']);
-    });
 
-    // --------------------------------------
-    // 🟠 AUTO-CREATE AGENT INVOICES (using price_per_case)
-    // --------------------------------------
-    $agentLines = collect();
+        DB::commit();
 
-    foreach ($receiveNotes as $rn) {
-        foreach ($rn->deliveryNotes as $dn) {
-            foreach ($dn->items as $dnItem) {
-                if ($dnItem->quantity_from_agent > 0 && $dnItem->agent_id && !$dnItem->agent_invoiced) {
-                    $product = $dnItem->product;
-                    if (!$product) continue;
-
-                    $receivedQty = $rn->items->firstWhere('product_id', $dnItem->product_id)?->quantity_received ?? 0;
-                    $agentQty = (float)$receivedQty;
-
-                    if ($agentQty <= 0) continue;
-
-                    // ✅ Get price_per_case from pivot
-                    $pivot = $dnItem->agent->products()->where('products.id', $product->id)->first();
-                    $pricePerCase = $pivot?->pivot?->price_per_case;
-
-                    if (is_null($pricePerCase)) {
-                        throw new \Exception("No price_per_case found for Agent {$dnItem->agent_id} and Product {$product->id}");
-                    }
-
-                    $agentLines->push([
-                        'agent_id'     => $dnItem->agent_id,
-                        'product_id'   => $product->id,
-                        'product_name' => $product->name,
-                        'quantity'     => $agentQty,
-                        'unit_price'   => (float)$pricePerCase,
-                        'cost_price'   => (float)$pricePerCase,
-                        'is_vat'       => (bool)$product->is_vat,
-                        'dn_id'        => $dn->delivery_note_id,
-                        'item_id'      => $dnItem->id,
-                    ]);
-                }
-            }
-        }
+        return redirect()
+            ->route('invoices.show', $invoice->id)
+            ->with('success', "Invoice {$invoiceCode} created successfully for {$customer->customer_name}.");
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        return back()->withErrors(['error' => 'Failed to create invoice: ' . $e->getMessage()]);
     }
-
-    if ($agentLines->isNotEmpty()) {
-        $agentGroups = $agentLines->groupBy('agent_id');
-
-        DB::transaction(function () use ($agentGroups, $vatRate) {
-            foreach ($agentGroups as $agentId => $lines) {
-                $agent = Agent::find($agentId);
-                if (!$agent) continue;
-
-                $subTotal = 0;
-                $totalVat = 0;
-                $invoiceItemsData = [];
-
-                foreach ($lines as $l) {
-                    $lineSub = $l['unit_price'] * $l['quantity'];
-                    $lineVat = $l['is_vat'] ? round($lineSub * ($vatRate / 100), 2) : 0;
-
-                    $invoiceItemsData[] = [
-                        'product_id'  => $l['product_id'],
-                        'description' => "Fulfilled shortage for DN {$l['dn_id']} - {$l['product_name']}",
-                        'quantity'    => $l['quantity'],
-                        'unit_price'  => $l['unit_price'],
-                        'cost_price'  => $l['cost_price'],
-                        'total'       => $lineSub + $lineVat,
-                        'vat_amount'  => $lineVat,
-                    ];
-
-                    $subTotal += $lineSub;
-                    $totalVat += $lineVat;
-                }
-
-                $invoice = $agent->invoices()->create([
-                    'invoice_id'     => 'INV-AGT-' . strtoupper(Str::random(6)),
-                    'status'         => 'unpaid',
-                    'sub_total'      => round($subTotal, 2),
-                    'vat_percentage' => $vatRate,
-                    'vat_amount'     => round($totalVat, 2),
-                    'total_amount'   => round($subTotal + $totalVat, 2),
-                    'amount_paid'    => 0,
-                    'due_date'       => now()->addDays(30),
-                    'is_vat_invoice' => $lines->contains(fn($l) => $l['is_vat']),
-                    'notes'          => 'Auto-generated agent invoice from RN shortages',
-                ]);
-
-                $invoice->items()->createMany($invoiceItemsData);
-
-                DeliveryNoteItem::whereIn('id', $lines->pluck('item_id'))
-                    ->update(['agent_invoiced' => true]);
-            }
-        });
-    }
-
-    // --------------------------------------
-    // ✅ Redirect
-    // --------------------------------------
-    return redirect()
-        ->route('invoices.index')
-        ->with('success', sprintf(
-            'Created %d customer invoice(s) for %s: %s',
-            count($createdInvoiceIds),
-            $customer->customer_name,
-            implode(', ', $createdInvoiceIds)
-        ));
 }
+
 
 
 
@@ -1352,6 +1149,44 @@ public function destroy(Invoice $invoice): RedirectResponse
     } catch (\Exception $e) {
         DB::rollBack();
         return back()->withErrors(['error' => 'Failed to delete invoice: ' . $e->getMessage()]);
+    }
+}
+public function fetchReceiveNoteProducts(Request $request)
+{
+    try {
+        $request->validate([
+            'receive_note_ids' => 'required|array|min:1',
+            'receive_note_ids.*' => 'exists:receive_notes,id',
+        ]);
+
+        // ✅ Load related products through items
+        $notes = \App\Models\ReceiveNote::with('items.product')
+            ->where('status', 'completed')
+            ->whereIn('id', $request->receive_note_ids)
+            ->get();
+
+        // ✅ Map to product structure
+        $products = $notes->flatMap(function ($rn) {
+            return $rn->items->map(function ($item) {
+                return [
+                    'product_id'        => $item->product->id ?? null,
+                    'product_name'      => $item->product->name ?? 'Unknown Product',
+                    'quantity_received' => $item->quantity_received ?? 0,
+                    'default_price'     => $item->product->selling_price ?? 0,
+                ];
+            });
+        })
+        ->filter(fn($p) => !is_null($p['product_id'])) // remove nulls
+        ->values();
+
+        return response()->json($products);
+    } catch (\Throwable $e) {
+        // Log and return detailed message
+        \Log::error('fetchReceiveNoteProducts error: ' . $e->getMessage());
+        return response()->json([
+            'error'   => 'Failed to fetch products',
+            'message' => $e->getMessage(),
+        ], 500);
     }
 }
 

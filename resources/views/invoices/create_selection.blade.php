@@ -14,10 +14,10 @@
                 <p class="text-sm text-gray-600 dark:text-gray-400">Generate an invoice for a customer from a completed purchase order.</p>
             </a>
             
-            <!-- <a href="{{ route('invoices.createAgent') }}" class="block w-full text-left p-4 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg">
+            <a href="{{ route('invoices.createAgent') }}" class="block w-full text-left p-4 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg">
                 <h3 class="font-semibold text-gray-900 dark:text-gray-200">Agent Payout Invoice</h3>
                 <p class="text-sm text-gray-600 dark:text-gray-400">Generate a payout invoice for an agent based on fulfilled shortages.</p>
-            </a> -->
+            </a> 
 
             <a href="{{ route('invoices.createSupplier') }}" class="block w-full text-left p-4 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg">
                 <h3 class="font-semibold text-gray-900 dark:text-gray-200">Supplier Invoice (from GRN)</h3>

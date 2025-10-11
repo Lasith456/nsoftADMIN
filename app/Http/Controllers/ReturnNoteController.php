@@ -31,6 +31,7 @@ class ReturnNoteController extends Controller
             'agent_id'   => $request->agent_id,
             'product_id' => $validated['product_id'],
             'quantity'   => $validated['quantity'],
+                'session_token' => $request->session_token,
         ]);
 
         return response()->json([
@@ -61,68 +62,79 @@ class ReturnNoteController extends Controller
             'status' => 'required|string|in:Pending,Processed,Ignored',
         ]);
 
-        $returnNote->update([
-            'status' => $validated['status'],
-        ]);
+        DB::beginTransaction();
+        try {
+            // Update Return Note status
+            $returnNote->update([
+                'status' => $validated['status'],
+            ]);
 
-        return redirect()->route('return-notes.index')
-                        ->with('success', "Return Note status changed to {$validated['status']}.");
-    }
-public function createPO(ReturnNote $returnNote)
-{
+            // ✅ If linked to a Receive Note → mark it completed
+            if ($returnNote->receive_note_id) {
+                \App\Models\ReceiveNote::where('id', $returnNote->receive_note_id)
+                    ->update(['status' => 'completed']);
+            }
 
-    DB::beginTransaction();
-
-    try {
-        // Step 1
-        if (empty($returnNote->product_id) || empty($returnNote->quantity)) {
-            \Log::warning("⚠️ Missing product or quantity for ReturnNote ID {$returnNote->id}");
-            return back()->withErrors(['error' => 'No product or quantity found in this Return Note.']);
-        }
-
-        // Step 2
-        $last = \App\Models\PurchaseOrder::orderByRaw("CAST(SUBSTRING(po_id, 4) AS UNSIGNED) DESC")->first();
-        $next = $last ? intval(substr($last->po_id, 3)) + 1 : 1;
-        $poCode = 'PO-' . str_pad($next, 4, '0', STR_PAD_LEFT);
-
-        // Step 3
-        $po = \App\Models\PurchaseOrder::create([
-            'po_id'         => $poCode,
-            'customer_id'   => $returnNote->customer_id,
-            'status'        => 'pending',
-            'delivery_date' => now()->addDays(7),
-            'notes'         => "Auto-created from Return Note {$returnNote->return_note_id}",
-        ]);
-
-        // Step 4
-        $product = \App\Models\Product::find($returnNote->product_id);
-        if (!$product) {
+            DB::commit();
+            return redirect()->route('return-notes.index')
+                ->with('success', "Return Note status changed to {$validated['status']}. Linked Receive Note marked as completed.");
+        } catch (\Throwable $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Product not found for this Return Note.']);
+            return back()->withErrors(['error' => 'Failed to change status: ' . $e->getMessage()]);
         }
-
-        // Step 5
-        \App\Models\PurchaseOrderItem::create([
-            'purchase_order_id' => $po->id,
-            'product_id'        => $product->id,
-            'product_name'      => $product->name,
-            'quantity'          => $returnNote->quantity,
-            'unit_price'        => (float) $product->selling_price,
-        ]);
-
-        // Step 6
-        $returnNote->update(['status' => 'Processed']);
-
-        DB::commit();
-
-        return redirect()->route('return-notes.index')
-            ->with('success', "Purchase Order {$po->po_id} created successfully from Return Note {$returnNote->return_note_id}.");
-
-    } catch (\Throwable $e) {
-        DB::rollBack();
-        return back()->withErrors(['error' => 'Failed to create PO: ' . $e->getMessage()]);
     }
-}
+
+    public function createPO(ReturnNote $returnNote)
+    {
+        DB::beginTransaction();
+        try {
+            if (empty($returnNote->product_id) || empty($returnNote->quantity)) {
+                return back()->withErrors(['error' => 'No product or quantity found in this Return Note.']);
+            }
+
+            $last = \App\Models\PurchaseOrder::orderByRaw("CAST(SUBSTRING(po_id, 4) AS UNSIGNED) DESC")->first();
+            $next = $last ? intval(substr($last->po_id, 3)) + 1 : 1;
+            $poCode = 'PO-' . str_pad($next, 4, '0', STR_PAD_LEFT);
+
+            $po = \App\Models\PurchaseOrder::create([
+                'po_id'         => $poCode,
+                'customer_id'   => $returnNote->customer_id,
+                'status'        => 'pending',
+                'delivery_date' => now()->addDays(7),
+                'notes'         => "Auto-created from Return Note {$returnNote->return_note_id}",
+            ]);
+
+            $product = \App\Models\Product::find($returnNote->product_id);
+            if (!$product) {
+                DB::rollBack();
+                return back()->withErrors(['error' => 'Product not found for this Return Note.']);
+            }
+
+            \App\Models\PurchaseOrderItem::create([
+                'purchase_order_id' => $po->id,
+                'product_id'        => $product->id,
+                'product_name'      => $product->name,
+                'quantity'          => $returnNote->quantity,
+                'unit_price'        => (float) $product->selling_price,
+            ]);
+
+            // ✅ Update Return Note and linked Receive Note
+            $returnNote->update(['status' => 'Processed']);
+            if ($returnNote->receive_note_id) {
+                \App\Models\ReceiveNote::where('id', $returnNote->receive_note_id)
+                    ->update(['status' => 'completed']);
+            }
+
+            DB::commit();
+            return redirect()->route('return-notes.index')
+                ->with('success', "Purchase Order {$po->po_id} created successfully from Return Note {$returnNote->return_note_id}. Linked Receive Note marked as completed.");
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return back()->withErrors(['error' => 'Failed to create PO: ' . $e->getMessage()]);
+        }
+    }
+
     public function show(ReturnNote $returnNote)
     {
         $returnNote->load(['company', 'customer', 'agent', 'product']);

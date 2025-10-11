@@ -279,6 +279,8 @@ Route::prefix('return-notes')->group(function () {
 Route::post('/stock-management/wastage-from-rn', [StockManagementController::class, 'apiWastageFromReceiveNote'])->name('stock-management.api.wastageFromRN');
 Route::post('/return-notes/{returnNote}/status', [ReturnNoteController::class, 'changeStatus'])->name('return-notes.changeStatus');
 Route::post('/return-notes/{returnNote}/create-po',[ReturnNoteController::class, 'createPO'])->name('return-notes.create-po');
+Route::post('/api/receive-notes/products', [InvoiceController::class, 'fetchReceiveNoteProducts'])
+    ->name('receive-notes.products');
 
 
 });
