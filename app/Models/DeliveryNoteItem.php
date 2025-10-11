@@ -50,4 +50,9 @@ class DeliveryNoteItem extends Model
     {
         return $this->belongsTo(Agent::class);
     }
+    public function isAgentProduct(): bool
+{
+    return !is_null($this->agent_id);
+}
+
 }

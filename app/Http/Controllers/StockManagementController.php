@@ -169,6 +169,74 @@ public function wastageReport(Request $request): View
 
     return view('stock_management.wastage_report', compact('wastageLogs', 'products', 'departments'));
 }
+public function apiConvertINRN(Request $request): JsonResponse
+{
+    $request->validate([
+        'product_id' => 'required|exists:products,id',
+        'quantity' => 'required|integer|min:1',
+    ]);
+
+    DB::beginTransaction();
+    try {
+        $product = Product::findOrFail($request->product_id);
+        $quantity = $request->quantity;
+
+        // 🔍 If product is assigned to an agent, don't increment stock
+        if ($product->agent_id) {
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Return Note created — agent product, stock unchanged.',
+            ]);
+        }
+
+        // ✅ For non-agent products: add to clear stock
+        $product->increment('clear_stock_quantity', $quantity);
+
+        DB::commit();
+        return response()->json([
+            'success' => true, 
+            'message' => 'Return Note created and stock updated successfully.',
+            'product' => $product->fresh()
+        ]);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+
+
+public function apiWastageRN(Request $request): JsonResponse
+    {
+        $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity' => 'required|integer|min:1',
+            'reason' => 'nullable|string|max:255',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $product = Product::findOrFail($request->product_id);
+            $quantity = $request->quantity;
+
+            WastageLog::create([
+                'product_id' => $product->id,
+                'quantity' => $quantity,
+                'stock_type' => 'RN_wastage',
+                'reason' => $request->reason,
+            ]);
+
+            DB::commit();
+            return response()->json([
+                'success' => true, 
+                'message' => 'Wastage logged successfully.',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
 
 }
 

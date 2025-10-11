@@ -22,6 +22,8 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyDepartmentNameController;
+use App\Http\Controllers\ReturnNoteController;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -77,6 +79,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/stock-management', [StockManagementController::class, 'index'])->name('stock-management.index');
     Route::post('/stock-management/convert', [StockManagementController::class, 'apiConvert'])->name('stock-management.api.convert');
     Route::post('/stock-management/wastage', [StockManagementController::class, 'apiWastage'])->name('stock-management.api.wastage');
+    Route::post('/stock-management/wastageRN', [StockManagementController::class, 'apiWastageRN'])->name('stock-management.api.wastageRN');
+    Route::post('/stock-management/apiConvertINRN', [StockManagementController::class, 'apiConvertINRN'])->name('stock-management.api.apiConvertINRN');
 
     // Invoice Creation Routes
     Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('invoices.create');
@@ -266,6 +270,13 @@ Route::get('/companies/{company}/customers', function (\App\Models\Company $comp
         $company->customers()->select('id', 'customer_name')->get()
     );
 })->name('companies.customers');
+Route::prefix('return-notes')->group(function () {
+    Route::get('/', [ReturnNoteController::class, 'index'])->name('return-notes.index');
+    Route::post('/store-ajax', [ReturnNoteController::class, 'storeAjax'])->name('return-notes.store.ajax');
+});
+Route::post('/stock-management/wastage-from-rn', [StockManagementController::class, 'apiWastageFromReceiveNote'])
+    ->name('stock-management.api.wastageFromRN');
+
 
 });
 

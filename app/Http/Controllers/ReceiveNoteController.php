@@ -58,12 +58,10 @@ class ReceiveNoteController extends Controller
         return view('receive_notes.index', compact('receiveNotes', 'companies'));
     }
 
-
 public function create(Request $request): View
 {
     $companies = \App\Models\Company::orderBy('company_name')->get();
-
-    $deliveryNotes = collect(); // Empty by default
+    $deliveryNotes = collect();
 
     if ($request->filled('customer_id')) {
         $query = DeliveryNote::where('status', 'delivered')
@@ -84,16 +82,22 @@ public function create(Request $request): View
         $deliveryNotes = $query->latest()->get();
     }
 
-    // Load all customers with eligible delivery notes and their company
     $allCustomers = Customer::whereHas('purchaseOrders.deliveryNotes', function ($q) {
-            $q->where('status', 'delivered')
-              ->whereDoesntHave('receiveNotes');
+            $q->where('status', 'delivered')->whereDoesntHave('receiveNotes');
         })
         ->with('company:id,company_name')
         ->orderBy('customer_name')
         ->get();
 
-    return view('receive_notes.create', compact('deliveryNotes', 'allCustomers', 'companies'));
+    // Pass selected values to view
+    return view('receive_notes.create', [
+        'deliveryNotes' => $deliveryNotes,
+        'allCustomers' => $allCustomers,
+        'companies' => $companies,
+        'selectedCustomerId' => $request->customer_id,
+        'selectedCompanyId' => $request->company_id,
+        'selectedCustomerName' => $request->customer_name,
+    ]);
 }
 
 
@@ -162,16 +166,14 @@ public function create(Request $request): View
 
         return view('receive_notes.show', compact('receiveNote'));
     }
-// app/Http/Controllers/ReceiveNoteController.php
 
-public function popup($id)
-{
-    $receiveNote = ReceiveNote::with(['items.product', 'deliveryNotes.purchaseOrders.customer'])->findOrFail($id);
+    public function popup($id)
+    {
+        $receiveNote = ReceiveNote::with(['items.product', 'deliveryNotes.purchaseOrders.customer'])->findOrFail($id);
 
-    // Return only the partial view (no layouts.app)
-    return view('receive_notes.partials.details', compact('receiveNote'));
-}
-
+        // Return only the partial view (no layouts.app)
+        return view('receive_notes.partials.details', compact('receiveNote'));
+    }
     public function getItemsForDeliveryNote(Request $request)
     {
         $dn_ids = $request->input('dn_ids', []);
@@ -179,52 +181,77 @@ public function popup($id)
             return response()->json(['items' => []]);
         }
 
+        // ✅ Fetch all items from selected Delivery Notes, including agent info
         $deliveryItems = \App\Models\DeliveryNoteItem::whereIn('delivery_note_id', $dn_ids)
-            ->with('product')
-            ->select('product_id', DB::raw('SUM(quantity_requested) as total_requested'))
-            ->groupBy('product_id')
+            ->with(['product:id,name'])
+            ->select(
+                'delivery_note_id',
+                'product_id',
+                'agent_id',
+                DB::raw('SUM(quantity_requested) as total_requested')
+            )
+            ->groupBy('delivery_note_id', 'product_id', 'agent_id')
             ->get();
-        
+
+        // ✅ Build response structure
         $responseItems = $deliveryItems->map(function ($item) {
             return [
-                'product_id' => $item->product_id,
-                'product_name' => $item->product->name,
+                'delivery_note_id'  => $item->delivery_note_id,
+                'product_id'        => $item->product_id,
+                'product_name'      => $item->product?->name ?? 'Unknown Product',
+                'agent_id'          => $item->agent_id, // 🟢 Needed for agent/mixed stock detection
                 'quantity_expected' => $item->total_requested,
                 'quantity_received' => $item->total_requested,
             ];
         });
 
-        return response()->json(['items' => $responseItems]);
+        // ✅ Merge duplicate products across multiple DNs (if same product appears twice)
+        $merged = $responseItems->groupBy('product_id')->map(function ($group) {
+            $totalExpected = $group->sum('quantity_expected');
+            $agentIds = $group->pluck('agent_id')->unique()->filter();
+            $isMixed = $agentIds->count() > 1 || $agentIds->isEmpty() === false && $agentIds->count() !== $group->count();
+
+            return [
+                'product_id'        => $group->first()['product_id'],
+                'product_name'      => $group->first()['product_name'],
+                'quantity_expected' => $totalExpected,
+                'quantity_received' => $totalExpected,
+                'agent_id'          => $agentIds->count() === 1 ? $agentIds->first() : null,
+                'is_mixed_stock'    => $isMixed, // 🟢 flag if same product came from both agent + own stock
+                'delivery_note_id'  => $group->pluck('delivery_note_id')->join(','),
+            ];
+        })->values();
+
+        return response()->json(['items' => $merged]);
     }
+
+
     public function destroy(ReceiveNote $receiveNote): RedirectResponse
     {
         try {
-            // Block if invoices exist
             if ($receiveNote->invoices()->exists()) {
                 return redirect()->route('receive-notes.index')
                     ->withErrors(['error' => 'Cannot delete: This Receive Note is already linked to an Invoice.']);
             }
 
             DB::beginTransaction();
-
-            // Delete related items first
+            $deliveryNotes = $receiveNote->deliveryNotes;
+            foreach ($deliveryNotes as $dn) {
+                $dn->update(['status' => 'Delivered']);
+            }
             $receiveNote->items()->delete();
-
-            // Detach delivery notes
             $receiveNote->deliveryNotes()->detach();
-
-            // Finally delete receive note
             $receiveNote->delete();
 
             DB::commit();
+
             return redirect()->route('receive-notes.index')
-                            ->with('success', 'Receive Note deleted successfully.');
+                ->with('success', 'Receive Note deleted successfully. Linked Delivery Notes have been marked as Delivered.');
 
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withErrors(['error' => 'Failed to delete Receive Note: ' . $e->getMessage()]);
         }
     }
-
 }
 
