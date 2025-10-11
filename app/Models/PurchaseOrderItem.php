@@ -40,5 +40,13 @@ class PurchaseOrderItem extends Model
     {
         return $this->belongsTo(Product::class);
     }
+    public function assignCategoryFromProduct()
+{
+    if ($this->product && $this->product->category_id) {
+        $this->category_id = $this->product->category_id;
+        $this->save();
+    }
+}
+
 }
 

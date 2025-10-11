@@ -5,32 +5,36 @@
     <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
         <form id="po-form" action="{{ route('purchase-orders.store') }}" method="POST">
             @csrf
+
+            {{-- HEADER --}}
             <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
                 <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Create Purchase Order</h2>
                 <div class="flex items-center space-x-2">
-                    <a href="{{ route('purchase-orders.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">
+                    <a href="{{ route('purchase-orders.index') }}"
+                       class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">
                         Back
                     </a>
-                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-gray-800 border rounded-md font-semibold text-xs text-white uppercase hover:bg-gray-700">
+                    <button type="submit"
+                            class="inline-flex items-center px-4 py-2 bg-gray-800 border rounded-md font-semibold text-xs text-white uppercase hover:bg-gray-700">
                         Create Order
                     </button>
                 </div>
             </div>
 
-            {{-- Validation Errors --}}
+            {{-- VALIDATION ERRORS --}}
             @if ($errors->any())
-            <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
-                 <ul class="list-disc pl-5 mt-2">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+                    <ul class="list-disc pl-5 mt-2">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
             @endif
 
-            <!-- Main PO Details -->
+            {{-- MAIN PO DETAILS --}}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <!-- Company -->
+                {{-- Company --}}
                 <div>
                     <label for="company_id" class="block text-sm font-medium">Company <span class="text-red-500">*</span></label>
                     <select id="company_id" name="company_id"
@@ -45,17 +49,13 @@
                     </select>
                 </div>
 
-                <!-- Customer -->
+                {{-- Customer --}}
                 <div>
                     <label for="customer_name" class="block text-sm font-medium">Customer <span class="text-red-500">*</span></label>
-                    <input list="customers-list"
-                           id="customer_name"
-                           x-model="customerName"
-                           @change="setCustomerId"
+                    <input list="customers-list" id="customer_name" x-model="customerName" @change="setCustomerId"
                            placeholder="Type customer name..."
                            class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3"
-                           required
-                           :disabled="!selectedCompany">
+                           required :disabled="!selectedCompany">
                     <datalist id="customers-list">
                         <template x-for="cust in filteredCustomers" :key="cust.id">
                             <option :value="cust.customer_name" :data-id="cust.id"></option>
@@ -66,13 +66,43 @@
                 </div>
             </div>
 
-            <!-- Delivery Date -->
+            {{-- Delivery Date --}}
             <div class="mb-4">
                 <label for="delivery_date" class="block text-sm font-medium">Delivery Date <span class="text-red-500">*</span></label>
-                <input type="date" name="delivery_date" id="delivery_date" class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3" required>
+                <input type="date" name="delivery_date" id="delivery_date"
+                       class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3"
+                       required>
             </div>
 
-            <!-- Prefilled shortages from discrepancy -->
+            {{-- Categorized PO --}}
+            <div class="mb-4 border-t border-gray-300 dark:border-gray-700 pt-4">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Categorization</h3>
+
+                <div class="flex items-center space-x-4 mb-3">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="is_categorized" value="0" x-model="isCategorized" class="mr-2">
+                        <span>No</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="is_categorized" value="1" x-model="isCategorized" class="mr-2">
+                        <span>Yes</span>
+                    </label>
+                </div>
+
+                {{-- Category Selection --}}
+                <div x-show="isCategorized == 1" x-transition>
+                    <label for="category_id" class="block text-sm font-medium">Select Category <span class="text-red-500">*</span></label>
+                    <select name="category_id" id="category_id"
+                            class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3">
+                        <option value="">-- Select Category --</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category->id }}">{{ $category->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            {{-- Prefilled Shortages (Optional) --}}
             @if(!empty($shortages))
             <div class="border-t border-gray-300 dark:border-gray-700 pt-4 mb-6">
                 <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Prefilled Items from Discrepancy</h3>
@@ -103,19 +133,17 @@
             </div>
             @endif
 
-            <!-- Item Entry Section (for normal add) -->
+            {{-- Item Entry Section --}}
             <div class="border-t dark:border-gray-700 pt-4">
                 <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4">Add Items</h3>
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    {{-- Item Entry Form --}}
+                    {{-- Item Form --}}
                     <div class="lg:col-span-1 space-y-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                        <!-- Department -->
+                        {{-- Department --}}
                         <div>
                             <label class="block text-sm font-medium">Department</label>
-                            <input list="departments-list"
-                                   id="department_name"
-                                   x-model="departmentName"
-                                   @change="departmentChangedByName"
+                            <input list="departments-list" id="department_name"
+                                   x-model="departmentName" @change="departmentChangedByName"
                                    placeholder="Type department..."
                                    class="mt-1 block w-full border rounded-md py-2 px-3 dark:bg-gray-900">
                             <datalist id="departments-list">
@@ -126,12 +154,10 @@
                             <p x-show="departmentError" class="text-red-600 text-xs mt-1" x-text="departmentError"></p>
                         </div>
 
-                        <!-- Product -->
+                        {{-- Product --}}
                         <div>
                             <label class="block text-sm font-medium">Product</label>
-                            <input list="products-list"
-                                   x-model="currentItem.product_name"
-                                   @change="productChangedByName"
+                            <input list="products-list" x-model="currentItem.product_name" @change="productChangedByName"
                                    :disabled="!selectedDepartment"
                                    placeholder="Select department first"
                                    class="mt-1 block w-full border rounded-md py-2 px-3 dark:bg-gray-900">
@@ -142,13 +168,17 @@
                             </datalist>
                         </div>
 
-                        <!-- Quantity -->
+                        {{-- Quantity --}}
                         <div>
                             <label class="block text-sm font-medium">Quantity</label>
-                            <input type="number" x-model.number="quantity" min="1" class="mt-1 block w-full border rounded-md py-2 px-3 dark:bg-gray-900">
+                            <input type="number" x-model.number="quantity" min="1"
+                                   class="mt-1 block w-full border rounded-md py-2 px-3 dark:bg-gray-900">
                         </div>
 
-                        <button type="button" @click="addItem" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">Add Item</button>
+                        <button type="button" @click="addItem"
+                                class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
+                            Add Item
+                        </button>
                     </div>
 
                     {{-- Items Table --}}
@@ -172,7 +202,9 @@
                                             </td>
                                         </tr>
                                     </template>
-                                    <tr x-show="items.length === 0"><td colspan="3" class="text-center py-4 text-sm text-gray-500">No items added.</td></tr>
+                                    <tr x-show="items.length === 0">
+                                        <td colspan="3" class="text-center py-4 text-sm text-gray-500">No items added.</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -180,7 +212,7 @@
                 </div>
             </div>
 
-            <!-- Hidden Inputs -->
+            {{-- Hidden Inputs --}}
             <template x-for="(item, index) in items" :key="index">
                 <div>
                     <input type="hidden" :name="`items[${index}][product_id]`" :value="item.product_id">
@@ -191,6 +223,7 @@
     </div>
 </div>
 
+{{-- ALPINE SCRIPT --}}
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('simplifiedPoForm', () => ({
@@ -207,6 +240,7 @@ document.addEventListener('alpine:init', () => {
         departmentError: '',
         currentItem: { product_id: '', product_name: '' },
         quantity: 1,
+        isCategorized: 0,
 
         get filteredProducts() {
             if (!this.selectedDepartment) return [];
@@ -277,7 +311,7 @@ document.addEventListener('alpine:init', () => {
             this.currentItem = { product_id: '', product_name: '' };
             this.quantity = 1;
         },
-        
+
         removeItem(index) {
             this.items.splice(index, 1);
         }

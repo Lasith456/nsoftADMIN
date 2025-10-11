@@ -23,7 +23,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyDepartmentNameController;
 use App\Http\Controllers\ReturnNoteController;
-
+use App\Http\Controllers\CategoryController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -58,6 +58,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('invoices', InvoiceController::class);
     Route::resource('companies', CompanyController::class);
     Route::resource('company_department_names', CompanyDepartmentNameController::class);
+    Route::resource('categories', CategoryController::class);
 
     // Dynamic Form Routes
     Route::get('/purchase-orders/get-agents-for-product', [PurchaseOrderController::class, 'getAgentsForProduct'])->name('purchase-orders.getAgentsForProduct');

@@ -63,7 +63,10 @@ class Product extends Model
     {
         return $this->hasMany(CustomerProductPrice::class);
     }
-
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
     protected static function boot()
     {
         parent::boot();

@@ -60,6 +60,7 @@ class PurchaseOrderController extends Controller
 public function create(Request $request): View
 {
     $companies   = \App\Models\Company::orderBy('company_name')->get();
+    $categories = \App\Models\Category::all();
     $customers   = Customer::where('is_active', true)->orderBy('customer_name')->get();
     $products    = Product::where('is_active', true)->orderBy('name')->get();
     $departments = \App\Models\Department::orderBy('name')->get();
@@ -68,10 +69,9 @@ public function create(Request $request): View
     $shortages = $request->query('shortages', []);
 
     return view('purchase_orders.create', compact(
-        'companies', 'customers', 'products', 'departments', 'prefillCustomerId', 'shortages'
+        'companies', 'customers', 'products', 'departments', 'prefillCustomerId', 'shortages', 'categories'
     ));
 }
-
 
 
     public function store(Request $request): RedirectResponse
@@ -79,49 +79,52 @@ public function create(Request $request): View
         $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'delivery_date' => 'required|date',
+            'is_categorized' => 'required|boolean',
+            'category_id' => 'nullable|required_if:is_categorized,1|exists:categories,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
         DB::beginTransaction();
+
         try {
-            // Create the main Purchase Order record
             $po = PurchaseOrder::create([
-                'customer_id' => $request->customer_id,
-                'delivery_date' => $request->delivery_date,
-                'status' => 'pending', // Default status
-
+                'customer_id'    => $request->customer_id,
+                'delivery_date'  => $request->delivery_date,
+                'status'         => 'pending',
+                'is_categorized' => $request->is_categorized,
+                'category_id'    => $request->is_categorized ? $request->category_id : null,
             ]);
-
-            // Create the PO items
             foreach ($request->items as $itemData) {
                 $product = Product::find($itemData['product_id']);
 
-                // Add a check to ensure the product was found
                 if (!$product) {
-                    // If not found, throw a specific exception that can be caught
-                    throw new \Exception("Product with ID {$itemData['product_id']} could not be found. The order was not created.");
+                    throw new \Exception("Product with ID {$itemData['product_id']} not found.");
                 }
 
-                PurchaseOrderItem::create([
+                $po->items()->create([
                     'purchase_order_id' => $po->id,
-                    'product_id' => $product->id,
-                    'product_name' => $product->name,
-                    'quantity' => $itemData['quantity'],
-                    'is_vat' => $product->is_vat,
+                    'product_id'    => $product->id,
+                    'product_name'  => $product->name,
+                    'quantity'      => $itemData['quantity'],
+                    'is_vat'        => $product->is_vat ?? 0,
                 ]);
             }
 
             DB::commit();
 
-            return redirect()->route('purchase-orders.index')->with('success', 'Purchase Order created successfully.');
+            return redirect()
+                ->route('purchase-orders.index')
+                ->with('success', 'Purchase Order created successfully.');
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Error creating purchase order: ' . $e->getMessage());
-            // Now display the more specific error message from our new check
-            return back()->withInput()->withErrors(['error' => $e->getMessage()]);
+
+            return back()
+                ->withInput()
+                ->withErrors(['error' => 'Failed to create Purchase Order: ' . $e->getMessage()]);
         }
     }
 

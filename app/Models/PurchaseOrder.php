@@ -18,6 +18,8 @@ class PurchaseOrder extends Model
         'delivery_date',
         'vehicle_id',
         'status',
+        'category_id',
+        'is_categorized'
     ];
 
     protected function casts(): array
@@ -46,7 +48,11 @@ class PurchaseOrder extends Model
     {
         return $this->belongsToMany(DeliveryNote::class, 'delivery_note_purchase_order');
     }
-    
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
     protected static function boot()
     {
         parent::boot();
