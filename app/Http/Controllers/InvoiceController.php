@@ -326,15 +326,16 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
         'receive_note_ids.*' => ['integer', 'exists:receive_notes,id'],
         'updated_prices'     => ['array'],
     ]);
+\Log::info('Updated prices received:', $request->input('updated_prices', []));
 
     $customer = \App\Models\Customer::with('company')->findOrFail($validated['customer_id']);
     $companyName  = optional($customer->company)->company_name ?? 'Company';
     $customerName = $customer->customer_name ?? 'Customer';
 
-    // ✅ check if department/category-wise separation is required
+    // ✅ Check if category/department-wise invoices are required
     $separateDept = (bool) $customer->separate_department_invoice;
 
-    // ✅ 1️⃣ Find all related Purchase Order delivery dates through linked Delivery Notes
+    // ✅ Get PO start/end dates (based on linked Delivery Notes)
     $poDates = \App\Models\PurchaseOrder::whereHas('deliveryNotes.receiveNotes', function ($q) use ($validated) {
         $q->whereIn('receive_notes.id', $validated['receive_note_ids']);
     })->pluck('delivery_date')->filter();
@@ -342,7 +343,7 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
     $poStart = $poDates->min();
     $poEnd   = $poDates->max();
 
-    // ✅ 2️⃣ Load Receive Notes with items + products + categories + departments
+    // ✅ Load Receive Notes with relations
     $receiveNotes = \App\Models\ReceiveNote::with([
         'items.product.department',
         'items.product.category',
@@ -355,77 +356,101 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
         return back()->withErrors(['receive_note_ids' => 'No valid receive notes found.']);
     }
 
-    // 🔹 Decode updated product prices from form
-    $updated = collect($request->input('updated_prices', []))
-        ->map(fn($p) => json_decode($p, true))
-        ->keyBy('product_id'); // easier lookup
+$updated = collect($request->input('updated_prices', []))
+    ->map(function ($json) {
+        $data = json_decode($json, true);
+        if (is_array($data) && isset($data['product_id'])) {
+            // 👇 include PO ID for precise match
+            $key = $data['product_id'] . '_' . ($data['receive_note_id'] ?? 'NA') . '_' . ($data['purchase_order_id'] ?? 'NA');
+            return [$key => $data];
+        }
+        return [];
+    })
+    ->collapse(); // flatten into associative array
+
+// 🧾 Log the parsed updated array for debugging
+\Log::info('✅ Parsed Updated Prices:', $updated->toArray());
+
+
 
     $vatRate = (float)(\App\Models\Setting::where('key', 'vat_rate')->value('value') ?? 12);
     $vatLines = collect();
     $nonVatLines = collect();
 
-    // ✅ Collect all product lines
-    foreach ($receiveNotes as $rn) {
-        foreach ($rn->items as $item) {
-            $product = $item->product;
-            if (!$product) continue;
+    // ✅ Collect all product lines (RAW by RAW)
+foreach ($receiveNotes as $rn) {
+    foreach ($rn->items as $item) {
+        $product = $item->product;
+        if (!$product) continue;
 
-            $qty = (float)$item->quantity_received;
-            if ($qty <= 0) continue;
+        $qty = (float)$item->quantity_received;
+        if ($qty <= 0) continue;
 
-            $unitPrice = (float)($updated[$product->id]['updated_price'] ?? $product->selling_price ?? 0);
+        // ✅ Build key including PO ID from receive_note_items
+        $poId = $item->purchase_order_id ?? 'NA';
+        $key  = $product->id . '_' . $rn->id . '_' . $poId;
 
-            // detect related PO (for categorization)
-            $po = optional($rn->deliveryNotes->first()?->purchaseOrders->first());
-            $isCategorized = $po?->is_categorized;
+        // ✅ Find updated price precisely for product + RN + PO
+        $unitPrice = $updated->has($key)
+            ? (float)$updated->get($key)['updated_price']
+            : (float)($product->selling_price ?? 0);
 
-            $line = [
-                'product_id'   => $product->id,
-                'description'  => $product->name ?? 'Product',
-                'quantity'     => $qty,
-                'unit_price'   => $unitPrice,
-                'is_vat'       => (bool)$product->is_vat,
-                'category_id'  => $isCategorized ? ($product->category?->id ?? null) : null,
-                'department_id'=> !$isCategorized ? ($product->department?->id ?? null) : null,
-                'is_categorized' => $isCategorized,
-            ];
+        \Log::info("🔍 Matching key {$key} => price {$unitPrice}");
 
-            if ($line['is_vat']) {
-                $vatLines->push($line);
-            } else {
-                $nonVatLines->push($line);
-            }
+        $po = optional($rn->deliveryNotes->first()?->purchaseOrders->first());
+        $isCategorized = $po?->is_categorized;
+
+        $line = [
+            'product_id'       => $product->id,
+            'description'      => $product->name ?? 'Product',
+            'quantity'         => $qty,
+            'unit_price'       => $unitPrice,
+            'is_vat'           => (bool)$product->is_vat,
+            'category_id'      => $isCategorized ? ($product->category?->id ?? null) : null,
+            'department_id'    => !$isCategorized ? ($product->department?->id ?? null) : null,
+            'is_categorized'   => $isCategorized,
+            'receive_note_id'  => $rn->id,
+            'purchase_order_id'=> $poId, // ✅ keep for traceability
+        ];
+
+        if ($line['is_vat']) {
+            $vatLines->push($line);
+        } else {
+            $nonVatLines->push($line);
         }
     }
+}
+
 
     if ($vatLines->isEmpty() && $nonVatLines->isEmpty()) {
         return back()->withErrors(['items' => 'No products found to invoice.']);
     }
 
-    // ✅ Helper: group duplicate products
-    $groupLines = fn($lines) => collect($lines)->groupBy('product_id')->map(function ($rows) {
-        $f = $rows->first();
-        return [
-            'product_id'  => $f['product_id'],
-            'description' => $f['description'],
-            'quantity'    => collect($rows)->sum('quantity'),
-            'unit_price'  => $f['unit_price'],
-            'is_vat'      => $f['is_vat'],
-            'category_id' => $f['category_id'],
-            'department_id' => $f['department_id'],
-            'is_categorized' => $f['is_categorized'],
-        ];
-    })->values();
+    // ✅ Preserve each line as-is (no merging or grouping)
+    $processLines = function ($lines) {
+        return collect($lines)->map(function ($l) {
+            return [
+                'product_id'     => $l['product_id'],
+                'description'    => $l['description'], // keep clean name only
+                'quantity'       => $l['quantity'],
+                'unit_price'     => $l['unit_price'],
+                'is_vat'         => $l['is_vat'],
+                'category_id'    => $l['category_id'],
+                'department_id'  => $l['department_id'],
+                'is_categorized' => $l['is_categorized'],
+                'receive_note_id'=> $l['receive_note_id'] ?? null,
+            ];
+        })->values();
+    };
 
-    $vatGrouped    = $groupLines($vatLines);
-    $nonVatGrouped = $groupLines($nonVatLines);
+    $vatGrouped    = $processLines($vatLines);
+    $nonVatGrouped = $processLines($nonVatLines);
 
-    // ✅ If department separation is enabled, regroup VAT and Non-VAT lines by department or category
+    // ✅ Department/Category separation
     if ($separateDept) {
         $vatGrouped    = $vatGrouped->groupBy(fn($l) => $l['is_categorized'] ? 'category_'.$l['category_id'] : 'department_'.$l['department_id']);
         $nonVatGrouped = $nonVatGrouped->groupBy(fn($l) => $l['is_categorized'] ? 'category_'.$l['category_id'] : 'department_'.$l['department_id']);
     } else {
-        // fallback: one group for all
         $vatGrouped    = collect(['default' => $vatGrouped]);
         $nonVatGrouped = collect(['default' => $nonVatGrouped]);
     }
@@ -450,7 +475,7 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
                 'is_vat_invoice' => false,
                 'po_start_date'  => $poStart,
                 'po_end_date'    => $poEnd,
-                'notes'          => $this->getInvoiceGroupLabel($groupKey), // ✅ add label
+                'notes'          => $this->getInvoiceGroupLabel($groupKey),
             ]);
             $invoice->invoiceable()->associate($customer);
             $invoice->save();
@@ -459,13 +484,14 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
             foreach ($groupLines as $line) {
                 $lineSub = round($line['quantity'] * $line['unit_price'], 2);
                 $invoice->items()->create([
-                    'product_id'  => $line['product_id'],
-                    'description' => $line['description'],
-                    'quantity'    => $line['quantity'],
-                    'unit_price'  => $line['unit_price'],
-                    'cost_price'  => 0,
-                    'vat_amount'  => 0,
-                    'total'       => $lineSub,
+                    'product_id'      => $line['product_id'],
+                    'description'     => $line['description'],
+                    'quantity'        => $line['quantity'],
+                    'unit_price'      => $line['unit_price'],
+                    'cost_price'      => 0,
+                    'vat_amount'      => 0,
+                    'total'           => $lineSub,
+                    'receive_note_id' => $line['receive_note_id'] ?? null,
                 ]);
                 $sub += $lineSub;
             }
@@ -498,18 +524,20 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
             $invoice->invoiceable()->associate($customer);
             $invoice->save();
 
-            $sub = 0; $vat = 0;
+            $sub = 0; 
+            $vat = 0;
             foreach ($groupLines as $line) {
                 $lineSub = round($line['quantity'] * $line['unit_price'], 2);
                 $lineVat = round($lineSub * ($vatRate / 100), 2);
                 $invoice->items()->create([
-                    'product_id'  => $line['product_id'],
-                    'description' => $line['description'],
-                    'quantity'    => $line['quantity'],
-                    'unit_price'  => $line['unit_price'],
-                    'cost_price'  => 0,
-                    'vat_amount'  => $lineVat,
-                    'total'       => $lineSub + $lineVat,
+                    'product_id'      => $line['product_id'],
+                    'description'     => $line['description'],
+                    'quantity'        => $line['quantity'],
+                    'unit_price'      => $line['unit_price'],
+                    'cost_price'      => 0,
+                    'vat_amount'      => $lineVat,
+                    'total'           => $lineSub + $lineVat,
+                    'receive_note_id' => $line['receive_note_id'] ?? null,
                 ]);
                 $sub += $lineSub;
                 $vat += $lineVat;
@@ -523,6 +551,7 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
             $createdCodes[] = $invoice->invoice_id;
         }
 
+        // ✅ Mark RN as invoiced
         $receiveNotes->each->update(['status' => 'invoiced']);
         DB::commit();
 
@@ -665,7 +694,7 @@ private function getInvoiceGroupLabel($key)
             return back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
     }
-    
+
 //Bill Show NAVY
     public function showOpt2($id)
     {
@@ -737,39 +766,71 @@ private function getInvoiceGroupLabel($key)
             return back()->withErrors(['error' => 'Failed to delete invoice: ' . $e->getMessage()]);
         }
     }
-    public function fetchReceiveNoteProducts(Request $request)
-    {
-        try {
-            $request->validate([
-                'receive_note_ids' => 'required|array|min:1',
-                'receive_note_ids.*' => 'exists:receive_notes,id',
-            ]);
-            $notes = \App\Models\ReceiveNote::with('items.product')
-                ->where('status', 'completed')
-                ->whereIn('id', $request->receive_note_ids)
-                ->get();
-            $products = $notes->flatMap(function ($rn) {
-                return $rn->items->map(function ($item) {
-                    return [
-                        'product_id'        => $item->product->id ?? null,
-                        'product_name'      => $item->product->name ?? 'Unknown Product',
-                        'quantity_received' => $item->quantity_received ?? 0,
-                        'default_price'     => $item->product->selling_price ?? 0,
-                    ];
-                });
-            })
-            ->filter(fn($p) => !is_null($p['product_id'])) 
-            ->values();
+public function fetchReceiveNoteProducts(Request $request)
+{
+    try {
+        $request->validate([
+            'receive_note_ids' => 'required|array|min:1',
+            'receive_note_ids.*' => 'exists:receive_notes,id',
+        ]);
 
-            return response()->json($products);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'error'   => 'Failed to fetch products',
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+        $notes = \App\Models\ReceiveNote::with([
+            'items.product',
+            'deliveryNotes.purchaseOrders'  // kept (don’t remove)
+        ])
+        ->where('status', 'completed')
+        ->whereIn('id', $request->receive_note_ids)
+        ->get();
+
+        $products = $notes->flatMap(function ($rn) {
+            // Keep your old PO logic — now secondary only
+            $poIds = $rn->deliveryNotes
+                ->flatMap(fn($dn) => $dn->purchaseOrders)
+                ->pluck('id')
+                ->unique()
+                ->values();
+
+            $poCodes = $rn->deliveryNotes
+                ->flatMap(fn($dn) => $dn->purchaseOrders)
+                ->pluck('po_number')
+                ->unique()
+                ->values();
+
+            // ✅ MAIN: use PO ID from ReceiveNoteItem
+            return $rn->items->map(function ($item) use ($rn, $poIds, $poCodes) {
+                return [
+                    'product_id'        => $item->product->id ?? null,
+                    'product_name'      => $item->product->name ?? 'Unknown Product',
+                    'quantity_received' => $item->quantity_received ?? 0,
+                    'default_price'     => $item->product->selling_price ?? 0,
+                    'receive_note_id'   => $rn->id,
+                    'purchase_order_id' => $item->purchase_order_id ?? null, // ✅ direct PO relationship
+                ];
+            });
+        })
+        ->filter(fn($p) => !is_null($p['product_id']))
+        ->values();
+
+        // ✅ Optional debug log
+        \Log::info('✅ Products fetched from Receive Notes:', $products->toArray());
+
+        return response()->json(array_values($products->toArray())); // ✅ pure JSON array
+
+    } catch (\Throwable $e) {
+        \Log::error('❌ Failed to fetch products:', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        return response()->json([
+            'error'   => 'Failed to fetch products',
+            'message' => $e->getMessage(),
+        ], 500);
     }
-private function generateInvoiceCode(bool $isVat, string $companyName, string $customerName): string
+}
+
+
+
+    private function generateInvoiceCode(bool $isVat, string $companyName, string $customerName): string
 {
     $companyInitial = strtoupper(substr($companyName, 0, 1));
     $customerInitial = strtoupper(substr($customerName, 0, 1));

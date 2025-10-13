@@ -153,6 +153,8 @@
                                     form="receive-note-form">
                                 <input type="hidden" :name="`items[${index}][product_id]`" :value="item.product_id" form="receive-note-form">
                                 <input type="hidden" :name="`items[${index}][quantity_expected]`" :value="item.quantity_expected" form="receive-note-form">
+                                <input type="hidden" :name="`items[${index}][purchase_order_id]`" :value="item.purchase_order_id" form="receive-note-form">
+
                             </td>
                             <td class="px-4 py-2 text-sm text-right" x-text="item.difference"></td>
                         </tr>

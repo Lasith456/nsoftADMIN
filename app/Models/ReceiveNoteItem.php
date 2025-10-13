@@ -16,6 +16,7 @@ class ReceiveNoteItem extends Model
         'quantity_expected',
         'quantity_received',
         'discrepancy_reason',
+        'purchase_order_id',  // ✅ new field
     ];
 
     /**

@@ -101,77 +101,90 @@ public function create(Request $request): View
 }
 
 
+public function store(Request $request): RedirectResponse
+{
+    $request->validate([
+        'delivery_note_ids' => 'required|array|min:1',
+        'delivery_note_ids.*' => 'exists:delivery_notes,id',
+        'received_date' => 'required|date',
+        'notes' => 'nullable|string',
+        'items' => 'required|array|min:1',
+        'items.*.product_id' => 'required|exists:products,id',
+        'items.*.quantity_expected' => 'required|integer',
+        'items.*.quantity_received' => 'required|integer|min:0',
+        'items.*.discrepancy_reason' => 'nullable|string|max:255',
+        'items.*.purchase_order_id' => 'nullable|integer|exists:purchase_orders,id', // ✅ add validation
+    ]);
 
-    public function store(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'delivery_note_ids' => 'required|array|min:1',
-            'delivery_note_ids.*' => 'exists:delivery_notes,id',
-            'received_date' => 'required|date',
-            'notes' => 'nullable|string',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity_expected' => 'required|integer',
-            'items.*.quantity_received' => 'required|integer|min:0',
-            'items.*.discrepancy_reason' => 'nullable|string|max:255',
+    DB::beginTransaction();
+    try {
+        $deliveryNoteIds = $request->delivery_note_ids;
+        $hasDiscrepancy = false;
+
+        // ✅ Create Receive Note
+        $receiveNote = ReceiveNote::create([
+            'received_date' => $request->received_date,
+            'notes' => $request->notes,
+            'status' => 'completed',
         ]);
 
-        DB::beginTransaction();
-        try {
-            $deliveryNoteIds = $request->delivery_note_ids;
-            $hasDiscrepancy = false;
+        // ✅ Link all Delivery Notes
+        $receiveNote->deliveryNotes()->attach($deliveryNoteIds);
 
-            $receiveNote = ReceiveNote::create([
-                'received_date' => $request->received_date,
-                'notes' => $request->notes,
-                'status' => 'completed',
+        // ✅ Save Items (including purchase_order_id)
+        foreach ($request->items as $itemData) {
+            if ($itemData['quantity_received'] != $itemData['quantity_expected']) {
+                $hasDiscrepancy = true;
+            }
+
+            ReceiveNoteItem::create([
+                'receive_note_id'    => $receiveNote->id,
+                'purchase_order_id'  => $itemData['purchase_order_id'] ?? null, // ✅ now stored
+                'product_id'         => $itemData['product_id'],
+                'quantity_expected'  => $itemData['quantity_expected'],
+                'quantity_received'  => $itemData['quantity_received'],
+                'discrepancy_reason' => $itemData['discrepancy_reason'] ?? null,
+            ]);
+        }
+
+        // ✅ Handle discrepancy status
+        if ($hasDiscrepancy) {
+            if ($request->has('has_wastage') && $request->has_wastage == '1') {
+                $receiveNote->update(['status' => 'completed']);
+            } else {
+                $receiveNote->update(['status' => 'discrepancy']);
+            }
+        }
+
+        // ✅ Mark linked Delivery Notes as received
+        DeliveryNote::whereIn('id', $deliveryNoteIds)->update(['status' => 'received']);
+
+        // ✅ Link return notes if token exists
+        if ($request->filled('session_token')) {
+            $updated = \App\Models\ReturnNote::where('session_token', $request->session_token)
+                ->whereNull('receive_note_id')
+                ->update(['receive_note_id' => $receiveNote->id]);
+
+            \Log::info('Linked Return Notes:', [
+                'token' => $request->session_token,
+                'updated_rows' => $updated
             ]);
 
-            $receiveNote->deliveryNotes()->attach($deliveryNoteIds);
-
-            foreach ($request->items as $itemData) {
-                if ($itemData['quantity_received'] != $itemData['quantity_expected']) {
-                    $hasDiscrepancy = true;
-                }
-                ReceiveNoteItem::create([
-                    'receive_note_id' => $receiveNote->id,
-                    'product_id' => $itemData['product_id'],
-                    'quantity_expected' => $itemData['quantity_expected'],
-                    'quantity_received' => $itemData['quantity_received'],
-                    'discrepancy_reason' => $itemData['discrepancy_reason'] ?? null,
-                ]);
-            }
-
-            if ($hasDiscrepancy) {
-                if ($request->has('has_wastage') && $request->has_wastage == '1') {
-                    $receiveNote->update(['status' => 'completed']);
-                } else {
-                    $receiveNote->update(['status' => 'discrepancy']);
-                }
-            }
-
-            
-            DeliveryNote::whereIn('id', $deliveryNoteIds)->update(['status' => 'received']);
-            if ($request->filled('session_token')) {
-                $updated = \App\Models\ReturnNote::where('session_token', $request->session_token)
-                    ->whereNull('receive_note_id')
-                    ->update(['receive_note_id' => $receiveNote->id]);
-
-                \Log::info('Linked Return Notes:', [
-                    'token' => $request->session_token,
-                    'updated_rows' => $updated
-                ]);
-                \App\Models\ReturnNote::where('receive_note_id', $receiveNote->id)
-                    ->update(['session_token' => null]);
-            }
-            DB::commit();
-            return redirect()->route('receive-notes.show', $receiveNote->id)
-                             ->with('success', 'Receive Note created successfully.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->withInput()->withErrors(['error' => $e->getMessage()]);
+            \App\Models\ReturnNote::where('receive_note_id', $receiveNote->id)
+                ->update(['session_token' => null]);
         }
+
+        DB::commit();
+
+        return redirect()
+            ->route('receive-notes.show', $receiveNote->id)
+            ->with('success', 'Receive Note created successfully with Purchase Order links.');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withInput()->withErrors(['error' => $e->getMessage()]);
     }
+}
+
 
     public function show(ReceiveNote $receiveNote): View
     {

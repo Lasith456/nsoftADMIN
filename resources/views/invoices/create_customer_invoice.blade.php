@@ -138,9 +138,19 @@
             <template x-for="id in selectedReceiveNotes" :key="id">
                 <input type="hidden" name="receive_note_ids[]" :value="id">
             </template>
-            <template x-for="(p, idx) in productList" :key="idx">
-                <input type="hidden" name="updated_prices[]" :value="JSON.stringify(p)">
-            </template>
+<template x-for="(p, idx) in productList" :key="'price-'+idx">
+    <input type="hidden"
+           name="updated_prices[]"
+           :value="JSON.stringify({
+               product_id: p.product_id,
+               receive_note_id: p.receive_note_id,
+               updated_price: Number(p.updated_price),
+               purchase_order_id: p.purchase_order_id,
+           })">
+</template>
+
+
+
         </form>
     </div>
 
@@ -234,6 +244,8 @@ document.addEventListener('alpine:init', () => {
 
                 return {
                     product_id: d.product_id,
+                    receive_note_id: d.receive_note_id,
+                    purchase_order_id: d.purchase_order_id,        // 👈 new field for display if needed
                     name: d.product_name,
                     quantity: d.quantity_received,
                     default_price: price,
@@ -242,12 +254,32 @@ document.addEventListener('alpine:init', () => {
             });
         },
 
-        handleSubmit(e) {
+handleSubmit(e) {
             if (!this.selectedCustomer || this.selectedReceiveNotes.length === 0) {
                 alert('Please select a company, customer, and at least one receive note.');
                 return;
             }
-            e.target.submit();
+
+            // ✅ remove existing hidden inputs before appending fresh ones
+            document.querySelectorAll('input[name="updated_prices[]"]').forEach(el => el.remove());
+
+            // ✅ dynamically append the latest prices to the form
+            const form = document.getElementById('customer-invoice-form');
+            this.productList.forEach(p => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'updated_prices[]';
+                input.value = JSON.stringify({
+                    product_id: p.product_id,
+                    receive_note_id: p.receive_note_id,
+                    purchase_order_id: p.purchase_order_id, 
+                    updated_price: Number(p.updated_price)
+                });
+                form.appendChild(input);
+            });
+
+            // ✅ now submit
+            form.submit();
         },
 
         openRnPopup(id) {
