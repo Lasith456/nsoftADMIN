@@ -9,6 +9,18 @@ use Illuminate\View\View;
 
 class CategoryController extends Controller
 {
+    public function __construct()
+    {
+        // ✅ Require login for all category routes
+        $this->middleware('auth');
+
+        // ✅ Define permission access per action
+        $this->middleware('permission:view categories')->only(['index']);
+        $this->middleware('permission:create categories')->only(['create', 'store']);
+        $this->middleware('permission:edit categories')->only(['edit', 'update']);
+        $this->middleware('permission:delete categories')->only(['destroy']);
+    }
+
     /** Display all categories. */
     public function index(): View
     {

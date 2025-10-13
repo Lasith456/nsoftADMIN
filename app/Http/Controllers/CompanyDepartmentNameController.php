@@ -9,6 +9,18 @@ use Illuminate\Http\Request;
 
 class CompanyDepartmentNameController extends Controller
 {
+    public function __construct()
+    {
+        // ✅ Require authentication for all actions
+        $this->middleware('auth');
+
+        // ✅ Define permissions for each action
+        $this->middleware('permission:view company department names')->only(['index', 'show']);
+        $this->middleware('permission:create company department names')->only(['create', 'store']);
+        $this->middleware('permission:edit company department names')->only(['edit', 'update']);
+        $this->middleware('permission:delete company department names')->only(['destroy']);
+    }
+
     /**
      * Display a listing of the resource.
      */

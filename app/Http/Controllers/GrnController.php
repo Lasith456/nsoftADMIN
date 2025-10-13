@@ -19,7 +19,7 @@ class GrnController extends Controller
     public function __construct()
     {
         $this->middleware('permission:grn-list|grn-create|grn-delete|grn-manage', ['only' => ['index','show', 'manage']]);
-        $this->middleware('permission:grn-create', ['only' => ['create','store']]);
+        $this->middleware('permission:grn-create', ['only' => ['create','store','selectType','createFromPo']]);
         $this->middleware('permission:grn-delete', ['only' => ['destroy']]);
         $this->middleware('permission:grn-manage', ['only' => ['manage', 'complete', 'cancel', 'generateInvoice']]);
     }
@@ -152,7 +152,12 @@ class GrnController extends Controller
                     'discount' => $itemData['discount'] ?? 0,
                 ]);
             }
-
+            if ($request->filled('grnpo_id')) {
+                        $grnPo = \App\Models\GrnPo::find($request->grnpo_id);
+                        if ($grnPo) {
+                            $grnPo->update(['status' => 'completed']); // or 'confirmed'
+                        }
+                    }
             DB::commit();
             return redirect()->route('grns.index')->with('success', 'GRN created successfully with pending status.');
         } catch (\Exception $e) {
@@ -310,4 +315,40 @@ class GrnController extends Controller
             return back()->withErrors(['error' => 'Failed to delete GRN: ' . $e->getMessage()]);
         }
     }
+
+public function selectType()
+{
+    $suppliers = \App\Models\Supplier::where('is_active', true)->orderBy('supplier_name')->get();
+    return view('grns.select_type', compact('suppliers'));
+}
+public function createFromPo($grnpoId)
+{
+    $grnpo = \App\Models\GrnPo::with(['supplier', 'items.product', 'items.department'])->findOrFail($grnpoId);
+
+    $supplier = $grnpo->supplier;
+    $departments = \App\Models\Department::orderBy('name')->get();
+
+    // Prefill items from GRN PO
+    $poItems = $grnpo->items->map(function ($item) {
+        return [
+            'department_id' => $item->department_id,
+            'department_name' => $item->department->name ?? '',
+            'product_id' => $item->product_id,
+            'product_name' => $item->product->name ?? '',
+            'expected_qty' => $item->quantity,
+            'quantity_received' => $item->quantity, // editable field
+            'unit_type' => 'Unit',
+            'stock_type' => 'clear',
+            'cost_price' => $item->product->cost_price ?? 0,
+            'selling_price' => $item->product->selling_price ?? 0,
+            'discount' => 0,
+            'is_free_issue' => 0,
+            'free_issue_qty' => 0,
+            'units_per_case' => $item->product->units_per_case ?? 1,
+        ];
+    });
+
+    return view('grns.create_from_po', compact('grnpo', 'supplier', 'departments', 'poItems'));
+}
+
 }

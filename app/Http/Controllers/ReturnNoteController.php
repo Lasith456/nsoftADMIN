@@ -4,10 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\ReturnNote;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+
 class ReturnNoteController extends Controller
 {
+    public function __construct()
+    {
+        // ✅ Require login for all routes
+        $this->middleware('auth');
+
+        // ✅ Apply permission-based route protection
+        $this->middleware('permission:view return notes')->only(['index', 'show']);
+        $this->middleware('permission:create return notes')->only(['storeAjax']);
+        $this->middleware('permission:update return notes')->only(['changeStatus']);
+        $this->middleware('permission:convert return note to po')->only(['createPO']);
+    }
+
     /**
      * AJAX create (for popup in Receive Note page)
      */
@@ -23,68 +35,66 @@ class ReturnNoteController extends Controller
         ]);
 
         $returnNote = ReturnNote::create([
-            'company_id' => $validated['company_id'] ?? null,
-            'customer_id' => $validated['customer_id'] ?? null,
-            'reason' => $validated['reason'],
-            'return_date' => $validated['return_date'] ?? now(),
-            'created_by' => auth()->id(),
-            'agent_id'   => $request->agent_id,
-            'product_id' => $validated['product_id'],
-            'quantity'   => $validated['quantity'],
-                'session_token' => $request->session_token,
+            'company_id'   => $validated['company_id'] ?? null,
+            'customer_id'  => $validated['customer_id'] ?? null,
+            'reason'       => $validated['reason'],
+            'return_date'  => $validated['return_date'] ?? now(),
+            'created_by'   => auth()->id(),
+            'agent_id'     => $request->agent_id,
+            'product_id'   => $validated['product_id'],
+            'quantity'     => $validated['quantity'],
+            'session_token'=> $request->session_token,
         ]);
 
         return response()->json([
-            'success' => true,
+            'success'        => true,
             'return_note_id' => $returnNote->return_note_id,
-            'id' => $returnNote->id,
+            'id'             => $returnNote->id,
         ]);
     }
 
     /**
-     * Optional index (for future)
+     * List all Return Notes with filters.
      */
-public function index(Request $request)
-{
-    $query = ReturnNote::with([
-        'receiveNote.deliveryNotes',
-        'receiveNote.customer',
-        'receiveNote.agent',
-        'company'
-    ]);
+    public function index(Request $request)
+    {
+        $query = ReturnNote::with([
+            'receiveNote.deliveryNotes',
+            'receiveNote.customer',
+            'receiveNote.agent',
+            'company'
+        ]);
 
-    // Company Filter
-    if ($request->filled('company_id')) {
-        $query->where('company_id', $request->company_id);
+        // 🔍 Filter by company
+        if ($request->filled('company_id')) {
+            $query->where('company_id', $request->company_id);
+        }
+
+        // 🔍 Date range
+        if ($request->filled('from_date') && $request->filled('to_date')) {
+            $query->whereBetween('return_date', [$request->from_date, $request->to_date]);
+        }
+
+        // 🔍 Search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('return_note_id', 'like', "%{$search}%")
+                  ->orWhere('reason', 'like', "%{$search}%")
+                  ->orWhereHas('receiveNote.customer', function ($c) use ($search) {
+                      $c->where('customer_name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $returnNotes = $query->latest()->paginate(10);
+        $companies = \App\Models\Company::orderBy('company_name')->get();
+
+        return view('return-notes.index', compact('returnNotes', 'companies'));
     }
-
-    // Date Range Filter
-    if ($request->filled('from_date') && $request->filled('to_date')) {
-        $query->whereBetween('return_date', [$request->from_date, $request->to_date]);
-    }
-
-    // Search Filter
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $query->where(function ($q) use ($search) {
-            $q->where('return_note_id', 'like', "%{$search}%")
-              ->orWhere('reason', 'like', "%{$search}%")
-              ->orWhereHas('receiveNote.customer', function ($c) use ($search) {
-                  $c->where('customer_name', 'like', "%{$search}%");
-              });
-        });
-    }
-
-    $returnNotes = $query->latest()->paginate(10);
-    $companies = \App\Models\Company::orderBy('company_name')->get();
-
-    return view('return-notes.index', compact('returnNotes', 'companies'));
-}
-
-
 
     /**
-     * Change Return Note status (e.g. to Ignored)
+     * Change Return Note status (e.g., Pending → Processed → Ignored)
      */
     public function changeStatus(Request $request, ReturnNote $returnNote)
     {
@@ -94,10 +104,7 @@ public function index(Request $request)
 
         DB::beginTransaction();
         try {
-            // Update Return Note status
-            $returnNote->update([
-                'status' => $validated['status'],
-            ]);
+            $returnNote->update(['status' => $validated['status']]);
 
             // ✅ If linked to a Receive Note → mark it completed
             if ($returnNote->receive_note_id) {
@@ -114,6 +121,9 @@ public function index(Request $request)
         }
     }
 
+    /**
+     * Auto-create a Purchase Order from a Return Note.
+     */
     public function createPO(ReturnNote $returnNote)
     {
         DB::beginTransaction();
@@ -148,7 +158,7 @@ public function index(Request $request)
                 'unit_price'        => (float) $product->selling_price,
             ]);
 
-            // ✅ Update Return Note and linked Receive Note
+            // ✅ Update statuses
             $returnNote->update(['status' => 'Processed']);
             if ($returnNote->receive_note_id) {
                 \App\Models\ReceiveNote::where('id', $returnNote->receive_note_id)
@@ -158,21 +168,18 @@ public function index(Request $request)
             DB::commit();
             return redirect()->route('return-notes.index')
                 ->with('success', "Purchase Order {$po->po_id} created successfully from Return Note {$returnNote->return_note_id}. Linked Receive Note marked as completed.");
-
         } catch (\Throwable $e) {
             DB::rollBack();
             return back()->withErrors(['error' => 'Failed to create PO: ' . $e->getMessage()]);
         }
     }
 
+    /**
+     * Show a single Return Note details.
+     */
     public function show(ReturnNote $returnNote)
     {
         $returnNote->load(['company', 'customer', 'agent', 'product']);
         return view('return-notes.show', compact('returnNote'));
     }
-
-
-
-
-
 }

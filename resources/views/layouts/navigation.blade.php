@@ -150,11 +150,12 @@
                         <svg x-show="!sidebarCollapsed || sidebarHover" class="ml-auto h-5 w-5 shrink-0 transition-transform duration-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" :class="{'rotate-90': open}"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
                     </button>
                     <ul x-show="open" class="mt-1 px-2 space-y-1">
-                        <li><a href="{{ route('grns.create') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Add GRN</a></li>
+                        <li><a href="{{ route('grns.selectType') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Add GRN</a></li>
                         <li><a href="{{ route('grns.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">All GRN</a></li>
+                        <li><a href="{{ route('grnpos.create') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Add PO GRN</a></li>
+                        <li><a href="{{ route('grnpos.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">All PO GRN</a></li>
                         <li><a href="{{ route('stock-management.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Wastage</a></li>
                         <li><a href="{{ route('return-notes.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Return Notes</a></li>
-
                     </ul>
                 </li>
                 

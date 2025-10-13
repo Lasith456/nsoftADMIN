@@ -24,6 +24,7 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyDepartmentNameController;
 use App\Http\Controllers\ReturnNoteController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\GrnPoController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -52,13 +53,13 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('agents', AgentController::class);
     Route::resource('departments', DepartmentController::class);
     Route::resource('purchase-orders', PurchaseOrderController::class);
-    Route::resource('grns', GrnController::class);
     Route::resource('delivery-notes', DeliveryNoteController::class);
     Route::resource('receive-notes', ReceiveNoteController::class);
     Route::resource('invoices', InvoiceController::class);
     Route::resource('companies', CompanyController::class);
     Route::resource('company_department_names', CompanyDepartmentNameController::class);
     Route::resource('categories', CategoryController::class);
+    Route::resource('grnpos', GrnPoController::class);
 
     // Dynamic Form Routes
     Route::get('/purchase-orders/get-agents-for-product', [PurchaseOrderController::class, 'getAgentsForProduct'])->name('purchase-orders.getAgentsForProduct');
@@ -281,6 +282,14 @@ Route::post('/return-notes/{returnNote}/status', [ReturnNoteController::class, '
 Route::post('/return-notes/{returnNote}/create-po',[ReturnNoteController::class, 'createPO'])->name('return-notes.create-po');
 Route::post('/api/receive-notes/products', [InvoiceController::class, 'fetchReceiveNoteProducts'])
     ->name('receive-notes.products');
+Route::get('/grnpos/pending/{supplierId}', [GrnPoController::class, 'pendingBySupplier'])
+    ->name('grnpos.pendingBySupplier');
+// ✅ Put before the resource route
+Route::get('/grns/new', [GrnController::class, 'selectType'])->name('grns.selectType');
+Route::get('/grns/create/from-po/{grnpo}', [GrnController::class, 'createFromPo'])->name('grns.createFromPo');
+
+// Keep this after
+Route::resource('grns', GrnController::class);
 
 
 });
