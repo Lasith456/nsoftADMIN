@@ -68,4 +68,9 @@ class ReturnNote extends Model
     {
         return $this->belongsTo(Product::class, 'product_id', 'id');
     }
+    public function receiveNote()
+    {
+        return $this->belongsTo(\App\Models\ReceiveNote::class, 'receive_note_id');
+    }
+
 }

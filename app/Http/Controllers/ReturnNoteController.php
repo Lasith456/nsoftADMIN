@@ -44,14 +44,44 @@ class ReturnNoteController extends Controller
     /**
      * Optional index (for future)
      */
-    public function index()
-    {
-        $returnNotes = ReturnNote::with(['company', 'customer', 'agent'])
-            ->latest()
-            ->paginate(10);
+public function index(Request $request)
+{
+    $query = ReturnNote::with([
+        'receiveNote.deliveryNotes',
+        'receiveNote.customer',
+        'receiveNote.agent',
+        'company'
+    ]);
 
-        return view('return-notes.index', compact('returnNotes'));
+    // Company Filter
+    if ($request->filled('company_id')) {
+        $query->where('company_id', $request->company_id);
     }
+
+    // Date Range Filter
+    if ($request->filled('from_date') && $request->filled('to_date')) {
+        $query->whereBetween('return_date', [$request->from_date, $request->to_date]);
+    }
+
+    // Search Filter
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('return_note_id', 'like', "%{$search}%")
+              ->orWhere('reason', 'like', "%{$search}%")
+              ->orWhereHas('receiveNote.customer', function ($c) use ($search) {
+                  $c->where('customer_name', 'like', "%{$search}%");
+              });
+        });
+    }
+
+    $returnNotes = $query->latest()->paginate(10);
+    $companies = \App\Models\Company::orderBy('company_name')->get();
+
+    return view('return-notes.index', compact('returnNotes', 'companies'));
+}
+
+
 
     /**
      * Change Return Note status (e.g. to Ignored)

@@ -254,32 +254,62 @@ public function store(Request $request): RedirectResponse
 }
 
 
-    public function destroy(ReceiveNote $receiveNote): RedirectResponse
-    {
-        try {
-            if ($receiveNote->invoices()->exists()) {
-                return redirect()->route('receive-notes.index')
-                    ->withErrors(['error' => 'Cannot delete: This Receive Note is already linked to an Invoice.']);
-            }
-
-            DB::beginTransaction();
-            $deliveryNotes = $receiveNote->deliveryNotes;
-            foreach ($deliveryNotes as $dn) {
-                $dn->update(['status' => 'Delivered']);
-            }
-            $receiveNote->items()->delete();
-            $receiveNote->deliveryNotes()->detach();
-            $receiveNote->delete();
-
-            DB::commit();
-
+   public function destroy(ReceiveNote $receiveNote): RedirectResponse
+{
+    try {
+        // ❌ Block deletion if linked to invoices
+        if ($receiveNote->invoices()->exists()) {
             return redirect()->route('receive-notes.index')
-                ->with('success', 'Receive Note deleted successfully. Linked Delivery Notes have been marked as Delivered.');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->withErrors(['error' => 'Failed to delete Receive Note: ' . $e->getMessage()]);
+                ->withErrors(['error' => 'Cannot delete: This Receive Note is already linked to an Invoice.']);
         }
+
+        // 🟢 Fetch linked return notes
+        $returnNotes = \App\Models\ReturnNote::where('receive_note_id', $receiveNote->id)->get();
+
+        // 🧠 Check each return note’s status
+        foreach ($returnNotes as $rn) {
+            if (in_array(strtolower($rn->status), ['processed', 'ignored'])) {
+                return redirect()->route('receive-notes.index')
+                    ->withErrors(['error' => "Cannot delete: This Receive Note is linked to a Return Note ({$rn->return_note_id}) with status '{$rn->status}'"]);
+            }
+        }
+
+        DB::beginTransaction();
+
+        // 🟡 If all return notes are 'pending', delete them
+        if ($returnNotes->isNotEmpty()) {
+            $pendingNotes = $returnNotes->where('status', 'pending');
+            if ($pendingNotes->count() === $returnNotes->count()) {
+                \App\Models\ReturnNote::where('receive_note_id', $receiveNote->id)->delete();
+                \Log::info("✅ Deleted pending return notes linked to Receive Note ID {$receiveNote->id}");
+            } else {
+                // If any non-pending remain (should not happen since we handled above)
+                return redirect()->route('receive-notes.index')
+                    ->withErrors(['error' => 'Cannot delete: Mixed return note statuses found.']);
+            }
+        }
+
+        // 🟢 Update linked Delivery Notes back to “Delivered”
+        $deliveryNotes = $receiveNote->deliveryNotes;
+        foreach ($deliveryNotes as $dn) {
+            $dn->update(['status' => 'Delivered']);
+        }
+
+        // 🧹 Delete related items and detach links
+        $receiveNote->items()->delete();
+        $receiveNote->deliveryNotes()->detach();
+        $receiveNote->delete();
+
+        DB::commit();
+
+        return redirect()->route('receive-notes.index')
+            ->with('success', '✅ Receive Note deleted successfully. Linked Delivery Notes marked as Delivered, and pending Return Notes removed.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withErrors(['error' => '❌ Failed to delete Receive Note: ' . $e->getMessage()]);
     }
+}
+
 }
 

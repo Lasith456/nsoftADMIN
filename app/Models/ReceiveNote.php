@@ -65,4 +65,14 @@ class ReceiveNote extends Model
     {
         return $this->belongsToMany(Invoice::class, 'invoice_receive_note');
     }
+    public function customer()
+    {
+        return $this->belongsTo(\App\Models\Customer::class, 'customer_id', 'id');
+    }
+
+    public function agent()
+    {
+        return $this->belongsTo(\App\Models\Agent::class, 'agent_id', 'id');
+    }
+
 }
