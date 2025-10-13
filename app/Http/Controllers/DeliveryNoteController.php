@@ -161,54 +161,66 @@ public function store(Request $request): RedirectResponse
 
         $deliveryNote->purchaseOrders()->attach($po_ids);
 
-        // ✅ Handle stock + items (same as before)
+        // ✅ Handle stock + items (now PO-wise while preserving your logic)
         $purchaseOrders = PurchaseOrder::with('items.product')->whereIn('id', $po_ids)->get();
         $requestedItems = [];
 
         foreach ($purchaseOrders as $po) {
             foreach ($po->items as $item) {
                 $productId = $item->product_id;
-                if (!isset($requestedItems[$productId])) {
-                    $requestedItems[$productId] = [
-                        'product_name' => $item->product_name,
-                        'total_quantity' => 0,
+
+                // ✅ Create a PO + product unique key to track per-PO shortage
+                $key = $po->id . '-' . $productId;
+
+                if (!isset($requestedItems[$key])) {
+                    $requestedItems[$key] = [
+                        'po_id'         => $po->id,
+                        'po_code'       => $po->po_id,
+                        'product_id'    => $productId,
+                        'product_name'  => $item->product_name,
+                        'total_quantity'=> 0,
                     ];
                 }
-                $requestedItems[$productId]['total_quantity'] += $item->quantity;
+                $requestedItems[$key]['total_quantity'] += $item->quantity;
             }
         }
 
-        foreach ($requestedItems as $productId => $itemData) {
-            $product = Product::lockForUpdate()->find($productId);
+        foreach ($requestedItems as $key => $itemData) {
+            $product = Product::lockForUpdate()->find($itemData['product_id']);
             $quantityNeeded = $itemData['total_quantity'];
             $fromClearStock = min($product->clear_stock_quantity, $quantityNeeded);
             $shortage = $quantityNeeded - $fromClearStock;
             $agentId = null;
             $fromAgent = 0;
 
+            // ✅ Lookup per-PO agent selection using poId-productId key
             if ($shortage > 0) {
-                if (isset($request->agent_selections[$productId]) && $request->agent_selections[$productId] != '') {
-                    $agentId = $request->agent_selections[$productId];
+                if (isset($request->agent_selections[$key]) && $request->agent_selections[$key] != '') {
+                    $agentId = $request->agent_selections[$key];
                     $fromAgent = $shortage;
                 } else {
-                    throw new \Exception("A stock shortage for {$product->name} requires an agent to be assigned.");
+                    throw new \Exception("A stock shortage for {$product->name} (PO: {$itemData['po_code']}) requires an agent to be assigned.");
                 }
             }
 
+            // ✅ Each PO-product gets its own DeliveryNoteItem
             $deliveryNote->items()->create([
-                'product_id' => $productId,
-                'product_name' => $itemData['product_name'],
-                'quantity_requested' => $quantityNeeded,
-                'quantity_from_stock' => $fromClearStock,
-                'agent_id' => $agentId,
-                'quantity_from_agent' => $fromAgent,
+                'purchase_order_id'    => $itemData['po_id'],
+                'product_id'           => $itemData['product_id'],
+                'product_name'         => $itemData['product_name'],
+                'quantity_requested'   => $quantityNeeded,
+                'quantity_from_stock'  => $fromClearStock,
+                'agent_id'             => $agentId,
+                'quantity_from_agent'  => $fromAgent,
             ]);
 
+            // ✅ Deduct clear stock if used
             if ($fromClearStock > 0) {
                 $product->decrement('clear_stock_quantity', $fromClearStock);
             }
         }
 
+        // ✅ Update PO statuses after processing
         PurchaseOrder::whereIn('id', $po_ids)->update(['status' => 'processing']);
 
         DB::commit();
@@ -222,27 +234,51 @@ public function store(Request $request): RedirectResponse
     }
 }
 
+
     
 public function checkStock(Request $request)
 {
     $po_ids = $request->input('po_ids', []);
+
     if (empty($po_ids)) {
         return response()->json(['items' => []]);
     }
 
     $items = PurchaseOrderItem::whereIn('purchase_order_id', $po_ids)
-        ->with(['product.department']) // ✅ Added department relationship
-        ->select('product_id', DB::raw('SUM(quantity) as total_quantity'))
-        ->groupBy('product_id')
+        ->with(['product.department', 'purchaseOrder'])
+        ->orderBy('purchase_order_id')
         ->get();
-    
+
     $response = [];
+
+    // ✅ Maintain in-memory stock tracking per product
+    $virtualClearStock = [];
+    $virtualNonClearStock = [];
+
     foreach ($items as $item) {
         $product = $item->product;
-        $clearStockShortage = max(0, $item->total_quantity - $product->clear_stock_quantity);
-        $agents = collect();
+        $purchaseOrder = $item->purchaseOrder;
 
-        if ($clearStockShortage > 0 && $product->non_clear_stock_quantity < $clearStockShortage) {
+        // ✅ Initialize virtual stock if not already set
+        if (!isset($virtualClearStock[$product->id])) {
+            $virtualClearStock[$product->id] = $product->clear_stock_quantity;
+            $virtualNonClearStock[$product->id] = $product->non_clear_stock_quantity;
+        }
+
+        // ✅ Calculate shortage based on virtual available stock
+        $availableClear = $virtualClearStock[$product->id];
+        $availableNonClear = $virtualNonClearStock[$product->id];
+        $requested = $item->quantity;
+
+        $fromClear = min($requested, $availableClear);
+        $clearStockShortage = max(0, $requested - $fromClear);
+
+        // ✅ Deduct used stock virtually (so next PO sees updated remaining)
+        $virtualClearStock[$product->id] -= $fromClear;
+
+        // ✅ Fetch related agents if shortage cannot be covered by non-clear
+        $agents = collect();
+        if ($clearStockShortage > 0 && $availableNonClear < $clearStockShortage) {
             $agents = Agent::whereHas('products', function ($query) use ($product) {
                     $query->where('products.id', $product->id);
                 })
@@ -251,7 +287,7 @@ public function checkStock(Request $request)
                     $query->where('products.id', $product->id);
                 }])
                 ->get()
-                ->map(function($agent) {
+                ->map(function ($agent) {
                     if ($agent->products->isNotEmpty()) {
                         $agent->price_per_case = $agent->products->first()->pivot->price_per_case;
                     } else {
@@ -263,20 +299,24 @@ public function checkStock(Request $request)
         }
 
         $response[] = [
-            'product_id' => $product->id,
-            'product_name' => $product->name,
-            'department_id' => $product->department->id ?? null, 
-            'department_name' => $product->department->name ?? 'N/A', // ✅ Added department name safely
-            'requested' => $item->total_quantity,
-            'clear_stock' => $product->clear_stock_quantity,
-            'non_clear_stock' => $product->non_clear_stock_quantity,
-            'clear_stock_shortage' => $clearStockShortage,
-            'agents' => $agents->values()->all(),
+            'purchase_order_id'   => $purchaseOrder->id,
+            'po_code'             => $purchaseOrder->po_id,
+            'product_id'          => $product->id,
+            'product_name'        => $product->name,
+            'department_id'       => $product->department->id ?? null,
+            'department_name'     => $product->department->name ?? 'N/A',
+            'requested'           => $requested,
+            'clear_stock'         => $availableClear, // show before deduction
+            'non_clear_stock'     => $availableNonClear,
+            'clear_stock_shortage'=> $clearStockShortage,
+            'agents'              => $agents->values()->all(),
         ];
     }
 
     return response()->json(['items' => $response]);
 }
+
+
 
 
     public function show(DeliveryNote $deliveryNote)

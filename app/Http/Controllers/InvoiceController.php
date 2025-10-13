@@ -493,7 +493,7 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
                 'is_vat_invoice' => true,
                 'po_start_date'  => $poStart,
                 'po_end_date'    => $poEnd,
-                'notes'          => $this->getInvoiceGroupLabel($groupKey), // ✅ add label
+                'notes'          => $this->getInvoiceGroupLabel($groupKey),
             ]);
             $invoice->invoiceable()->associate($customer);
             $invoice->save();
@@ -536,9 +536,7 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
     }
 }
 
-/**
- * Helper to generate label for grouped invoice
- */
+
 private function getInvoiceGroupLabel($key)
 {
     if (str_starts_with($key, 'category_')) {
@@ -667,6 +665,7 @@ private function getInvoiceGroupLabel($key)
             return back()->withInput()->withErrors(['error' => $e->getMessage()]);
         }
     }
+    
 //Bill Show NAVY
     public function showOpt2($id)
     {

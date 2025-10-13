@@ -23,6 +23,7 @@
                     <table class="w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-100 dark:bg-gray-700">
                             <tr>
+                                <th class="px-3 py-2 text-left">PO</th>
                                 <th class="px-3 py-2 text-left">Product</th>
                                 <th class="px-3 py-2 text-left">Department</th> 
                                 <th class="px-3 py-2 text-right">Clear Stock</th>
@@ -32,8 +33,9 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <template x-for="item in convertibleItems" :key="item.product_id">
+                            <template x-for="item in convertibleItems" :key="item.purchase_order_id + '-' + item.product_id">
                                 <tr>
+                                    <td class="px-3 py-2 text-blue-700 font-semibold" x-text="item.po_code"></td>
                                     <td class="px-3 py-2" x-text="item.product_name"></td>
                                     <td class="px-3 py-2" x-text="item.department_name || 'N/A'"></td>
                                     <td class="px-3 py-2 text-right" x-text="item.clear_stock"></td>
@@ -44,7 +46,7 @@
                                 </tr>
                             </template>
                             <tr x-show="convertibleItems.length === 0">
-                                <td colspan="6" class="px-3 py-4 text-center text-gray-500">
+                                <td colspan="7" class="px-3 py-4 text-center text-gray-500">
                                     No products require conversion.
                                 </td>
                             </tr>
@@ -189,7 +191,6 @@
                    class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-xs uppercase font-semibold">Back</a>
                 <a href="{{ route('agents.create') }}"
                    class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-xs uppercase font-semibold">Create Agent</a>
-
                 <button type="submit"
                         form="deliveryForm"
                         class="px-4 py-2 bg-blue-600 text-white rounded-md text-xs uppercase font-semibold"
@@ -209,6 +210,7 @@
             </ul>
         </div>
         @endif
+
         <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <!-- Left Column -->
             <div class="lg:col-span-2 flex flex-col space-y-4">
@@ -264,7 +266,6 @@
                             Clear
                         </a>
                     </form>
-
                     <form id="deliveryForm" x-ref="deliveryForm"
                           action="{{ route('delivery-notes.store') }}"
                           method="POST" class="space-y-4"
@@ -279,7 +280,9 @@
                                            x-model="selectedPurchaseOrderIds"
                                            @change="checkStock"
                                            class="rounded">
-                                    <span class="ml-3 text-sm">{{ $po->po_id }} - {{ $po->customer->customer_name }}</span>
+                                    <span class="ml-3 text-sm font-semibold text-blue-800">
+                                        {{ $po->po_id }} - {{ $po->customer->customer_name }}
+                                    </span>
                                 </label>
                             @empty
                                 <p class="text-sm text-gray-500 p-2">No purchase orders found. Select a customer above.</p>
@@ -288,7 +291,9 @@
 
                         <div>
                             <label class="block text-sm font-medium">Delivery Date</label>
-                            <input type="date" name="delivery_date" class="mt-1 block w-full border rounded-md p-2" required>
+                            <input type="date" name="delivery_date"
+                                   class="mt-1 block w-full border rounded-md p-2"
+                                   required>
                         </div>
 
                         <div>
@@ -296,7 +301,9 @@
                             <select name="vehicle_id" class="mt-1 block w-full border rounded-md p-2" required>
                                 <option value="">Select Vehicle</option>
                                 @foreach($vehicles as $vehicle)
-                                    <option value="{{ $vehicle->id }}">{{ $vehicle->vehicle_no }} - {{ $vehicle->driver_name }}</option>
+                                    <option value="{{ $vehicle->id }}">
+                                        {{ $vehicle->vehicle_no }} - {{ $vehicle->driver_name }}
+                                    </option>
                                 @endforeach
                             </select>
                         </div>
@@ -315,15 +322,13 @@
 
                         <div>
                             <label class="block text-sm font-medium">Helper Name (Override)</label>
-                            <input type="text" name="assistant_name"
-                                   placeholder="Leave empty to use vehicle default"
+                            <input type="text" name="assistant_name" placeholder="Leave empty to use vehicle default"
                                    class="mt-1 block w-full border rounded-md p-2">
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium">Helper Mobile (Override)</label>
-                            <input type="text" name="assistant_mobile"
-                                   placeholder="Leave empty to use vehicle default"
+                            <input type="text" name="assistant_mobile" placeholder="Leave empty to use vehicle default"
                                    class="mt-1 block w-full border rounded-md p-2">
                         </div>
 
@@ -334,8 +339,10 @@
                         </button>
 
                         <!-- Hidden agent selections -->
-                        <template x-for="(agentId, productId) in agentSelections">
-                            <input type="hidden" :name="`agent_selections[${productId}]`" :value="agentId">
+                        <template x-for="(agentId, key) in agentSelections" :key="key">
+                            <input type="hidden"
+                                   :name="`agent_selections[${key}]`"
+                                   :value="agentId">
                         </template>
                     </form>
                 </div>
@@ -344,29 +351,33 @@
             <!-- Right Column -->
             <div class="lg:col-span-3">
                 <h3 class="text-lg font-bold text-gray-800 mb-2">2. Stock Check</h3>
-                <div class="overflow-x-auto max-h-96">
+                <div class="overflow-x-auto max-h-96 border rounded-md">
                     <table class="w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
+                                <th class="px-2 py-2 text-left text-xs font-medium uppercase">PO</th>
                                 <th class="px-2 py-2 text-left text-xs font-medium uppercase">Product</th>
                                 <th class="px-2 py-2 text-right text-xs font-medium uppercase">Req.</th>
-                                <th class="px-2 py-2 text-right text-xs font-medium uppercase">Clear Stock</th>
+                                <th class="px-2 py-2 text-right text-xs font-medium uppercase">Clear</th>
                                 <th class="px-2 py-2 text-right text-xs font-medium uppercase">Non-Clear</th>
                                 <th class="px-2 py-2 text-right text-xs font-medium uppercase">Shortage</th>
                                 <th class="px-2 py-2 text-left text-xs font-medium uppercase">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <template x-for="item in items" :key="item.product_id">
+                            <template x-for="item in items" :key="item.purchase_order_id + '-' + item.product_id">
                                 <tr>
+                                    <td class="px-2 py-2 text-sm text-blue-700 font-semibold"
+                                        x-text="item.po_code"></td>
                                     <td class="px-2 py-2 text-sm" x-text="item.product_name"></td>
                                     <td class="px-2 py-2 text-sm text-right" x-text="item.requested"></td>
                                     <td class="px-2 py-2 text-sm text-right" x-text="item.clear_stock"></td>
                                     <td class="px-2 py-2 text-sm text-right" x-text="item.non_clear_stock"></td>
                                     <td class="px-2 py-2 text-sm text-right font-bold"
-                                        :class="item.clear_stock_shortage > 0 ? 'text-red-500' : 'text-green-500'"
+                                        :class="item.clear_stock_shortage > 0 ? 'text-red-500' : 'text-green-600'"
                                         x-text="item.clear_stock_shortage"></td>
                                     <td class="px-2 py-2 text-sm">
+
                                         <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock >= item.clear_stock_shortage"
                                              class="text-xs text-orange-500">Convert Stock</div>
 
@@ -374,8 +385,8 @@
                                         <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock < item.clear_stock_shortage"
                                              class="mb-2">
                                             <select
-                                                x-model="stockFulfillment[item.product_id] ? stockFulfillment[item.product_id].type : ''"
-                                                @change="handleFulfillmentTypeChange(item.product_id, $event.target.value)"
+                                                x-model="stockFulfillment[item.purchase_order_id + '-' + item.product_id]?.type"
+                                                @change="handleFulfillmentTypeChange(item.purchase_order_id + '-' + item.product_id, $event.target.value)"
                                                 class="block w-full rounded-md border p-1 text-sm">
                                                 <option value="">Select Fulfilment</option>
                                                 <option value="agent">Agent</option>
@@ -383,16 +394,18 @@
                                             </select>
                                         </div>
 
-                                        <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock < item.clear_stock_shortage && stockFulfillment[item.product_id]?.type === 'agent'">
-                                            <select x-model="agentSelections[item.product_id]" class="block w-full rounded-md border p-1 text-sm">
+                                        <div x-show="stockFulfillment[item.purchase_order_id + '-' + item.product_id]?.type === 'agent'">
+                                            <select x-model="agentSelections[item.purchase_order_id + '-' + item.product_id]"
+                                                    class="block w-full rounded-md border p-1 text-sm">
                                                 <option value="">Select Agent</option>
                                                 <template x-for="agent in item.agents" :key="agent.id">
-                                                    <option :value="agent.id" x-text="`${agent.name} (${parseFloat(agent.price_per_case).toFixed(2)})`"></option>
+                                                    <option :value="agent.id"
+                                                            x-text="`${agent.name} (${parseFloat(agent.price_per_case).toFixed(2)})`"></option>
                                                 </template>
                                             </select>
                                         </div>
 
-                                        <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock < item.clear_stock_shortage && stockFulfillment[item.product_id]?.type === 'supplier'"
+                                        <div x-show="stockFulfillment[item.purchase_order_id + '-' + item.product_id]?.type === 'supplier'"
                                              class="mt-2 text-center">
                                             <button type="button"
                                                     @click="createNewGRN(item)"
@@ -400,14 +413,19 @@
                                                 Create GRN for Supplier
                                             </button>
                                         </div>
+
                                     </td>
                                 </tr>
                             </template>
                             <tr x-show="items.length === 0 && selectedPurchaseOrderIds.length > 0">
-                                <td colspan="6" class="text-center py-4 text-sm">Loading items...</td>
+                                <td colspan="7" class="text-center py-4 text-sm text-gray-500">
+                                    Loading items...
+                                </td>
                             </tr>
                             <tr x-show="items.length === 0 && selectedPurchaseOrderIds.length === 0">
-                                <td colspan="6" class="text-center py-4 text-sm">Select a customer and PO above.</td>
+                                <td colspan="7" class="text-center py-4 text-sm text-gray-500">
+                                    Select a customer and PO above.
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -430,10 +448,10 @@ document.addEventListener('alpine:init', () => {
         selectedPurchaseOrderIds: [],
         items: [],
         agentSelections: {},
+        stockFulfillment: {},
         isStockModalOpen: false,
         stockModalMessage: '',
         stockModalSuccess: false,
-        stockFulfillment: {},
 
         filterCustomersByCompany() {
             if (!this.selectedCompany) {
@@ -446,48 +464,73 @@ document.addEventListener('alpine:init', () => {
             this.customerName = '';
             this.selectedCustomer = '';
         },
+
         setCustomerId() {
             const match = this.filteredCustomers.find(c => c.customer_name === this.customerName);
-            if (match) { this.selectedCustomer = match.id; this.customerError = ''; }
-            else { this.selectedCustomer = ''; this.customerError = 'Customer not found or not in this company'; }
+            if (match) {
+                this.selectedCustomer = match.id;
+                this.customerError = '';
+            } else {
+                this.selectedCustomer = '';
+                this.customerError = 'Customer not found or not in this company';
+            }
         },
+
         get convertibleItems() {
-            return this.items.filter(item => item.clear_stock_shortage > 0 && item.non_clear_stock >= item.clear_stock_shortage);
+            return this.items.filter(item =>
+                item.clear_stock_shortage > 0 && item.non_clear_stock >= item.clear_stock_shortage
+            );
         },
+
         get isStockSufficient() {
-            if (this.items.length === 0 && this.selectedPurchaseOrderIds.length > 0) return false;
             if (this.items.length === 0) return false;
             return this.items.every(item => {
+                const key = item.purchase_order_id + '-' + item.product_id;
                 if (item.clear_stock_shortage > 0) {
                     if (item.non_clear_stock >= item.clear_stock_shortage) return false;
-                    const fulfill = this.stockFulfillment[item.product_id];
-                    if (fulfill && fulfill.type === 'supplier') return false; // 🚫 block supplier path
-                    const agentSelected = this.agentSelections[item.product_id] && this.agentSelections[item.product_id] !== '';
+                    const fulfill = this.stockFulfillment[key];
+                    if (fulfill && fulfill.type === 'supplier') return false; // block supplier path
+                    const agentSelected = this.agentSelections[key] && this.agentSelections[key] !== '';
                     return agentSelected;
                 }
                 return true;
             });
         },
+
         filteredProducts(deptId) {
             if (!deptId) return [];
             return this.products.filter(p => p.department_id == deptId);
         },
+
         updateDepartmentName(formType) {
             const form = this[formType];
             if (form.selectedDepartment) {
                 form.departmentError = '';
                 form.department_name = this.products.find(p => p.department_id == form.selectedDepartment)?.department_name || '';
-            } else form.departmentError = 'Please select a department';
+            } else {
+                form.departmentError = 'Please select a department';
+            }
         },
+
         checkStock() {
-            this.agentSelections = {}; this.stockFulfillment = {};
-            if (this.selectedPurchaseOrderIds.length === 0) { this.items = []; return; }
+            this.agentSelections = {};
+            this.stockFulfillment = {};
+            if (this.selectedPurchaseOrderIds.length === 0) {
+                this.items = [];
+                return;
+            }
             fetch('{{ route("delivery-notes.checkStock") }}', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify({ po_ids: this.selectedPurchaseOrderIds })
-            }).then(res => res.json()).then(data => { this.items = data.items; });
+            })
+            .then(res => res.json())
+            .then(data => { this.items = data.items; });
         },
+
         submitForm() {
             if (!this.isStockSufficient) {
                 alert('Cannot create delivery note. Supplier fulfilments must have GRNs created first.');
@@ -495,36 +538,62 @@ document.addEventListener('alpine:init', () => {
             }
             this.$refs.deliveryForm.submit();
         },
+
         convertStock() {
             this.stockModalMessage = '';
             fetch('{{ route("stock-management.api.convert") }}', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify(this.convert)
-            }).then(res => res.json()).then(data => {
-                this.stockModalSuccess = data.success; this.stockModalMessage = data.message;
-                if (data.success) { this.convert = { department_name:'',selectedDepartment:'',departmentError:'',product_id:'',quantity:1 }; this.checkStock(); setTimeout(()=>{this.stockModalMessage=''},3000); }
+            })
+            .then(res => res.json())
+            .then(data => {
+                this.stockModalSuccess = data.success;
+                this.stockModalMessage = data.message;
+                if (data.success) {
+                    this.convert = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', quantity: 1 };
+                    this.checkStock();
+                    setTimeout(() => { this.stockModalMessage = ''; }, 3000);
+                }
             });
         },
+
         logWastage() {
             this.stockModalMessage = '';
             fetch('{{ route("stock-management.api.wastage") }}', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
                 body: JSON.stringify(this.wastage)
-            }).then(res => res.json()).then(data => {
-                this.stockModalSuccess = data.success; this.stockModalMessage = data.message;
-                if (data.success) { this.wastage = { department_name:'',selectedDepartment:'',departmentError:'',product_id:'',stock_type:'clear',quantity:1,reason:'' }; this.checkStock(); setTimeout(()=>{this.stockModalMessage=''},3000); }
+            })
+            .then(res => res.json())
+            .then(data => {
+                this.stockModalSuccess = data.success;
+                this.stockModalMessage = data.message;
+                if (data.success) {
+                    this.wastage = { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', stock_type: 'clear', quantity: 1, reason: '' };
+                    this.checkStock();
+                    setTimeout(() => { this.stockModalMessage = ''; }, 3000);
+                }
             });
         },
-        handleFulfillmentTypeChange(productId, value) { this.stockFulfillment[productId] = { type: value }; },
+
+        handleFulfillmentTypeChange(key, value) {
+            this.stockFulfillment[key] = { type: value };
+        },
+
         createNewGRN(item) {
             const url = `/grns/create?supplier_id=${item.supplier_id}&department_id=${item.department_id}&product_id=${item.product_id}&product_name=${encodeURIComponent(item.product_name)}&shortage=${item.clear_stock_shortage}`;
             window.location.href = url;
         },
 
-        convert:{department_name:'',selectedDepartment:'',departmentError:'',product_id:'',quantity:1},
-        wastage:{department_name:'',selectedDepartment:'',departmentError:'',product_id:'',stock_type:'clear',quantity:1,reason:''},
+        convert: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', quantity: 1 },
+        wastage: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', stock_type: 'clear', quantity: 1, reason: '' }
     }));
 });
 </script>
