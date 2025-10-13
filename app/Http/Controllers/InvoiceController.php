@@ -326,7 +326,6 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
         'receive_note_ids.*' => ['integer', 'exists:receive_notes,id'],
         'updated_prices'     => ['array'],
     ]);
-\Log::info('Updated prices received:', $request->input('updated_prices', []));
 
     $customer = \App\Models\Customer::with('company')->findOrFail($validated['customer_id']);
     $companyName  = optional($customer->company)->company_name ?? 'Company';
@@ -367,11 +366,6 @@ $updated = collect($request->input('updated_prices', []))
         return [];
     })
     ->collapse(); // flatten into associative array
-
-// 🧾 Log the parsed updated array for debugging
-\Log::info('✅ Parsed Updated Prices:', $updated->toArray());
-
-
 
     $vatRate = (float)(\App\Models\Setting::where('key', 'vat_rate')->value('value') ?? 12);
     $vatLines = collect();
@@ -439,6 +433,7 @@ foreach ($receiveNotes as $rn) {
                 'department_id'  => $l['department_id'],
                 'is_categorized' => $l['is_categorized'],
                 'receive_note_id'=> $l['receive_note_id'] ?? null,
+                'purchase_order_id' => $l['purchase_order_id'] ?? null,
             ];
         })->values();
     };
@@ -492,6 +487,7 @@ foreach ($receiveNotes as $rn) {
                     'vat_amount'      => 0,
                     'total'           => $lineSub,
                     'receive_note_id' => $line['receive_note_id'] ?? null,
+                    'purchase_order_id' => $line['purchase_order_id'] ?? null,
                 ]);
                 $sub += $lineSub;
             }
@@ -538,6 +534,7 @@ foreach ($receiveNotes as $rn) {
                     'vat_amount'      => $lineVat,
                     'total'           => $lineSub + $lineVat,
                     'receive_note_id' => $line['receive_note_id'] ?? null,
+                    'purchase_order_id' => $line['purchase_order_id'] ?? null, 
                 ]);
                 $sub += $lineSub;
                 $vat += $lineVat;

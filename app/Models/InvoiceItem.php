@@ -18,6 +18,7 @@ class InvoiceItem extends Model
         'unit_price',
         'total',
         'vat_amount',
+        'purchase_order_id'
     ];
     protected function casts(): array
     {
@@ -37,4 +38,9 @@ class InvoiceItem extends Model
     {
         return $this->belongsTo(Product::class);
     }
+    public function purchaseOrder()
+    {
+        return $this->belongsTo(\App\Models\PurchaseOrder::class);
+    }
+
 }

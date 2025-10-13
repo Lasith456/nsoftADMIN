@@ -62,26 +62,28 @@
         @php
             $product = $item->product;
 
-            // --- Find the related purchase order ---
-            $purchaseOrder = optional(
-                $item->invoice?->receiveNotes?->first()?->deliveryNotes?->first()?->purchaseOrders?->first()
-            );
+            // --- Related Purchase Order from stored PO ID ---
+            $purchaseOrder = \App\Models\PurchaseOrder::find($item->purchase_order_id);
 
-            $isCategorized = $purchaseOrder?->is_categorized;
-            $categoryName = null;
-            $displayName = null;
+            // --- Determine if categorized ---
+            $isCategorized = $purchaseOrder?->is_categorized ?? false;
 
+            // --- Category or Department display logic ---
             if ($isCategorized) {
-                // ✅ If categorized → category name
-                $categoryName = $purchaseOrder?->category?->name ?? 'CATEGORY';
+                // ✅ Case 1: Categorized product → show category name
+                $categoryName = $product?->category?->name 
+                    ?? $purchaseOrder?->category?->name 
+                    ?? 'CATEGORY';
                 $displayName = strtoupper("SUPPLY OF {$categoryName}");
             } else {
-                // ✅ If not categorized → department logic
-                $department = $product?->department;
+                // ✅ Case 2: Non-categorized product → check department
+                $department = $product?->department 
+                    ?? $purchaseOrder?->department; // fallback to PO’s department
+
                 $departmentName = $department?->name ?? 'DEPARTMENT';
                 $companyId = $invoice->invoiceable?->company_id ?? null;
 
-                // Check if a custom appear name exists in CompanyDepartmentName
+                // 🟢 Custom appear name from CompanyDepartmentName table
                 $appearName = \App\Models\CompanyDepartmentName::where('company_id', $companyId)
                     ->where('department_id', $department?->id)
                     ->value('appear_name');
@@ -91,7 +93,7 @@
             }
         @endphp
 
-        {{-- Header changes only when different from previous --}}
+        {{-- Header Row - Only show when changing section --}}
         @if($currentHeader !== $displayName)
             <tr class="bg-gray-100 font-bold uppercase">
                 <td colspan="5" class="border px-2 py-1">{{ $displayName }}</td>
@@ -101,14 +103,22 @@
 
         {{-- Item Row --}}
         <tr>
-            <td class="border px-2 py-1">{{ $item->description ?? $product->name }}</td>
+            <td class="border px-2 py-1">
+                {{ $item->description ?? $product->name }}
+                <!-- @if($purchaseOrder)
+                    <span class="text-xs text-gray-500"> (PO: {{ $purchaseOrder->po_number ?? $purchaseOrder->id }})</span>
+                @endif -->
+            </td>
             <td class="border px-2 py-1 text-right">{{ number_format($item->unit_price, 2) }}</td>
-            <td class="border px-2 py-1 text-center">{{ $item->quantity ?? 0 }} {{ $product->unit_of_measure ?? 'PCS' }}</td>
+            <td class="border px-2 py-1 text-center">
+                {{ $item->quantity ?? 0 }} {{ $product->unit_of_measure ?? 'PCS' }}
+            </td>
             <td class="border px-2 py-1 text-right">{{ number_format($item->vat_amount ?? 0, 2) }}</td>
             <td class="border px-2 py-1 text-right">{{ number_format($item->total, 2) }}</td>
         </tr>
     @endforeach
 </tbody>
+
 
 
         </table>
