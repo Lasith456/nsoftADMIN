@@ -32,7 +32,7 @@
         @endif
 
         {{-- MAIN GRID --}}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6">
             {{-- LEFT SIDE --}}
             <div class="lg:col-span-1 flex flex-col space-y-4">
                 {{-- Filters --}}
@@ -126,35 +126,42 @@
                 <div class="overflow-y-auto max-h-[28rem] border rounded-md">
                     <table class="w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50 sticky top-0">
-                            <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium uppercase">Product</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium uppercase">Expected</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium uppercase">Received</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium uppercase">Difference</th>
-                            </tr>
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase">DN</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase">PO</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase">Category</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium uppercase">Product</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium uppercase">Expected</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium uppercase">Received</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium uppercase">Difference</th>
+                        </tr>
                         </thead>
                         <tbody>
-                            <template x-for="(item, index) in items" :key="item.product_id">
-                                <tr>
-                                    <td class="px-4 py-2 text-sm" x-text="item.product_name"></td>
-                                    <td class="px-4 py-2 text-sm text-right" x-text="item.quantity_expected"></td>
-                                    <td class="px-4 py-2 text-sm text-right">
-                                        <input type="number"
-                                               :name="`items[${index}][quantity_received]`"
-                                               x-model.number="item.quantity_received"
-                                               @input="calculateDiff(item)"
-                                               class="w-24 border rounded-md py-1 px-2 text-sm text-right"
-                                               form="receive-note-form">
-                                        <input type="hidden" :name="`items[${index}][product_id]`" :value="item.product_id" form="receive-note-form">
-                                        <input type="hidden" :name="`items[${index}][quantity_expected]`" :value="item.quantity_expected" form="receive-note-form">
-                                    </td>
-                                    <td class="px-4 py-2 text-sm text-right" x-text="item.difference"></td>
-                                </tr>
-                            </template>
-                            <tr x-show="items.length === 0">
-                                <td colspan="4" class="text-center py-4 text-sm text-gray-500">Select delivery notes to load items.</td>
-                            </tr>
+                        <template x-for="(item, index) in items" :key="`${item.delivery_note_id || 'DN'}-${item.purchase_order_id || 'PO'}-${item.product_id || index}`">
+                        <tr>
+                            <td class="px-4 py-2 text-sm font-semibold text-blue-600" x-text="item.delivery_note_id"></td>
+                            <td class="px-4 py-2 text-sm font-semibold text-purple-600" x-text="item.po_code"></td>
+                            <td class="px-4 py-2 text-sm text-gray-700" x-text="item.category_name"></td>
+                            <td class="px-4 py-2 text-sm" x-text="item.product_name"></td>
+                            <td class="px-4 py-2 text-sm text-right" x-text="item.quantity_expected"></td>
+                            <td class="px-4 py-2 text-sm text-right">
+                                <input type="number"
+                                    :name="`items[${index}][quantity_received]`"
+                                    x-model.number="item.quantity_received"
+                                    @input="calculateDiff(item)"
+                                    class="w-20 border rounded-md py-1 px-2 text-sm text-right"
+                                    form="receive-note-form">
+                                <input type="hidden" :name="`items[${index}][product_id]`" :value="item.product_id" form="receive-note-form">
+                                <input type="hidden" :name="`items[${index}][quantity_expected]`" :value="item.quantity_expected" form="receive-note-form">
+                            </td>
+                            <td class="px-4 py-2 text-sm text-right" x-text="item.difference"></td>
+                        </tr>
+                        </template>
+                        <tr x-show="items.length === 0">
+                            <td colspan="7" class="text-center py-4 text-sm text-gray-500">Select delivery notes to load items.</td>
+                        </tr>
                         </tbody>
+
                     </table>
                 </div>
             </div>
@@ -245,15 +252,17 @@ document.addEventListener('alpine:init', () => {
             })
             .then(res => res.json())
             .then(data => {
-                // 🟢 UPDATED: Include agent_id & is_mixed_stock in item objects
-                this.items = data.items.map(it => ({
-                    ...it,
-                    quantity_received: it.quantity_expected,
-                    difference: 0,
-                    agent_id: it.agent_id || null,
-                    is_mixed_stock: it.is_mixed_stock || false
-                }));
+                this.$nextTick(() => {
+                    this.items.splice(0, this.items.length, ...data.items.map(it => ({
+                        ...it,
+                        quantity_received: it.quantity_expected,
+                        difference: 0,
+                        agent_id: it.agent_id || null,
+                        is_mixed_stock: it.is_mixed_stock || false
+                    })));
+                });
             })
+
             .catch(err => console.error('⚠️ Failed to fetch items:', err));
         },
 

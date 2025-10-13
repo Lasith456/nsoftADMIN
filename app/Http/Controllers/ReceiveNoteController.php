@@ -191,55 +191,54 @@ public function create(Request $request): View
         return view('receive_notes.partials.details', compact('receiveNote'));
     }
     public function getItemsForDeliveryNote(Request $request)
-    {
-        $dn_ids = $request->input('dn_ids', []);
-        if (empty($dn_ids)) {
-            return response()->json(['items' => []]);
-        }
-
-        // ✅ Fetch all items from selected Delivery Notes, including agent info
-        $deliveryItems = \App\Models\DeliveryNoteItem::whereIn('delivery_note_id', $dn_ids)
-            ->with(['product:id,name'])
-            ->select(
-                'delivery_note_id',
-                'product_id',
-                'agent_id',
-                DB::raw('SUM(quantity_requested) as total_requested')
-            )
-            ->groupBy('delivery_note_id', 'product_id', 'agent_id')
-            ->get();
-
-        // ✅ Build response structure
-        $responseItems = $deliveryItems->map(function ($item) {
-            return [
-                'delivery_note_id'  => $item->delivery_note_id,
-                'product_id'        => $item->product_id,
-                'product_name'      => $item->product?->name ?? 'Unknown Product',
-                'agent_id'          => $item->agent_id, // 🟢 Needed for agent/mixed stock detection
-                'quantity_expected' => $item->total_requested,
-                'quantity_received' => $item->total_requested,
-            ];
-        });
-
-        // ✅ Merge duplicate products across multiple DNs (if same product appears twice)
-        $merged = $responseItems->groupBy('product_id')->map(function ($group) {
-            $totalExpected = $group->sum('quantity_expected');
-            $agentIds = $group->pluck('agent_id')->unique()->filter();
-            $isMixed = $agentIds->count() > 1 || $agentIds->isEmpty() === false && $agentIds->count() !== $group->count();
-
-            return [
-                'product_id'        => $group->first()['product_id'],
-                'product_name'      => $group->first()['product_name'],
-                'quantity_expected' => $totalExpected,
-                'quantity_received' => $totalExpected,
-                'agent_id'          => $agentIds->count() === 1 ? $agentIds->first() : null,
-                'is_mixed_stock'    => $isMixed, // 🟢 flag if same product came from both agent + own stock
-                'delivery_note_id'  => $group->pluck('delivery_note_id')->join(','),
-            ];
-        })->values();
-
-        return response()->json(['items' => $merged]);
+{
+    $dn_ids = $request->input('dn_ids', []);
+    if (empty($dn_ids)) {
+        return response()->json(['items' => []]);
     }
+
+    // ✅ Fetch each Delivery Note Item (DN + PO + Product + Category)
+    $deliveryItems = \App\Models\DeliveryNoteItem::whereIn('delivery_note_id', $dn_ids)
+        ->with([
+            'product:id,name',
+            'deliveryNote:id,delivery_note_id',
+            'purchaseOrder:id,po_id,category_id,is_categorized',
+            'purchaseOrder.category:id,name'
+        ])
+        ->select(
+            'delivery_note_id',
+            'purchase_order_id',
+            'product_id',
+            'agent_id',
+            DB::raw('SUM(quantity_requested) as total_requested')
+        )
+        ->groupBy('delivery_note_id', 'purchase_order_id', 'product_id', 'agent_id')
+        ->orderBy('delivery_note_id')
+        ->get();
+
+    // ✅ Prepare response row by row
+    $response = $deliveryItems->map(function ($item) {
+        $po = $item->purchaseOrder;
+        $categoryName = ($po && $po->is_categorized && $po->category)
+            ? $po->category->name
+            : 'N/A';
+
+        return [
+            'delivery_note_id'  => $item->deliveryNote?->delivery_note_id ?? 'N/A',
+            'purchase_order_id' => $po?->id ?? null,
+            'po_code'           => $po?->po_id ?? 'N/A',
+            'category_name'     => $categoryName,
+            'product_id'        => $item->product_id,
+            'product_name'      => $item->product?->name ?? 'Unknown Product',
+            'agent_id'          => $item->agent_id,
+            'quantity_expected' => $item->total_requested,
+            'quantity_received' => $item->total_requested,
+            'difference'        => 0,
+        ];
+    });
+
+    return response()->json(['items' => $response]);
+}
 
 
     public function destroy(ReceiveNote $receiveNote): RedirectResponse
