@@ -389,7 +389,6 @@ foreach ($receiveNotes as $rn) {
             ? (float)$updated->get($key)['updated_price']
             : (float)($product->selling_price ?? 0);
 
-        \Log::info("🔍 Matching key {$key} => price {$unitPrice}");
 
         $po = optional($rn->deliveryNotes->first()?->purchaseOrders->first());
         $isCategorized = $po?->is_categorized;
@@ -827,12 +826,23 @@ public function fetchReceiveNoteProducts(Request $request)
 
 
 
-    private function generateInvoiceCode(bool $isVat, string $companyName, string $customerName): string
+private function generateInvoiceCode(bool $isVat, string $companyName, string $customerName): string
 {
-    $companyInitial = strtoupper(substr($companyName, 0, 1));
+    // Extract company initials (1 or 2 letters)
+    $companyWords = preg_split('/\s+/', trim($companyName));
+    $companyInitial = strtoupper(substr($companyWords[0], 0, 1));
+
+    if (count($companyWords) > 1) {
+        $companyInitial .= strtoupper(substr($companyWords[1], 0, 1));
+    }
+
+    // Extract customer initial (always first letter)
     $customerInitial = strtoupper(substr($customerName, 0, 1));
+
+    // VAT suffix
     $suffix = $isVat ? '-V' : '';
 
+    // Get last invoice
     $last = \App\Models\Invoice::where('is_vat_invoice', $isVat)
         ->orderBy('id', 'desc')
         ->first();
@@ -840,8 +850,10 @@ public function fetchReceiveNoteProducts(Request $request)
     $next = $last ? intval(preg_replace('/\D/', '', $last->invoice_id)) + 1 : 1;
     $formatted = str_pad($next, 4, '0', STR_PAD_LEFT);
 
+    // Example: INV-0005-IGC
     return "INV-{$formatted}-{$companyInitial}{$customerInitial}{$suffix}";
 }
+
 
 
 // In InvoiceController (private method)

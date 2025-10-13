@@ -7,10 +7,7 @@
         {{-- HEADER --}}
         <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
             <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Return Notes</h2>
-            <a href="{{ url()->previous() }}"
-               class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">
-                Back
-            </a>
+
         </div>
 
         {{-- ALERTS --}}
