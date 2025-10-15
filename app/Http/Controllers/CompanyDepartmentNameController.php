@@ -9,16 +9,19 @@ use Illuminate\Http\Request;
 
 class CompanyDepartmentNameController extends Controller
 {
+    /**
+     * Instantiate a new controller instance.
+     */
     public function __construct()
     {
         // ✅ Require authentication for all actions
         $this->middleware('auth');
 
-        // ✅ Define permissions for each action
-        $this->middleware('permission:view company department names')->only(['index', 'show']);
-        $this->middleware('permission:create company department names')->only(['create', 'store']);
-        $this->middleware('permission:edit company department names')->only(['edit', 'update']);
-        $this->middleware('permission:delete company department names')->only(['destroy']);
+        // ✅ Standardized permission structure
+        $this->middleware('permission:companydepartmentname-list|companydepartmentname-create|companydepartmentname-edit|companydepartmentname-delete', ['only' => ['index', 'show']]);
+        $this->middleware('permission:companydepartmentname-create', ['only' => ['create', 'store']]);
+        $this->middleware('permission:companydepartmentname-edit', ['only' => ['edit', 'update']]);
+        $this->middleware('permission:companydepartmentname-delete', ['only' => ['destroy']]);
     }
 
     /**
@@ -35,8 +38,8 @@ class CompanyDepartmentNameController extends Controller
      */
     public function create()
     {
-        $companies = Company::all();
-        $departments = Department::all();
+        $companies = Company::orderBy('company_name')->get();
+        $departments = Department::orderBy('name')->get();
         return view('company_department_names.create', compact('companies', 'departments'));
     }
 
@@ -51,10 +54,10 @@ class CompanyDepartmentNameController extends Controller
             'appear_name'   => 'required|string|max:255',
         ]);
 
-        // prevent duplicate company + department pair
+        // Prevent duplicate company + department pair
         $exists = CompanyDepartmentName::where('company_id', $request->company_id)
-                    ->where('department_id', $request->department_id)
-                    ->first();
+            ->where('department_id', $request->department_id)
+            ->first();
 
         if ($exists) {
             return redirect()->back()->withErrors([
@@ -65,7 +68,7 @@ class CompanyDepartmentNameController extends Controller
         CompanyDepartmentName::create($request->only(['company_id', 'department_id', 'appear_name']));
 
         return redirect()->route('company_department_names.index')
-                         ->with('success', 'Companywise Department Name created successfully.');
+                         ->with('success', 'Company-wise Department Name created successfully.');
     }
 
     /**
@@ -81,8 +84,8 @@ class CompanyDepartmentNameController extends Controller
      */
     public function edit(CompanyDepartmentName $companyDepartmentName)
     {
-        $companies = Company::all();
-        $departments = Department::all();
+        $companies = Company::orderBy('company_name')->get();
+        $departments = Department::orderBy('name')->get();
         return view('company_department_names.edit', compact('companyDepartmentName', 'companies', 'departments'));
     }
 
@@ -97,11 +100,11 @@ class CompanyDepartmentNameController extends Controller
             'appear_name'   => 'required|string|max:255',
         ]);
 
-        // prevent duplicate company + department pair (excluding current record)
+        // Prevent duplicate company + department pair (excluding current record)
         $exists = CompanyDepartmentName::where('company_id', $request->company_id)
-                    ->where('department_id', $request->department_id)
-                    ->where('id', '!=', $companyDepartmentName->id)
-                    ->first();
+            ->where('department_id', $request->department_id)
+            ->where('id', '!=', $companyDepartmentName->id)
+            ->first();
 
         if ($exists) {
             return redirect()->back()->withErrors([
@@ -112,7 +115,7 @@ class CompanyDepartmentNameController extends Controller
         $companyDepartmentName->update($request->only(['company_id', 'department_id', 'appear_name']));
 
         return redirect()->route('company_department_names.index')
-                         ->with('success', 'Companywise Department Name updated successfully.');
+                         ->with('success', 'Company-wise Department Name updated successfully.');
     }
 
     /**
@@ -123,6 +126,6 @@ class CompanyDepartmentNameController extends Controller
         $companyDepartmentName->delete();
 
         return redirect()->route('company_department_names.index')
-                         ->with('success', 'Companywise Department Name deleted successfully.');
+                         ->with('success', 'Company-wise Department Name deleted successfully.');
     }
 }

@@ -9,22 +9,34 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\WastageLogsExport;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class StockManagementController extends Controller
 {
+    /**
+     * Instantiate a new controller instance.
+     */
     public function __construct()
     {
         // ✅ Require authentication for all actions
         $this->middleware('auth');
 
-        // ✅ Apply fine-grained permission control
-        $this->middleware('permission:view stock management')->only(['index', 'wastageReport']);
-        $this->middleware('permission:manage stock conversion')->only(['apiConvert', 'apiConvertINRN']);
-        $this->middleware('permission:log stock wastage')->only(['apiWastage', 'apiWastageRN']);
-        $this->middleware('permission:export stock reports')->only(['exportWastageExcel', 'exportWastagePdf']);
+        // ✅ Apply permission-based access control (consistent with CustomerController pattern)
+        $this->middleware('permission:stockmanagement-list|stockmanagement-create|stockmanagement-edit|stockmanagement-delete', 
+            ['only' => ['index', 'wastageReport']]
+        );
+        $this->middleware('permission:stockmanagement-create', 
+            ['only' => ['apiConvert', 'apiConvertINRN', 'apiWastage', 'apiWastageRN']]
+        );
+        $this->middleware('permission:stockmanagement-edit', 
+            ['only' => ['exportWastageExcel', 'exportWastagePdf']]
+        );
+        $this->middleware('permission:stockmanagement-delete', 
+            ['only' => []] // reserved for future delete-related actions
+        );
     }
 
     /**
@@ -126,7 +138,7 @@ class StockManagementController extends Controller
     /**
      * Export wastage report to Excel.
      */
-    public function exportWastageExcel(Request $request)
+    public function exportWastageExcel(Request $request): RedirectResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         return Excel::download(new WastageLogsExport($request), 'wastage_report.xlsx');
     }
@@ -160,7 +172,7 @@ class StockManagementController extends Controller
     }
 
     /**
-     * Show the wastage report.
+     * Show the wastage report page.
      */
     public function wastageReport(Request $request): View
     {
@@ -201,7 +213,7 @@ class StockManagementController extends Controller
             $product = Product::findOrFail($request->product_id);
             $quantity = $request->quantity;
 
-            // Agent products: do not adjust stock
+            // Agent products: skip stock updates
             if ($product->agent_id) {
                 DB::commit();
                 return response()->json([
@@ -257,5 +269,44 @@ class StockManagementController extends Controller
             DB::rollBack();
             return response()->json(['success' => false, 'message' => $e->getMessage()]);
         }
+    }
+public function wastageLogs(Request $request): View
+{
+    $query = WastageLog::with('product')->latest();
+
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+
+    if ($request->filled('search')) {
+        $query->whereHas('product', function ($q) use ($request) {
+            $q->where('name', 'like', '%' . $request->search . '%');
+        });
+    }
+
+    $logs = $query->paginate(10);
+
+    return view('stock_management.wastage_logs', compact('logs'));
+}
+
+public function markAsReturned(WastageLog $log): RedirectResponse
+    {
+        if ($log->status === 'returned') {
+            return back()->with('info', 'This wastage has already been returned.');
+        }
+
+        // Update status
+        $log->update(['status' => 'returned']);
+
+        // Add back to the correct stock type
+        $product = $log->product;
+
+        if ($log->stock_type === 'clear') {
+            $product->increment('clear_stock', $log->quantity);
+        } elseif ($log->stock_type === 'non-clear') {
+            $product->increment('non_clear_stock', $log->quantity);
+        }
+
+        return back()->with('success', 'Wastage returned and stock updated.');
     }
 }

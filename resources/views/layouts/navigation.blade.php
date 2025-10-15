@@ -155,6 +155,7 @@
                         <li><a href="{{ route('grnpos.create') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Add PO GRN</a></li>
                         <li><a href="{{ route('grnpos.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">All PO GRN</a></li>
                         <li><a href="{{ route('stock-management.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Wastage</a></li>
+                        <li><a href="{{ route('stock.wastageLogs') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Wastage Logs</a></li>
                         <li><a href="{{ route('return-notes.index') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Return Notes</a></li>
                     </ul>
                 </li>

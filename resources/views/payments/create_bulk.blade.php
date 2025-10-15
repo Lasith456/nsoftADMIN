@@ -5,8 +5,12 @@
     <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
         <form id="bulk-payment-form" action="{{ route('payments.storeBulk') }}" method="POST">
             @csrf
+
+            {{-- HEADER --}}
             <div class="flex justify-between items-center mb-4 pb-3 border-b dark:border-gray-700">
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Record Bulk Customer Payment</h2>
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200">
+                    Record Bulk Customer Payment
+                </h2>
                 <div class="flex items-center space-x-2">
                     <a href="{{ url()->previous() }}" 
                        class="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md font-semibold text-xs text-gray-800 dark:text-gray-200 uppercase">
@@ -20,6 +24,7 @@
                 </div>
             </div>
 
+            {{-- ERRORS --}}
             @if ($errors->any())
             <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
                 <p class="font-bold">Error</p>
@@ -31,12 +36,12 @@
             </div>
             @endif
 
-            {{-- Customer + Payment Info --}}
+            {{-- COMPANY + CUSTOMER --}}
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
-
-                <!-- Company & Customer -->
                 <div>
-                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">1. Select Company & Customer</h3>
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">
+                        1. Select Company & Customer
+                    </h3>
 
                     <select x-model="selectedCompany" @change="filterCustomersByCompany"
                             class="block w-full border rounded-md dark:bg-gray-900 py-2 px-3 mb-2">
@@ -50,16 +55,24 @@
                            placeholder="Type customer name..."
                            class="block w-full border rounded-md dark:bg-gray-900 py-2 px-3 mb-2"
                            :disabled="!selectedCompany">
+
                     <datalist id="customers-list">
                         <template x-for="cust in filteredCustomers" :key="cust.id">
                             <option :value="cust.customer_name" :data-id="cust.id"></option>
                         </template>
                     </datalist>
+
                     <input type="hidden" name="customer_id" x-model="selectedCustomerId">
                     <p x-show="customerError" class="text-red-600 text-xs mt-1" x-text="customerError"></p>
+
+                    {{-- Debit Note Display --}}
+                    <div x-show="selectedCustomerId" class="mt-2 text-sm">
+                        <span class="text-gray-600 dark:text-gray-300">Available Debit Note Balance: </span>
+                        <span class="font-semibold text-blue-600" x-text="formatCurrency(availableDebit)"></span>
+                    </div>
                 </div>
 
-                <!-- Payment Details -->
+                {{-- PAYMENT DETAILS --}}
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Date</label>
@@ -77,7 +90,7 @@
                         </select>
                     </div>
 
-                    <!-- Cheque Fields -->
+                    {{-- CHEQUE FIELDS --}}
                     <div x-show="paymentMethod === 'Cheque'" x-cloak class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 col-span-2">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Bank</label>
@@ -110,7 +123,7 @@
                 </div>
             </div>
 
-            {{-- Invoice Section --}}
+            {{-- INVOICE SECTION --}}
             <div x-show="selectedCustomerId" x-cloak class="border-t pt-4">
                 <div class="flex justify-between items-center mb-2">
                     <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200">2. Select Invoices to Pay</h3>
@@ -120,7 +133,7 @@
                     </div>
                 </div>
 
-                <!-- Payment Summary -->
+                {{-- Payment Summary --}}
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount to Pay</label>
@@ -140,15 +153,23 @@
                                placeholder="0.00"
                                class="mt-1 block w-full dark:bg-gray-900 text-lg rounded-md py-1 px-2 border border-gray-300 dark:border-gray-600">
                     </div>
-                    <div class="pt-6 text-sm col-span-2">
-                        <div class="flex justify-between"><span>Total Selected (Invoices):</span><span x-text="formatCurrency(totalSelectedForPayment)"></span></div>
+                    <div class="pt-6 text-sm col-span-2 space-y-1">
+                        <div class="flex justify-between"><span>Amount to Pay:</span><span x-text="formatCurrency(amountPaid || 0)"></span></div>
                         <div class="flex justify-between"><span>Stamp Fee:</span><span x-text="formatCurrency(stampFee || 0)"></span></div>
                         <div class="flex justify-between"><span>Surcharge Fee:</span><span x-text="formatCurrency(surchargeFee || 0)"></span></div>
-                        <div class="flex justify-between font-bold text-blue-600"><span>Grand Total:</span><span x-text="formatCurrency(grandTotal)"></span></div>
+                        <div class="flex justify-between"><span>Available Debit:</span><span x-text="formatCurrency(availableDebit || 0)"></span></div>
+
+                        <div class="flex justify-between font-bold text-blue-600 border-t pt-2">
+                            <span>Grand Total (Overall Payable):</span>
+                            <span x-text="formatCurrency(grandTotal)"></span>
+                        </div>
+
+                        <p x-show="showWarning" class="text-xs text-red-600 font-medium mt-1" x-text="warningMessage"></p>
                     </div>
+
                 </div>
 
-                <!-- Invoices Table -->
+                {{-- INVOICE TABLE --}}
                 <div class="mt-4 max-h-80 overflow-y-auto border rounded-md">
                     <table class="w-full min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                         <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0">
@@ -178,6 +199,7 @@
     </div>
 </div>
 
+{{-- Alpine Logic --}}
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('bulkPaymentForm', () => ({
@@ -194,20 +216,23 @@ document.addEventListener('alpine:init', () => {
         amountPaid: '',
         stampFee: 0,
         surchargeFee: 0,
+        availableDebit: 0,
+        warningMessage: '',
+        showWarning: false,
         paymentMethod: '',
 
-        init() { if (this.selectedCustomerId) this.fetchInvoices(); },
+        init() {
+            if (this.selectedCustomerId) {
+                this.fetchInvoices();
+                this.fetchDebitBalance();
+            }
+        },
 
         filterCustomersByCompany() {
-            if (!this.selectedCompany) {
-                this.filteredCustomers = [];
-                this.customerName = '';
-                this.selectedCustomerId = '';
-                return;
-            }
             this.filteredCustomers = this.customers.filter(c => c.company_id == this.selectedCompany);
             this.customerName = '';
             this.selectedCustomerId = '';
+            this.availableDebit = 0;
         },
 
         setCustomerId() {
@@ -216,6 +241,7 @@ document.addEventListener('alpine:init', () => {
                 this.selectedCustomerId = match.id;
                 this.customerError = '';
                 this.fetchInvoices();
+                this.fetchDebitBalance();
             } else {
                 this.selectedCustomerId = '';
                 this.customerError = 'Customer not found or not in this company';
@@ -223,13 +249,18 @@ document.addEventListener('alpine:init', () => {
         },
 
         fetchInvoices() {
-            this.invoices = [];
-            this.selectedInvoiceIds = [];
             if (!this.selectedCustomerId) return;
             this.isLoading = true;
             fetch(`/customers/${this.selectedCustomerId}/unpaid-invoices`)
                 .then(res => res.json())
                 .then(data => { this.invoices = data; this.isLoading = false; });
+        },
+
+        fetchDebitBalance() {
+            if (!this.selectedCustomerId) return;
+            fetch(`/customers/${this.selectedCustomerId}/debit-balance`)
+                .then(res => res.json())
+                .then(data => this.availableDebit = data.balance || 0);
         },
 
         get totalOutstanding() {
@@ -240,16 +271,32 @@ document.addEventListener('alpine:init', () => {
                 .filter(i => this.selectedInvoiceIds.includes(String(i.id)))
                 .reduce((t, i) => t + (i.total_amount - i.amount_paid), 0);
         },
-        // ✅ FIXED: Grand total is now Amount + Stamp + Surcharge
 get grandTotal() {
-    // ✅ Grand total = total invoices + stamp fee + surcharge fee
-    return (this.totalSelectedForPayment || 0)
-           +((this.stampFee || 0) + (this.surchargeFee || 0));
+    // ✅ Grand total = Stamp Fee + Surcharge Fee + Available Debit + Amount to Pay
+    const total = 
+        (Number(this.amountPaid) || 0) +
+        (Number(this.stampFee) || 0) +
+        (Number(this.surchargeFee) || 0) +
+        (Number(this.availableDebit) || 0);
+
+    // Optional warning if everything is 0
+    if (total <= 0) {
+        this.warningMessage = "⚠️ Please enter at least one value (amount, fee, or debit).";
+        this.showWarning = true;
+    } else {
+        this.showWarning = false;
+        this.warningMessage = '';
+    }
+
+    return total;
 },
+
+
 
         isFormValid() {
             return this.selectedCustomerId && this.selectedInvoiceIds.length > 0 && this.amountPaid > 0;
         },
+
         formatCurrency(a) {
             return new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(a);
         },

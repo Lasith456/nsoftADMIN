@@ -8,16 +8,19 @@ use Illuminate\Support\Facades\DB;
 
 class ReturnNoteController extends Controller
 {
+    /**
+     * Instantiate a new controller instance.
+     */
     public function __construct()
     {
         // ✅ Require login for all routes
         $this->middleware('auth');
 
-        // ✅ Apply permission-based route protection
-        $this->middleware('permission:view return notes')->only(['index', 'show']);
-        $this->middleware('permission:create return notes')->only(['storeAjax']);
-        $this->middleware('permission:update return notes')->only(['changeStatus']);
-        $this->middleware('permission:convert return note to po')->only(['createPO']);
+        // ✅ Standardized permission-based access control
+        $this->middleware('permission:returnnote-list|returnnote-create|returnnote-edit|returnnote-po', ['only' => ['index', 'show']]);
+        $this->middleware('permission:returnnote-create', ['only' => ['storeAjax']]);
+        $this->middleware('permission:returnnote-edit', ['only' => ['changeStatus']]);
+        $this->middleware('permission:returnnote-po', ['only' => ['createPO']]);
     }
 
     /**

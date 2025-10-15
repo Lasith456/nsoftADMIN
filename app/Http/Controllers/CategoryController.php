@@ -9,32 +9,41 @@ use Illuminate\View\View;
 
 class CategoryController extends Controller
 {
+    /**
+     * Instantiate a new controller instance.
+     */
     public function __construct()
     {
         // ✅ Require login for all category routes
         $this->middleware('auth');
 
-        // ✅ Define permission access per action
-        $this->middleware('permission:view categories')->only(['index']);
-        $this->middleware('permission:create categories')->only(['create', 'store']);
-        $this->middleware('permission:edit categories')->only(['edit', 'update']);
-        $this->middleware('permission:delete categories')->only(['destroy']);
+        // ✅ Apply standardized permission-based access control
+        $this->middleware('permission:category-list|category-create|category-edit|category-delete', ['only' => ['index']]);
+        $this->middleware('permission:category-create', ['only' => ['create', 'store']]);
+        $this->middleware('permission:category-edit', ['only' => ['edit', 'update']]);
+        $this->middleware('permission:category-delete', ['only' => ['destroy']]);
     }
 
-    /** Display all categories. */
+    /** 
+     * Display a listing of all categories.
+     */
     public function index(): View
     {
         $categories = Category::latest()->paginate(10);
         return view('categories.index', compact('categories'));
     }
 
-    /** Show create form. */
+    /** 
+     * Show the form for creating a new category.
+     */
     public function create(): View
     {
         return view('categories.create');
     }
 
-    /** Store new category. */
+    /** 
+     * Store a newly created category in storage.
+     */
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -43,16 +52,21 @@ class CategoryController extends Controller
 
         Category::create($validated);
 
-        return redirect()->route('categories.index')->with('success', 'Category created successfully.');
+        return redirect()->route('categories.index')
+                         ->with('success', 'Category created successfully.');
     }
 
-    /** Show edit form. */
+    /** 
+     * Show the form for editing the specified category.
+     */
     public function edit(Category $category): View
     {
         return view('categories.edit', compact('category'));
     }
 
-    /** Update existing category. */
+    /** 
+     * Update the specified category in storage.
+     */
     public function update(Request $request, Category $category): RedirectResponse
     {
         $validated = $request->validate([
@@ -61,14 +75,18 @@ class CategoryController extends Controller
 
         $category->update($validated);
 
-        return redirect()->route('categories.index')->with('success', 'Category updated successfully.');
+        return redirect()->route('categories.index')
+                         ->with('success', 'Category updated successfully.');
     }
 
-    /** Delete category. */
+    /** 
+     * Remove the specified category from storage.
+     */
     public function destroy(Category $category): RedirectResponse
     {
         $category->delete();
 
-        return redirect()->route('categories.index')->with('success', 'Category deleted successfully.');
+        return redirect()->route('categories.index')
+                         ->with('success', 'Category deleted successfully.');
     }
 }

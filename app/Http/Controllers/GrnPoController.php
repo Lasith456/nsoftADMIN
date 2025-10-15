@@ -8,34 +8,40 @@ use App\Models\Supplier;
 use App\Models\Product;
 use App\Models\Department;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class GrnPoController extends Controller
 {
+    /**
+     * Instantiate a new controller instance.
+     */
     public function __construct()
     {
-        // ✅ Protect all routes by authentication
-        $this->middleware('auth');
-
-        // ✅ Apply permission-based middleware (Spatie Laravel-Permission or Policy)
-        // You can adjust these to match your defined permission names
-        $this->middleware('permission:view grnpos')->only(['index', 'show']);
-        $this->middleware('permission:create grnpos')->only(['create', 'store']);
-        $this->middleware('permission:delete grnpos')->only(['destroy']);
+        // ✅ Apply permission-based access control (same pattern as CustomerController)
+        $this->middleware('permission:grnpo-list|grnpo-create|grnpo-edit|grnpo-delete', ['only' => ['index', 'show', 'pendingBySupplier']]);
+        $this->middleware('permission:grnpo-create', ['only' => ['create', 'store']]);
+        $this->middleware('permission:grnpo-edit', ['only' => ['edit', 'update']]);
+        $this->middleware('permission:grnpo-delete', ['only' => ['destroy']]);
     }
 
-    // ======================
-    // INDEX PAGE (List all)
-    // ======================
-    public function index(Request $request)
+    /**
+     * Display a listing of the GRN POs.
+     */
+    public function index(Request $request): View
     {
         $query = GrnPo::with('supplier');
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where('grnpo_id', 'like', "%$search%")
-                ->orWhereHas('supplier', fn($q) => $q->where('supplier_name', 'like', "%$search%"));
+            $query->where(function ($q) use ($search) {
+                $q->where('grnpo_id', 'LIKE', "%{$search}%")
+                  ->orWhereHas('supplier', function ($sq) use ($search) {
+                      $sq->where('supplier_name', 'LIKE', "%{$search}%");
+                  });
+            });
         }
 
         if ($request->filled('delivery_date')) {
@@ -47,10 +53,10 @@ class GrnPoController extends Controller
         return view('grnpos.index', compact('grnpos'));
     }
 
-    // ======================
-    // CREATE PAGE
-    // ======================
-    public function create()
+    /**
+     * Show the form for creating a new GRN PO.
+     */
+    public function create(): View
     {
         $suppliers = Supplier::where('is_active', true)->orderBy('supplier_name')->get();
         $departments = Department::orderBy('name')->get();
@@ -59,13 +65,11 @@ class GrnPoController extends Controller
         return view('grnpos.create', compact('suppliers', 'departments', 'products'));
     }
 
-    // ======================
-    // STORE (Save new record)
-    // ======================
-    public function store(Request $request)
+    /**
+     * Store a newly created GRN PO.
+     */
+    public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', GrnPo::class); // ✅ policy check (optional but good practice)
-
         $request->validate([
             'supplier_id' => 'required|exists:suppliers,id',
             'delivery_date' => 'required|date',
@@ -76,8 +80,14 @@ class GrnPoController extends Controller
         ]);
 
         DB::beginTransaction();
+
         try {
+            // Generate unique GRNPO ID
+            $nextId = (GrnPo::max('id') ?? 0) + 1;
+            $grnpoId = 'GRNPO-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
+
             $grnpo = GrnPo::create([
+                'grnpo_id' => $grnpoId,
                 'supplier_id' => $request->supplier_id,
                 'delivery_date' => $request->delivery_date,
                 'status' => 'pending',
@@ -93,39 +103,76 @@ class GrnPoController extends Controller
             }
 
             DB::commit();
-            Log::info('GRN PO created', ['id' => $grnpo->id, 'supplier_id' => $grnpo->supplier_id]);
+
+            Log::info('GRN PO created successfully', ['grnpo_id' => $grnpo->grnpo_id]);
 
             return redirect()->route('grnpos.index')
-                ->with('success', 'GRN PO created successfully.');
+                             ->with('success', 'GRN PO created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to create GRN PO', ['error' => $e->getMessage()]);
-
-            return back()->withInput()
-                ->withErrors(['error' => 'Failed to save GRN PO: ' . $e->getMessage()]);
+            Log::error('GRN PO creation failed', ['error' => $e->getMessage()]);
+            return back()->withInput()->withErrors(['error' => 'Failed to save GRN PO.']);
         }
     }
 
-    // ======================
-    // SHOW SINGLE GRN PO
-    // ======================
-    public function show($id)
+    /**
+     * Display the specified GRN PO.
+     */
+    public function show(GrnPo $grnpo): View
     {
-        $this->authorize('view', GrnPo::class);
-
-        $grnpo = GrnPo::with(['supplier', 'items.product', 'items.department'])
-            ->findOrFail($id);
-
+        $grnpo->load(['supplier', 'items.product', 'items.department']);
         return view('grnpos.show', compact('grnpo'));
     }
 
-    // ======================
-    // AJAX: Pending POs per supplier
-    // ======================
+    /**
+     * Show the form for editing the specified GRN PO.
+     */
+    public function edit(GrnPo $grnpo): View
+    {
+        $suppliers = Supplier::where('is_active', true)->orderBy('supplier_name')->get();
+        $departments = Department::orderBy('name')->get();
+        $products = Product::where('is_active', true)->get();
+        $grnpo->load('items');
+
+        return view('grnpos.edit', compact('grnpo', 'suppliers', 'departments', 'products'));
+    }
+
+    /**
+     * Update the specified GRN PO.
+     */
+    public function update(Request $request, GrnPo $grnpo): RedirectResponse
+    {
+        $request->validate([
+            'supplier_id' => 'required|exists:suppliers,id',
+            'delivery_date' => 'required|date',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $grnpo->update([
+                'supplier_id' => $request->supplier_id,
+                'delivery_date' => $request->delivery_date,
+            ]);
+
+            DB::commit();
+
+            Log::info('GRN PO updated', ['grnpo_id' => $grnpo->grnpo_id]);
+
+            return redirect()->route('grnpos.index')
+                             ->with('success', 'GRN PO updated successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to update GRN PO', ['error' => $e->getMessage()]);
+            return back()->withInput()->withErrors(['error' => 'Failed to update GRN PO.']);
+        }
+    }
+
+    /**
+     * Return pending GRN POs by supplier (AJAX use).
+     */
     public function pendingBySupplier($supplierId)
     {
-        $this->authorize('view', GrnPo::class);
-
         $pendingPos = GrnPo::where('supplier_id', $supplierId)
             ->where('status', 'pending')
             ->with('supplier:id,supplier_name')
@@ -136,22 +183,20 @@ class GrnPoController extends Controller
                 'id' => $po->id,
                 'grnpo_id' => $po->grnpo_id,
                 'supplier_name' => $po->supplier->supplier_name ?? 'Unknown',
-                'delivery_date' => $po->delivery_date->format('Y-m-d'),
+                'delivery_date' => $po->delivery_date ? $po->delivery_date->format('Y-m-d') : null,
             ];
         });
 
         return response()->json($formatted);
     }
 
-    // ======================
-    // DESTROY (Delete)
-    // ======================
-    public function destroy(GrnPo $grnpo)
+    /**
+     * Remove the specified GRN PO from storage.
+     */
+    public function destroy(GrnPo $grnpo): RedirectResponse
     {
-        $this->authorize('delete', $grnpo);
-
         try {
-            if ($grnpo->status === 'completed' || $grnpo->status === 'confirmed') {
+            if (in_array($grnpo->status, ['completed', 'confirmed'])) {
                 return back()->withErrors(['error' => 'Cannot delete a completed or confirmed GRN PO.']);
             }
 
@@ -162,12 +207,13 @@ class GrnPoController extends Controller
 
             DB::commit();
 
-            Log::warning('GRN PO deleted', ['grnpo_id' => $grnpo->id]);
+            Log::warning('GRN PO deleted', ['grnpo_id' => $grnpo->grnpo_id]);
 
-            return redirect()->route('grnpos.index')->with('success', 'GRN PO deleted successfully.');
+            return redirect()->route('grnpos.index')
+                             ->with('success', 'GRN PO deleted successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to delete GRN PO', ['error' => $e->getMessage()]);
+            Log::error('GRN PO delete failed', ['error' => $e->getMessage()]);
             return back()->withErrors(['error' => 'Failed to delete GRN PO.']);
         }
     }

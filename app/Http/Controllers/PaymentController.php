@@ -149,28 +149,65 @@ public function storeBulk(Request $request): RedirectResponse
 
     DB::beginTransaction();
     try {
-        $stampFee     = $request->stamp_fee ?? 0;
+        $customer = Customer::findOrFail($request->customer_id);
+        $stampFee = $request->stamp_fee ?? 0;
         $surchargeFee = $request->surcharge_fee ?? 0;
 
-        // ✅ Only this much goes to invoices
-        $amountToDistribute = $request->amount - ($stampFee + $surchargeFee);
-
-        $batchId = uniqid('BATCH-');
-
+        // Selected invoice total
         $invoices = Invoice::where('invoiceable_id', $request->customer_id)
             ->where('invoiceable_type', Customer::class)
             ->whereIn('id', $request->invoice_ids)
-            ->whereIn('status', ['unpaid', 'partially-paid'])
-            ->orderBy('created_at', 'asc')
-            ->lockForUpdate()
             ->get();
 
+        $totalInvoiceAmount = $invoices->sum(fn($i) => $i->total_amount - $i->amount_paid);
+        $userTotal = $request->amount + $stampFee + $surchargeFee;
+
+        // --- Validation logic ---
+        if ($userTotal < $totalInvoiceAmount) {
+            $difference = $totalInvoiceAmount - $userTotal;
+
+            // Check debit notes
+            $availableDebit = $customer->debitNotes()
+                ->where('status', 'unused')
+                ->sum(DB::raw('amount - used_amount'));
+
+            if ($availableDebit >= $difference) {
+                // Apply debit note
+                $remaining = $difference;
+                $debitNotes = $customer->debitNotes()
+                    ->where('status', 'unused')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($debitNotes as $note) {
+                    $usable = min($note->remaining, $remaining);
+                    $note->used_amount += $usable;
+                    if ($note->remaining <= 0.01) $note->status = 'used';
+                    $note->save();
+                    $remaining -= $usable;
+                    if ($remaining <= 0) break;
+                }
+
+                $request->merge(['amount' => $request->amount + $difference]);
+            } else {
+                DB::rollBack();
+                return back()->withErrors([
+                    'error' => "Insufficient payment. Missing LKR " . number_format($difference, 2) . 
+                    " — No usable debit note found for this customer."
+                ]);
+            }
+        }
+
+        // ✅ Continue with your original bulk payment logic
+        $batchId = uniqid('BATCH-');
+        $amountToDistribute = $request->amount - ($stampFee + $surchargeFee);
         $firstPayment = true;
 
         foreach ($invoices as $invoice) {
             if ($amountToDistribute <= 0) break;
 
-            $balanceDue    = $invoice->total_amount - $invoice->amount_paid;
+            $balanceDue = $invoice->total_amount - $invoice->amount_paid;
             $paymentAmount = min($amountToDistribute, $balanceDue);
 
             if ($paymentAmount > 0) {
@@ -205,10 +242,9 @@ public function storeBulk(Request $request): RedirectResponse
 
     } catch (\Exception $e) {
         DB::rollBack();
-        return back()->withInput()->withErrors(['error' => 'An error occurred: ' . $e->getMessage()]);
+        return back()->withErrors(['error' => 'An error occurred: ' . $e->getMessage()]);
     }
 }
-
 
 
 

@@ -164,10 +164,11 @@ Route::prefix('payments')->name('payments.')->group(function () {
     ->name('payments.history.supplierPayments');
 Route::get('/stock/wastage-report', [StockManagementController::class, 'wastageReport'])
     ->name('stock.wastage.report');
+Route::post('/stock/wastage/{log}/return', [StockManagementController::class, 'markAsReturned'])->name('stock.markReturned');
 
 Route::get('/stock/wastage-report/export-excel', [StockManagementController::class, 'exportWastageExcel'])
     ->name('stock.wastage.export.excel');
-
+    Route::get('/stock/wastage-logs', [StockManagementController::class, 'wastageLogs'])->name('stock.wastageLogs');
 Route::get('/stock/wastage-report/export-pdf', [StockManagementController::class, 'exportWastagePdf'])
     ->name('stock.wastage.export.pdf');
 Route::get('/reports/outstanding-payments', [ReportController::class, 'outstandingPayments'])->name('reports.outstanding');
