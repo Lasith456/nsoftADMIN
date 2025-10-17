@@ -355,83 +355,94 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
         return back()->withErrors(['receive_note_ids' => 'No valid receive notes found.']);
     }
 
-$updated = collect($request->input('updated_prices', []))
-    ->map(function ($json) {
-        $data = json_decode($json, true);
-        if (is_array($data) && isset($data['product_id'])) {
-            // 👇 include PO ID for precise match
-            $key = $data['product_id'] . '_' . ($data['receive_note_id'] ?? 'NA') . '_' . ($data['purchase_order_id'] ?? 'NA');
-            return [$key => $data];
-        }
-        return [];
-    })
-    ->collapse(); // flatten into associative array
+    // ✅ Map updated prices (from frontend JSON inputs)
+    $updated = collect($request->input('updated_prices', []))
+        ->map(function ($json) {
+            $data = json_decode($json, true);
+            if (is_array($data) && isset($data['product_id'])) {
+                $key = $data['product_id'] . '_' . ($data['receive_note_id'] ?? 'NA') . '_' . ($data['purchase_order_id'] ?? 'NA');
+                return [$key => $data];
+            }
+            return [];
+        })
+        ->collapse();
 
     $vatRate = (float)(\App\Models\Setting::where('key', 'vat_rate')->value('value') ?? 12);
     $vatLines = collect();
     $nonVatLines = collect();
 
-    // ✅ Collect all product lines (RAW by RAW)
-foreach ($receiveNotes as $rn) {
-    foreach ($rn->items as $item) {
-        $product = $item->product;
-        if (!$product) continue;
+    // ✅ Collect all product lines
+    foreach ($receiveNotes as $rn) {
+        foreach ($rn->items as $item) {
+            $product = $item->product;
+            if (!$product) continue;
 
-        $qty = (float)$item->quantity_received;
-        if ($qty <= 0) continue;
+            $qty = (float)$item->quantity_received;
+            if ($qty <= 0) continue;
 
-        // ✅ Build key including PO ID from receive_note_items
-        $poId = $item->purchase_order_id ?? 'NA';
-        $key  = $product->id . '_' . $rn->id . '_' . $poId;
+            $poId = $item->purchase_order_id ?? 'NA';
+            $key  = $product->id . '_' . $rn->id . '_' . $poId;
 
-        // ✅ Find updated price precisely for product + RN + PO
-        $unitPrice = $updated->has($key)
-            ? (float)$updated->get($key)['updated_price']
-            : (float)($product->selling_price ?? 0);
+            $unitPrice = $updated->has($key)
+                ? (float)$updated->get($key)['updated_price']
+                : (float)($product->selling_price ?? 0);
 
+            $po = optional($rn->deliveryNotes->first()?->purchaseOrders->first());
+            $isCategorized = $po?->is_categorized ?? false;
+            $companyId = $customer->company_id ?? null;
 
-        $po = optional($rn->deliveryNotes->first()?->purchaseOrders->first());
-        $isCategorized = $po?->is_categorized;
+            // ✅ Determine correct department for company-wise invoice
+            if ($isCategorized) {
+                $categoryId = $product->category?->id ?? null;
+                $departmentId = null;
+            } else {
+                // 🟢 Check company-specific department mapping
+                $mappedDeptId = \App\Models\ProductDepartmentWise::where('product_id', $product->id)
+                    ->where('company_id', $companyId)
+                    ->value('department_id');
 
-        $line = [
-            'product_id'       => $product->id,
-            'description'      => $product->name ?? 'Product',
-            'quantity'         => $qty,
-            'unit_price'       => $unitPrice,
-            'is_vat'           => (bool)$product->is_vat,
-            'category_id'      => $isCategorized ? ($product->category?->id ?? null) : null,
-            'department_id'    => !$isCategorized ? ($product->department?->id ?? null) : null,
-            'is_categorized'   => $isCategorized,
-            'receive_note_id'  => $rn->id,
-            'purchase_order_id'=> $poId, // ✅ keep for traceability
-        ];
+                $departmentId = $mappedDeptId ?: ($product->department?->id ?? null);
+                $categoryId = null;
+            }
 
-        if ($line['is_vat']) {
-            $vatLines->push($line);
-        } else {
-            $nonVatLines->push($line);
+            $line = [
+                'product_id'        => $product->id,
+                'description'       => $product->name ?? 'Product',
+                'quantity'          => $qty,
+                'unit_price'        => $unitPrice,
+                'is_vat'            => (bool)$product->is_vat,
+                'category_id'       => $categoryId,
+                'department_id'     => $departmentId,
+                'is_categorized'    => $isCategorized,
+                'receive_note_id'   => $rn->id,
+                'purchase_order_id' => $poId,
+            ];
+
+            if ($line['is_vat']) {
+                $vatLines->push($line);
+            } else {
+                $nonVatLines->push($line);
+            }
         }
     }
-}
-
 
     if ($vatLines->isEmpty() && $nonVatLines->isEmpty()) {
         return back()->withErrors(['items' => 'No products found to invoice.']);
     }
 
-    // ✅ Preserve each line as-is (no merging or grouping)
+    // ✅ Prepare clean line structures
     $processLines = function ($lines) {
         return collect($lines)->map(function ($l) {
             return [
-                'product_id'     => $l['product_id'],
-                'description'    => $l['description'], // keep clean name only
-                'quantity'       => $l['quantity'],
-                'unit_price'     => $l['unit_price'],
-                'is_vat'         => $l['is_vat'],
-                'category_id'    => $l['category_id'],
-                'department_id'  => $l['department_id'],
-                'is_categorized' => $l['is_categorized'],
-                'receive_note_id'=> $l['receive_note_id'] ?? null,
+                'product_id'        => $l['product_id'],
+                'description'       => $l['description'],
+                'quantity'          => $l['quantity'],
+                'unit_price'        => $l['unit_price'],
+                'is_vat'            => $l['is_vat'],
+                'category_id'       => $l['category_id'],
+                'department_id'     => $l['department_id'],
+                'is_categorized'    => $l['is_categorized'],
+                'receive_note_id'   => $l['receive_note_id'] ?? null,
                 'purchase_order_id' => $l['purchase_order_id'] ?? null,
             ];
         })->values();
@@ -442,10 +453,19 @@ foreach ($receiveNotes as $rn) {
 
     // ✅ Department/Category separation
     if ($separateDept) {
-        $vatGrouped    = $vatGrouped->groupBy(fn($l) => $l['is_categorized'] ? 'category_'.$l['category_id'] : 'department_'.$l['department_id']);
-        $nonVatGrouped = $nonVatGrouped->groupBy(fn($l) => $l['is_categorized'] ? 'category_'.$l['category_id'] : 'department_'.$l['department_id']);
+        $vatGrouped = $vatGrouped->groupBy(fn($l) => 
+            $l['is_categorized'] 
+                ? 'category_'.$l['category_id'] 
+                : 'department_'.$l['department_id']
+        );
+
+        $nonVatGrouped = $nonVatGrouped->groupBy(fn($l) => 
+            $l['is_categorized'] 
+                ? 'category_'.$l['category_id'] 
+                : 'department_'.$l['department_id']
+        );
     } else {
-        $vatGrouped    = collect(['default' => $vatGrouped]);
+        $vatGrouped = collect(['default' => $vatGrouped]);
         $nonVatGrouped = collect(['default' => $nonVatGrouped]);
     }
 
@@ -478,18 +498,19 @@ foreach ($receiveNotes as $rn) {
             foreach ($groupLines as $line) {
                 $lineSub = round($line['quantity'] * $line['unit_price'], 2);
                 $invoice->items()->create([
-                    'product_id'      => $line['product_id'],
-                    'description'     => $line['description'],
-                    'quantity'        => $line['quantity'],
-                    'unit_price'      => $line['unit_price'],
-                    'cost_price'      => 0,
-                    'vat_amount'      => 0,
-                    'total'           => $lineSub,
-                    'receive_note_id' => $line['receive_note_id'] ?? null,
-                    'purchase_order_id' => $line['purchase_order_id'] ?? null,
+                    'product_id'       => $line['product_id'],
+                    'description'      => $line['description'],
+                    'quantity'         => $line['quantity'],
+                    'unit_price'       => $line['unit_price'],
+                    'cost_price'       => 0,
+                    'vat_amount'       => 0,
+                    'total'            => $lineSub,
+                    'receive_note_id'  => $line['receive_note_id'] ?? null,
+                    'purchase_order_id'=> $line['purchase_order_id'] ?? null,
                 ]);
                 $sub += $lineSub;
             }
+
             $invoice->update([
                 'sub_total'    => $sub,
                 'total_amount' => $sub,
@@ -525,19 +546,20 @@ foreach ($receiveNotes as $rn) {
                 $lineSub = round($line['quantity'] * $line['unit_price'], 2);
                 $lineVat = round($lineSub * ($vatRate / 100), 2);
                 $invoice->items()->create([
-                    'product_id'      => $line['product_id'],
-                    'description'     => $line['description'],
-                    'quantity'        => $line['quantity'],
-                    'unit_price'      => $line['unit_price'],
-                    'cost_price'      => 0,
-                    'vat_amount'      => $lineVat,
-                    'total'           => $lineSub + $lineVat,
-                    'receive_note_id' => $line['receive_note_id'] ?? null,
-                    'purchase_order_id' => $line['purchase_order_id'] ?? null, 
+                    'product_id'       => $line['product_id'],
+                    'description'      => $line['description'],
+                    'quantity'         => $line['quantity'],
+                    'unit_price'       => $line['unit_price'],
+                    'cost_price'       => 0,
+                    'vat_amount'       => $lineVat,
+                    'total'            => $lineSub + $lineVat,
+                    'receive_note_id'  => $line['receive_note_id'] ?? null,
+                    'purchase_order_id'=> $line['purchase_order_id'] ?? null,
                 ]);
                 $sub += $lineSub;
                 $vat += $lineVat;
             }
+
             $invoice->update([
                 'sub_total'    => $sub,
                 'vat_amount'   => $vat,
@@ -549,6 +571,7 @@ foreach ($receiveNotes as $rn) {
 
         // ✅ Mark RN as invoiced
         $receiveNotes->each->update(['status' => 'invoiced']);
+
         DB::commit();
 
         return redirect()

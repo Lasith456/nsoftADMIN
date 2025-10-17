@@ -1220,18 +1220,29 @@ public function companyReport(Request $request)
                 $deptName = $item->product->department->name ?? 'Unassigned';
                 $key = $deptName . ($invoice->is_vat_invoice ? ' (VAT)' : ' (Non-VAT)');
 
+                // ✅ Use stored database values
+                $amount = $item->total;
+                $vat = $invoice->is_vat_invoice ? $item->vat_amount : null;
+                $total = $amount + ($vat ?? 0);
+
                 if (!isset($departmentWise[$key])) {
-                    $departmentWise[$key] = 0;
+                    $departmentWise[$key] = [
+                        'amount' => 0,
+                        'vat'    => 0,
+                        'total'  => 0,
+                    ];
                 }
 
-                $departmentWise[$key] += $item->total; // use InvoiceItem::total
+                $departmentWise[$key]['amount'] += $amount;
+                $departmentWise[$key]['vat']    += $vat ?? 0;
+                $departmentWise[$key]['total']  += $total;
             }
         }
 
         $reportData[] = [
             'customer'       => $customer->customer_name,
             'departmentWise' => $departmentWise,
-            'total'          => array_sum($departmentWise),
+            'total'          => array_sum(array_column($departmentWise, 'total')),
         ];
     }
 
@@ -1239,6 +1250,7 @@ public function companyReport(Request $request)
         'company', 'reportData', 'startDate', 'endDate'
     ));
 }
+
 
 
 
@@ -1334,7 +1346,6 @@ public function exportCompanyExcel(Request $request)
 public function exportCompanyPdf(Request $request)
 {
     $company = Company::findOrFail($request->company_id);
-
     $customers = Customer::where('company_id', $company->id)->get();
     $startDate = $request->start_date;
     $endDate   = $request->end_date;
@@ -1352,22 +1363,28 @@ public function exportCompanyPdf(Request $request)
 
         foreach ($invoices as $invoice) {
             foreach ($invoice->items as $item) {
-                // ✅ Use "name" not "department_name"
                 $deptName = $item->product->department->name ?? 'Unassigned';
                 $key = $deptName . ($invoice->is_vat_invoice ? ' (VAT)' : ' (Non-VAT)');
 
-                if (!isset($departmentWise[$key])) {
-                    $departmentWise[$key] = 0;
+                // Ensure it's always an array structure
+                if (!isset($departmentWise[$key]) || !is_array($departmentWise[$key])) {
+                    $departmentWise[$key] = ['amount' => 0, 'vat' => 0, 'total' => 0];
                 }
 
-                $departmentWise[$key] += $item->total;
+                $amount = $item->total;
+                $vat = $invoice->is_vat_invoice ? $item->vat_amount : 0;
+                $total = $amount + $vat;
+
+                $departmentWise[$key]['amount'] += $amount;
+                $departmentWise[$key]['vat'] += $vat;
+                $departmentWise[$key]['total'] += $total;
             }
         }
 
         $reportData[] = [
             'customer'       => $customer->customer_name,
             'departmentWise' => $departmentWise,
-            'total'          => array_sum($departmentWise),
+            'total'          => array_sum(array_column($departmentWise, 'total')),
         ];
     }
 
@@ -1380,6 +1397,7 @@ public function exportCompanyPdf(Request $request)
 
     return $pdf->download('company_report.pdf');
 }
+
 public function companyOutstandingReport(Request $request)
 {
     $companies = Company::orderBy('company_name')->get();
