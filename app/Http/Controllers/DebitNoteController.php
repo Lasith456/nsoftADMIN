@@ -14,7 +14,7 @@ class DebitNoteController extends Controller
     /** List all debit notes */
     public function index(): View
     {
-        $debitNotes = DebitNote::with('customer')->latest()->paginate(10);
+        $debitNotes = DebitNote::with('customer')->latest()->paginate(15);
         return view('debit_notes.index', compact('debitNotes'));
     }
 
@@ -31,26 +31,18 @@ class DebitNoteController extends Controller
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'amount' => 'required|numeric|min:0.01',
-            'reason' => 'nullable|string',
-            'issued_date' => 'required|date',
+            'reason' => 'nullable|string|max:255',
+            'issued_date' => 'nullable|date',
         ]);
 
         DB::beginTransaction();
         try {
-            // Generate Debit Note ID
-            $last = DebitNote::orderBy('id', 'desc')->first();
-            $next = $last ? intval(substr($last->debit_note_id, 3)) + 1 : 1;
-            $formatted = str_pad($next, 4, '0', STR_PAD_LEFT);
-            $debitNoteId = "DN-" . $formatted;
-
-            $validated['debit_note_id'] = $debitNoteId;
-            $validated['status'] = 'unused';
-
             DebitNote::create($validated);
 
             DB::commit();
-            return redirect()->route('debit-notes.index')->with('success', 'Debit Note created successfully.');
-        } catch (\Exception $e) {
+            return redirect()->route('debit-notes.index')
+                ->with('success', 'Debit Note created successfully.');
+        } catch (\Throwable $e) {
             DB::rollBack();
             return back()->withErrors(['error' => 'Failed to create debit note: ' . $e->getMessage()]);
         }
@@ -69,29 +61,59 @@ class DebitNoteController extends Controller
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'amount' => 'required|numeric|min:0.01',
-            'reason' => 'nullable|string',
+            'used_amount' => 'nullable|numeric|min:0',
+            'reason' => 'nullable|string|max:255',
             'issued_date' => 'required|date',
             'status' => 'required|in:unused,partially-used,used',
         ]);
 
+        // Auto-update status based on usage
+        if ($validated['used_amount'] >= $validated['amount']) {
+            $validated['status'] = 'used';
+        } elseif ($validated['used_amount'] > 0) {
+            $validated['status'] = 'partially-used';
+        }
+
         $debitNote->update($validated);
 
-        return redirect()->route('debit-notes.index')->with('success', 'Debit Note updated successfully.');
+        return redirect()->route('debit-notes.index')
+            ->with('success', 'Debit Note updated successfully.');
     }
 
     /** Delete debit note */
     public function destroy(DebitNote $debitNote): RedirectResponse
     {
         $debitNote->delete();
-        return redirect()->route('debit-notes.index')->with('success', 'Debit Note deleted successfully.');
+        return redirect()->route('debit-notes.index')
+            ->with('success', 'Debit Note deleted successfully.');
     }
 
-    /** Return total available debit balance for a customer (for your Alpine fetch) */
+    /** ───────────────────────────────
+     *  API Endpoint: Return total available debit balance for a customer
+     *  (Used in Alpine.js fetchDebitBalance)
+     *  ─────────────────────────────── */
     public function balance(Customer $customer)
     {
         $balance = $customer->debitNotes()
-            ->where('status', '!=', 'used')
+            ->active()
             ->sum(DB::raw('amount - used_amount'));
+
         return response()->json(['balance' => round($balance, 2)]);
+    }
+
+    /** ───────────────────────────────
+     *  (Optional) Method to auto-create Debit Note on Overpayment
+     *  ─────────────────────────────── */
+    public static function createAutoDebit(int $customerId, float $excess, string $reason = 'Overpayment Adjustment'): void
+    {
+        if ($excess > 0) {
+            DebitNote::create([
+                'customer_id' => $customerId,
+                'amount' => $excess,
+                'reason' => $reason,
+                'status' => 'unused',
+                'issued_date' => now(),
+            ]);
+        }
     }
 }

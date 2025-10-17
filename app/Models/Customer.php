@@ -72,6 +72,11 @@ class Customer extends Model
     {
         return $this->morphMany(Invoice::class, 'invoiceable');
     }
+    public function debitNotes()
+{
+    return $this->hasMany(\App\Models\DebitNote::class, 'customer_id');
+}
+
     public function productPrices()
     {
         return $this->hasMany(CustomerProductPrice::class);

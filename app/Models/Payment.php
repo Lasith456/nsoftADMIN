@@ -24,6 +24,7 @@ class Payment extends Model
         'cheque_received_date',
         'stamp_fee',       
         'surcharge_fee',   
+        'used_debit',
     ];
 
     protected function casts(): array
@@ -33,6 +34,10 @@ class Payment extends Model
             'amount'               => 'decimal:2',
             'cheque_date'          => 'date',
             'cheque_received_date' => 'date',
+             'stamp_fee'            => 'decimal:2',
+            'surcharge_fee'        => 'decimal:2',
+            'used_debit'           => 'decimal:2',
+
         ];
     }
 

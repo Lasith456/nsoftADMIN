@@ -153,11 +153,19 @@
                                placeholder="0.00"
                                class="mt-1 block w-full dark:bg-gray-900 text-lg rounded-md py-1 px-2 border border-gray-300 dark:border-gray-600">
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Debit Used (Optional)</label>
+                        <input type="number" step="0.01" name="used_debit" x-model.number="usedDebit"
+                               placeholder="0.00"
+                               class="mt-1 block w-full dark:bg-gray-900 text-lg rounded-md py-1 px-2 border border-gray-300 dark:border-gray-600">
+                    </div>
+
+                    {{-- Summary Table --}}
                     <div class="pt-6 text-sm col-span-2 space-y-1">
                         <div class="flex justify-between"><span>Amount to Pay:</span><span x-text="formatCurrency(amountPaid || 0)"></span></div>
                         <div class="flex justify-between"><span>Stamp Fee:</span><span x-text="formatCurrency(stampFee || 0)"></span></div>
                         <div class="flex justify-between"><span>Surcharge Fee:</span><span x-text="formatCurrency(surchargeFee || 0)"></span></div>
-                        <div class="flex justify-between"><span>Available Debit:</span><span x-text="formatCurrency(availableDebit || 0)"></span></div>
+                        <div class="flex justify-between"><span>Debit Used:</span><span x-text="formatCurrency(usedDebit || 0)"></span></div>
 
                         <div class="flex justify-between font-bold text-blue-600 border-t pt-2">
                             <span>Grand Total (Overall Payable):</span>
@@ -166,7 +174,6 @@
 
                         <p x-show="showWarning" class="text-xs text-red-600 font-medium mt-1" x-text="warningMessage"></p>
                     </div>
-
                 </div>
 
                 {{-- INVOICE TABLE --}}
@@ -185,7 +192,7 @@
                             <template x-if="!isLoading && invoices.length === 0"><tr><td colspan="4" class="text-center p-4">No outstanding invoices found.</td></tr></template>
                             <template x-for="invoice in invoices" :key="invoice.id">
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                    <td class="pl-4"><input type="checkbox" name="invoice_ids[]" :value="invoice.id" x-model="selectedInvoiceIds" class="rounded"></td>
+                                    <td class="pl-4"><input type="checkbox" name="invoice_ids[]" :value="invoice.id" x-model="selectedInvoiceIds" @change="updateAmountToPay" class="rounded"></td>
                                     <td class="px-4 py-2 text-sm" x-text="invoice.invoice_id"></td>
                                     <td class="px-4 py-2 text-sm" x-text="new Date(invoice.created_at).toLocaleDateString()"></td>
                                     <td class="px-4 py-2 text-sm text-right" x-text="formatCurrency(invoice.total_amount - invoice.amount_paid)"></td>
@@ -216,6 +223,7 @@ document.addEventListener('alpine:init', () => {
         amountPaid: '',
         stampFee: 0,
         surchargeFee: 0,
+        usedDebit: 0,
         availableDebit: 0,
         warningMessage: '',
         showWarning: false,
@@ -263,35 +271,34 @@ document.addEventListener('alpine:init', () => {
                 .then(data => this.availableDebit = data.balance || 0);
         },
 
+        // ✅ Auto-calculate amount when invoices are selected
+        updateAmountToPay() {
+            this.amountPaid = this.invoices
+                .filter(i => this.selectedInvoiceIds.includes(String(i.id)))
+                .reduce((t, i) => t + (i.total_amount - i.amount_paid), 0)
+                .toFixed(2);
+        },
+
         get totalOutstanding() {
             return this.invoices.reduce((t, i) => t + (i.total_amount - i.amount_paid), 0);
         },
-        get totalSelectedForPayment() {
-            return this.invoices
-                .filter(i => this.selectedInvoiceIds.includes(String(i.id)))
-                .reduce((t, i) => t + (i.total_amount - i.amount_paid), 0);
+
+        get grandTotal() {
+            const total = 
+                (Number(this.amountPaid) || 0) +
+                (Number(this.stampFee) || 0) +
+                (Number(this.surchargeFee) || 0) +
+                (Number(this.usedDebit) || 0);
+
+            if (total <= 0) {
+                this.warningMessage = "⚠️ Please enter at least one value (amount, fee, or debit).";
+                this.showWarning = true;
+            } else {
+                this.showWarning = false;
+                this.warningMessage = '';
+            }
+            return total;
         },
-get grandTotal() {
-    // ✅ Grand total = Stamp Fee + Surcharge Fee + Available Debit + Amount to Pay
-    const total = 
-        (Number(this.amountPaid) || 0) +
-        (Number(this.stampFee) || 0) +
-        (Number(this.surchargeFee) || 0) +
-        (Number(this.availableDebit) || 0);
-
-    // Optional warning if everything is 0
-    if (total <= 0) {
-        this.warningMessage = "⚠️ Please enter at least one value (amount, fee, or debit).";
-        this.showWarning = true;
-    } else {
-        this.showWarning = false;
-        this.warningMessage = '';
-    }
-
-    return total;
-},
-
-
 
         isFormValid() {
             return this.selectedCustomerId && this.selectedInvoiceIds.length > 0 && this.amountPaid > 0;

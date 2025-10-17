@@ -148,69 +148,87 @@ public function storeBulk(Request $request): RedirectResponse
     ]);
 
     DB::beginTransaction();
-    try {
-        $customer = Customer::findOrFail($request->customer_id);
-        $stampFee = $request->stamp_fee ?? 0;
-        $surchargeFee = $request->surcharge_fee ?? 0;
 
-        // Selected invoice total
+    try {
+        $customer     = Customer::findOrFail($request->customer_id);
+        $stampFee     = $request->stamp_fee ?? 0;
+        $surchargeFee = $request->surcharge_fee ?? 0;
+        $cashPaid     = $request->amount;
+        $usedDebit    = 0;
+
+        // ✅ Fetch selected invoices (ordered for proper distribution)
         $invoices = Invoice::where('invoiceable_id', $request->customer_id)
             ->where('invoiceable_type', Customer::class)
             ->whereIn('id', $request->invoice_ids)
+            ->orderBy('id')
+            ->lockForUpdate()
             ->get();
 
-        $totalInvoiceAmount = $invoices->sum(fn($i) => $i->total_amount - $i->amount_paid);
-        $userTotal = $request->amount + $stampFee + $surchargeFee;
+        if ($invoices->isEmpty()) {
+            throw new \Exception('No valid invoices found for this customer.');
+        }
 
-        // --- Validation logic ---
+        $totalInvoiceAmount = $invoices->sum(fn($i) => $i->total_amount - $i->amount_paid);
+        $userTotal = $cashPaid + $stampFee + $surchargeFee;
+
+        // ✅ Check and apply debit notes if user paid less than total
         if ($userTotal < $totalInvoiceAmount) {
             $difference = $totalInvoiceAmount - $userTotal;
 
-            // Check debit notes
             $availableDebit = $customer->debitNotes()
-                ->where('status', 'unused')
+                ->where('status', '!=', 'used')
                 ->sum(DB::raw('amount - used_amount'));
 
             if ($availableDebit >= $difference) {
-                // Apply debit note
                 $remaining = $difference;
                 $debitNotes = $customer->debitNotes()
-                    ->where('status', 'unused')
+                    ->where('status', '!=', 'used')
                     ->orderBy('id')
                     ->lockForUpdate()
                     ->get();
 
                 foreach ($debitNotes as $note) {
-                    $usable = min($note->remaining, $remaining);
+                    $usable = min(($note->amount - $note->used_amount), $remaining);
                     $note->used_amount += $usable;
-                    if ($note->remaining <= 0.01) $note->status = 'used';
+
+                    if (($note->amount - $note->used_amount) <= 0.01) {
+                        $note->status = 'used';
+                    } elseif ($note->used_amount > 0) {
+                        $note->status = 'partially-used';
+                    }
+
                     $note->save();
+
+                    $usedDebit += $usable;
                     $remaining -= $usable;
                     if ($remaining <= 0) break;
                 }
-
-                $request->merge(['amount' => $request->amount + $difference]);
             } else {
                 DB::rollBack();
                 return back()->withErrors([
-                    'error' => "Insufficient payment. Missing LKR " . number_format($difference, 2) . 
-                    " — No usable debit note found for this customer."
+                    'error' => "Insufficient payment. Missing LKR " . number_format($difference, 2) .
+                        " — No usable debit note found for this customer."
                 ]);
             }
         }
 
-        // ✅ Continue with your original bulk payment logic
+        // ✅ Create unique batch ID
         $batchId = uniqid('BATCH-');
-        $amountToDistribute = $request->amount - ($stampFee + $surchargeFee);
-        $firstPayment = true;
+
+        // ✅ Start distributing payments
+        $amountToDistribute = $cashPaid;
+        $lastInvoiceId = $invoices->last()->id; // mark last invoice
 
         foreach ($invoices as $invoice) {
             if ($amountToDistribute <= 0) break;
 
-            $balanceDue = $invoice->total_amount - $invoice->amount_paid;
+            $balanceDue = max($invoice->total_amount - $invoice->amount_paid, 0);
             $paymentAmount = min($amountToDistribute, $balanceDue);
 
             if ($paymentAmount > 0) {
+                // ✅ Apply fees only to the LAST invoice
+                $isLastInvoice = ($invoice->id === $lastInvoiceId);
+
                 $invoice->payments()->create([
                     'payment_date'         => $request->payment_date,
                     'amount'               => $paymentAmount,
@@ -222,27 +240,44 @@ public function storeBulk(Request $request): RedirectResponse
                     'cheque_number'        => $request->cheque_number,
                     'cheque_date'          => $request->cheque_date,
                     'cheque_received_date' => $request->cheque_received_date,
-                    'stamp_fee'            => $firstPayment ? $stampFee : 0,
-                    'surcharge_fee'        => $firstPayment ? $surchargeFee : 0,
+                    'stamp_fee'            => $isLastInvoice ? $stampFee : 0,
+                    'surcharge_fee'        => $isLastInvoice ? $surchargeFee : 0,
+                    'used_debit'           => $isLastInvoice ? $usedDebit : 0,
                 ]);
 
-                $invoice->amount_paid = $invoice->payments()->sum('amount');
-                $invoice->status = abs($invoice->amount_paid - $invoice->total_amount) < 0.01
-                    ? 'paid'
-                    : 'partially-paid';
+                // ✅ Update invoice balance
+                $invoice->amount_paid += $paymentAmount;
+                $totalCovered = $invoice->amount_paid;
+
+                // Add extra fees to totalCovered only for last invoice
+                if ($isLastInvoice) {
+                    $totalCovered += ($stampFee + $surchargeFee + $usedDebit);
+                }
+
+                // ✅ Update invoice status
+                if ($totalCovered >= $invoice->total_amount - 0.01) {
+                    $invoice->status = 'paid';
+                    $invoice->amount_paid = $invoice->total_amount;
+                } else {
+                    $invoice->status = 'partially-paid';
+                }
+
                 $invoice->save();
 
                 $amountToDistribute -= $paymentAmount;
-                $firstPayment = false;
             }
         }
 
         DB::commit();
+
+        // ✅ Redirect to receipt page
         return redirect()->route('payments.receipt', $batchId);
 
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
         DB::rollBack();
-        return back()->withErrors(['error' => 'An error occurred: ' . $e->getMessage()]);
+        return back()->withErrors([
+            'error' => 'An error occurred while processing payment: ' . $e->getMessage(),
+        ]);
     }
 }
 
@@ -279,6 +314,7 @@ public function showReceipt(string $batchId): View
 {
     $payments = Payment::with(['invoice.invoiceable', 'bank'])
         ->where('batch_id', $batchId)
+        ->orderBy('id')
         ->get();
 
     if ($payments->isEmpty()) {
@@ -287,55 +323,50 @@ public function showReceipt(string $batchId): View
 
     $invoiceable = $payments->first()->invoice->invoiceable;
 
-    $vatTotal    = $payments->filter(fn($p) => $p->invoice->is_vat_invoice)->sum('amount');
-    $nonVatTotal = $payments->filter(fn($p) => !$p->invoice->is_vat_invoice)->sum('amount');
+    // ✅ Calculate totals directly from DB
+    $vatTotal     = $payments->filter(fn($p) => $p->invoice->is_vat_invoice)->sum('amount');
+    $nonVatTotal  = $payments->filter(fn($p) => !$p->invoice->is_vat_invoice)->sum('amount');
+    $cashPaid     = $payments->sum('amount');
 
-    // ✅ Now directly from DB
-    $stampFee    = $payments->first()->stamp_fee ?? 0;
-    $surchargeFee = $payments->first()->surcharge_fee ?? 0;
+    // ✅ Take fees and debit from LAST payment (the one with extra adjustments)
+    $lastPayment  = $payments->last();
+    $stampFee     = $lastPayment->stamp_fee ?? 0;
+    $surchargeFee = $lastPayment->surcharge_fee ?? 0;
+    $usedDebit    = $lastPayment->used_debit ?? 0;
 
-    // Supplier Receipt
+    // ✅ Prepare data for view
+    $viewData = [
+        'payments'      => $payments,
+        'batchId'       => $batchId,
+        'vatTotal'      => $vatTotal,
+        'nonVatTotal'   => $nonVatTotal,
+        'cashPaid'      => $cashPaid,
+        'stampFee'      => $stampFee,
+        'surchargeFee'  => $surchargeFee,
+        'usedDebit'     => $usedDebit,
+    ];
+
+    // ✅ Route to correct receipt type
     if ($invoiceable instanceof \App\Models\Supplier) {
-        return view('payments.supplier_receipt', [
-            'payments'      => $payments,
-            'supplier'      => $invoiceable,
-            'batchId'       => $batchId,
-            'vatTotal'      => $vatTotal,
-            'nonVatTotal'   => $nonVatTotal,
-            'stampFee'      => $stampFee,
-            'surchargeFee'  => $surchargeFee,
-        ]);
+        return view('payments.supplier_receipt', array_merge($viewData, [
+            'supplier' => $invoiceable,
+        ]));
     }
 
-    // Agent Receipt
     if ($invoiceable instanceof \App\Models\Agent) {
-        return view('payments.agent_receipt', [
-            'payments'      => $payments,
-            'agent'         => $invoiceable,
-            'batchId'       => $batchId,
-            'vatTotal'      => $vatTotal,
-            'nonVatTotal'   => $nonVatTotal,
-            'stampFee'      => $stampFee,
-            'surchargeFee'  => $surchargeFee,
-        ]);
+        return view('payments.agent_receipt', array_merge($viewData, [
+            'agent' => $invoiceable,
+        ]));
     }
 
-    // Customer Receipt (default fallback)
     if ($invoiceable instanceof \App\Models\Customer) {
-        return view('payments.receipt', [
-            'payments'      => $payments,
-            'customer'      => $invoiceable,
-            'batchId'       => $batchId,
-            'vatTotal'      => $vatTotal,
-            'nonVatTotal'   => $nonVatTotal,
-            'stampFee'      => $stampFee,
-            'surchargeFee'  => $surchargeFee,
-        ]);
+        return view('payments.receipt', array_merge($viewData, [
+            'customer' => $invoiceable,
+        ]));
     }
 
     abort(404, 'Unsupported receipt type.');
 }
-
 
 
 

@@ -25,6 +25,7 @@ use App\Http\Controllers\CompanyDepartmentNameController;
 use App\Http\Controllers\ReturnNoteController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\GrnPoController;
+use App\Http\Controllers\DebitNoteController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -296,7 +297,30 @@ Route::prefix('reports')->middleware('auth')->group(function () {
     Route::get('return-notes/export-excel', [ReportController::class, 'exportReturnNotesExcel'])->name('reports.returnnotes.export.excel');
     Route::get('return-notes/export-pdf', [ReportController::class, 'exportReturnNotesPdf'])->name('reports.returnnotes.export.pdf');
 });
+    Route::get('/debit-notes', [DebitNoteController::class, 'index'])->name('debit-notes.index');
+    Route::get('/debit-notes/create', [DebitNoteController::class, 'create'])->name('debit-notes.create');
+    Route::post('/debit-notes', [DebitNoteController::class, 'store'])->name('debit-notes.store');
+    Route::get('/debit-notes/{debitNote}/edit', [DebitNoteController::class, 'edit'])->name('debit-notes.edit');
+    Route::put('/debit-notes/{debitNote}', [DebitNoteController::class, 'update'])->name('debit-notes.update');
+    Route::delete('/debit-notes/{debitNote}', [DebitNoteController::class, 'destroy'])->name('debit-notes.destroy');
 
+    // ===============================
+    // 🔹 CUSTOMER-SPECIFIC ENDPOINTS
+    // ===============================
+    
+    // Get total available debit note balance (used in Alpine fetch)
+    Route::get('/customers/{customer}/debit-balance', [DebitNoteController::class, 'balance'])
+        ->name('customers.debit-balance');
+
+    // (Optional) Get all debit notes for a customer
+    Route::get('/customers/{customer}/debit-notes', function (App\Models\Customer $customer) {
+        return response()->json([
+            'debit_notes' => $customer->debitNotes()
+                ->orderByDesc('issued_date')
+                ->select('debit_note_id', 'amount', 'used_amount', 'status', 'reason', 'issued_date')
+                ->get(),
+        ]);
+    })->name('customers.debit-notes.list');
 
 });
 
