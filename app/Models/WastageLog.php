@@ -15,6 +15,7 @@ class WastageLog extends Model
         'quantity',
         'stock_type',
         'reason',
+        'status',
     ];
 
     /**

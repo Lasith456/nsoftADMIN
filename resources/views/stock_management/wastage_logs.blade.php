@@ -31,7 +31,6 @@
         </div>
     @endif
 
-    <!-- 🧾 Wastage Table -->
     <table class="min-w-full bg-white border border-gray-300">
         <thead class="bg-gray-100">
             <tr>
@@ -57,16 +56,17 @@
                     </span>
                 </td>
                 <td class="p-2 text-center">
-                    @if ($log->status !== 'returned')
+                    @if ($log->stock_type === 'RN_wastage')
+                        <span class="text-gray-500 italic">Can't be Returned</span>
+                    @elseif ($log->status !== 'returned')
                         <form action="{{ route('stock.markReturned', $log->id) }}" method="POST" class="inline">
                             @csrf
-                            <!-- ✅ Return Icon -->
                             <button type="submit" title="Mark as Returned"
                                 class="text-blue-500 hover:text-blue-700 transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                     stroke-width="2" stroke="currentColor" class="w-6 h-6 inline">
+                                    stroke-width="2" stroke="currentColor" class="w-6 h-6 inline">
                                     <path stroke-linecap="round" stroke-linejoin="round"
-                                          d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 110 12h-3" />
+                                        d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 110 12h-3" />
                                 </svg>
                             </button>
                         </form>

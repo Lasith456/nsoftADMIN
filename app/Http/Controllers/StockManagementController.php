@@ -294,17 +294,15 @@ public function markAsReturned(WastageLog $log): RedirectResponse
         if ($log->status === 'returned') {
             return back()->with('info', 'This wastage has already been returned.');
         }
-
         // Update status
         $log->update(['status' => 'returned']);
-
         // Add back to the correct stock type
         $product = $log->product;
 
         if ($log->stock_type === 'clear') {
-            $product->increment('clear_stock', $log->quantity);
+            $product->increment('clear_stock_quantity', $log->quantity);
         } elseif ($log->stock_type === 'non-clear') {
-            $product->increment('non_clear_stock', $log->quantity);
+            $product->increment('non_clear_stock_quantity', $log->quantity);
         }
 
         return back()->with('success', 'Wastage returned and stock updated.');
