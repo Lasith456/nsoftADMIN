@@ -53,6 +53,10 @@ class Product extends Model
     {
         return $this->belongsTo(Department::class);
     }
+    public function productDepartmentWise()
+    {
+        return $this->hasMany(ProductDepartmentWise::class);
+    }
 
 
     public function supplier(): BelongsTo

@@ -5,7 +5,8 @@
      x-data="productForm({
          product: {{ json_encode($product) }},
          departments: {{ json_encode($departments) }},
-         companies: {{ json_encode($companies) }}
+         companies: {{ json_encode($companies) }},
+         companyDepartments: {{ json_encode($companyDepartments) }}
      })">
 
     <!-- ================= MODAL FOR NEW DEPARTMENT ================= -->
@@ -133,7 +134,8 @@
                     <datalist id="units">
                         <option value="Pieces"></option>
                         <option value="KG"></option>
-                        <option value="Litre"></option>
+                        <option value="Ltr"></option>
+                        <option value="NOS"></option>
                         <option value="Pack"></option>
                         <option value="Box"></option>
                         <option value="Bottle"></option>
@@ -154,30 +156,53 @@
                  x-data="companyCustomerPriceHandler({
                     companies: {{ json_encode($companies) }},
                     existingPrices: {{ json_encode($product->companyPrices()->get()) }},
-                    customerPrices: {{ json_encode($product->customerPrices()->get()) }}
+                    customerPrices: {{ json_encode($product->customerPrices()->get()) }},
+                    companyDepartments: {{ json_encode($companyDepartments) }},
+                    departments: {{ json_encode($departments) }}
                  })" x-init="init()">
 
-                <h3 class="text-lg font-semibold mb-2">Company and Customer Prices</h3>
+                <h3 class="text-lg font-semibold mb-2">Company-wise Departments & Prices</h3>
 
                 <template x-for="company in companyPrices" :key="company.id">
                     <div class="border border-gray-300 rounded-md mb-4 bg-gray-50 p-4">
-                        <div class="flex justify-between items-center mb-2">
-                            <h4 class="font-semibold text-gray-700" x-text="company.company_name"></h4>
-                            <label class="inline-flex items-center">
-                                <input type="checkbox" x-model="company.showCustomers" @change="loadCustomers(company)"
-                                       class="h-4 w-4 text-indigo-600 rounded">
-                                <span class="ml-2 text-sm">Show customer-specific prices</span>
-                            </label>
+                        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                            <!-- Company Name -->
+                            <h4 class="font-semibold text-gray-700 w-full md:w-1/4" x-text="company.company_name"></h4>
+
+                            <!-- Department Dropdown -->
+                            <div class="w-full md:w-1/4">
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Department</label>
+                                <select
+                                    :name="`company_departments[${company.id}][department_id]`"
+                                    class="block w-full border rounded-md px-2 py-1">
+                                    <option value="">-- Select Department --</option>
+                                    <template x-for="dept in departments" :key="dept.id">
+                                        <option :value="dept.id" x-text="dept.name"
+                                            :selected="dept.id == company.department_id"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <!-- Default Selling Price -->
+                            <div class="w-full md:w-1/4">
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Selling Price</label>
+                                <input type="number" step="0.01"
+                                       :name="`company_prices[${company.id}][selling_price]`"
+                                       x-model="company.selling_price"
+                                       class="block w-full border rounded-md px-2 py-1">
+                            </div>
+
+                            <!-- Checkbox -->
+                            <div class="w-full md:w-1/4 text-right mt-2 md:mt-0">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" x-model="company.showCustomers" @change="loadCustomers(company)"
+                                           class="h-4 w-4 text-indigo-600 rounded">
+                                    <span class="ml-2 text-sm">Customer prices</span>
+                                </label>
+                            </div>
                         </div>
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-600 mb-1">Default Selling Price</label>
-                            <input type="number" step="0.01"
-                                   :name="`company_prices[${company.id}][selling_price]`"
-                                   x-model="company.selling_price"
-                                   class="mt-1 block w-full border rounded-md px-2 py-1">
-                        </div>
-
+                        <!-- Customer Section -->
                         <template x-if="company.showCustomers">
                             <div class="mt-3">
                                 <template x-if="company.customers.length === 0">
@@ -313,6 +338,7 @@ document.addEventListener('alpine:init', () => {
     /* ---------- COMPANY + CUSTOMER PRICE HANDLER ---------- */
     Alpine.data('companyCustomerPriceHandler', (initialData) => ({
         companyPrices: [],
+        departments: initialData.departments,
 
         init() {
             const existingPrices = initialData.existingPrices.reduce((acc, p) => {
@@ -320,10 +346,16 @@ document.addEventListener('alpine:init', () => {
                 return acc;
             }, {});
 
+            const existingDepartments = (initialData.companyDepartments || []).reduce((acc, d) => {
+                acc[d.company_id] = d.department_id;
+                return acc;
+            }, {});
+
             this.companyPrices = initialData.companies.map(c => ({
                 id: c.id,
                 company_name: c.company_name,
                 selling_price: existingPrices[c.id] ?? '',
+                department_id: existingDepartments[c.id] ?? '',
                 showCustomers: false,
                 customers: []
             }));
@@ -344,9 +376,7 @@ document.addEventListener('alpine:init', () => {
                         };
                     });
                 })
-                .catch(() => {
-                    company.customers = [];
-                });
+                .catch(() => { company.customers = []; });
         },
     }));
 });

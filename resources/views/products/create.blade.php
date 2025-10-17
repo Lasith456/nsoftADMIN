@@ -133,7 +133,8 @@
                     <datalist id="units">
                         <option value="Pieces"></option>
                         <option value="KG"></option>
-                        <option value="Litre"></option>
+                        <option value="Ltr"></option>
+                        <option value="NOS"></option>
                         <option value="Pack"></option>
                         <option value="Box"></option>
                         <option value="Bottle"></option>
@@ -158,15 +159,32 @@
 
                 <template x-for="company in companyPrices" :key="company.id">
                     <div class="border border-gray-300 rounded-md mb-4 bg-gray-50 p-4">
-                        <div class="flex justify-between items-center mb-2">
-                            <h4 class="font-semibold text-gray-700" x-text="company.company_name"></h4>
-                            <label class="inline-flex items-center">
-                                <input type="checkbox" x-model="company.showCustomers" @change="loadCustomers(company)"
-                                       class="h-4 w-4 text-indigo-600 rounded">
-                                <span class="ml-2 text-sm">Show customer-specific prices</span>
-                            </label>
-                        </div>
+                        <div class="flex flex-wrap justify-between items-center mb-3">
+                            <!-- Company Name -->
+                            <h4 class="font-semibold text-gray-700 w-full md:w-1/3" x-text="company.company_name"></h4>
 
+                            <!-- Department Dropdown -->
+                            <div class="w-full md:w-1/3">
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Select Department</label>
+                                <select
+                                    :name="`company_departments[${company.id}][department_id]`"
+                                    class="block w-full border rounded-md px-2 py-1">
+                                    <option value="">-- Select Department --</option>
+                                    @foreach ($departments as $dept)
+                                        <option value="{{ $dept->id }}">{{ $dept->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <!-- Checkbox -->
+                            <div class="w-full md:w-1/3 text-right mt-2 md:mt-0">
+                                <label class="inline-flex items-center">
+                                    <input type="checkbox" x-model="company.showCustomers" @change="loadCustomers(company)"
+                                        class="h-4 w-4 text-indigo-600 rounded">
+                                    <span class="ml-2 text-sm">Show customer-specific prices</span>
+                                </label>
+                            </div>
+                        </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-600 mb-1">Default Selling Price</label>
                             <input type="number" step="0.01"

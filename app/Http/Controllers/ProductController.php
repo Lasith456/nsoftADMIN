@@ -114,6 +114,17 @@ class ProductController extends Controller
                     'selling_price' => $price['selling_price'] ?? 0,
                 ]);
             }
+
+            // Save company-wise department links
+            foreach ((array) $request->input('company_departments', []) as $companyId => $dept) {
+                if (!empty($dept['department_id'])) {
+                    $product->productDepartmentWise()->create([
+                        'company_id' => $companyId,
+                        'department_id' => $dept['department_id'],
+                    ]);
+                }
+            }
+
         });
 
         return redirect()
@@ -126,8 +137,17 @@ class ProductController extends Controller
     ============================================================ */
     public function show(Product $product): View
     {
+        // Load all required relations at once (Eager Loading)
+        $product->load([
+            'department',
+            'companyPrices.company',
+            'customerPrices.customer',
+            'productDepartmentWise.company',
+            'productDepartmentWise.department',
+        ]);
         return view('products.show', compact('product'));
     }
+
 
     /* ============================================================
        EDIT PRODUCT VIEW
@@ -136,7 +156,8 @@ class ProductController extends Controller
     {
         $departments = Department::orderBy('name')->get();
         $companies = Company::orderBy('company_name')->get();
-        return view('products.edit', compact('product', 'departments', 'companies'));
+        $companyDepartments = $product->productDepartmentWise()->get();
+        return view('products.edit', compact('product', 'departments', 'companies', 'companyDepartments'));
     }
 
     /* ============================================================
@@ -156,49 +177,76 @@ class ProductController extends Controller
             'company_prices.*.selling_price' => 'nullable|numeric|min:0',
             'customer_prices' => 'nullable|array',
             'customer_prices.*.selling_price' => 'nullable|numeric|min:0',
+            'company_departments' => 'nullable|array',
+            'company_departments.*.department_id' => 'nullable|exists:departments,id',
         ]);
 
-        // ✅ Handle missing or null units_per_case safely
+        // ✅ Safe handling for units per case
         $unitsPerCase = $request->product_type === 'pack'
             ? 1
-            : (int) $request->input('units_per_case', 1);
-
-        if ($unitsPerCase < 1) {
-            $unitsPerCase = 1;
-        }
+            : max(1, (int) $request->input('units_per_case', 1));
 
         DB::transaction(function () use ($request, $product, $unitsPerCase) {
-            // ✅ Update product details
+
+            /* =========================
+            🔹 1. Update main product
+            ==========================*/
             $product->update([
                 'name' => $request->name,
                 'appear_name' => $request->appear_name,
                 'department_id' => $request->department_id,
-                'units_per_case' => $unitsPerCase, // always at least 1
+                'units_per_case' => $unitsPerCase,
                 'unit_of_measure' => $request->unit_of_measure,
                 'reorder_qty' => $request->reorder_qty,
-                'is_active' => $request->has('is_active'),
-                'is_vat' => $request->has('is_vat'),
-                'is_clear' => $request->has('is_clear'),
-                'separate_department_invoice' => $request->has('separate_department_invoice'),
-                'discount' => $request->filled('discount') ? $request->discount : 0.00,
+                'is_active' => $request->boolean('is_active'),
+                'is_vat' => $request->boolean('is_vat'),
+                'is_clear' => $request->boolean('is_clear'),
+                'separate_department_invoice' => $request->boolean('separate_department_invoice'),
+                'discount' => $request->input('discount', 0.00),
             ]);
 
-            // ✅ Update or create company prices
-            foreach ((array) $request->company_prices as $companyId => $prices) {
-                $product->companyPrices()->updateOrCreate(
-                    ['company_id' => $companyId],
-                    [
-                        'selling_price' => $prices['selling_price'] ?? 0,
-                        'cost_price' => $prices['cost_price'] ?? null,
-                    ]
-                );
+
+            /* ======================================
+            🔹 2. Update / Create Company Prices
+            =======================================*/
+            foreach ((array) $request->input('company_prices', []) as $companyId => $prices) {
+                if (is_array($prices)) {
+                    $product->companyPrices()->updateOrCreate(
+                        ['company_id' => $companyId],
+                        [
+                            'selling_price' => $prices['selling_price'] ?? 0,
+                            'cost_price' => $prices['cost_price'] ?? null,
+                        ]
+                    );
+                }
             }
 
-            // ✅ Update or create customer-specific overrides
-            foreach ((array) $request->customer_prices as $customerId => $prices) {
-                $product->customerPrices()->updateOrCreate(
-                    ['customer_id' => $customerId],
-                    ['selling_price' => $prices['selling_price'] ?? 0]
+
+            /* =============================================
+            🔹 3. Update / Create Customer Price Overrides
+            ==============================================*/
+            foreach ((array) $request->input('customer_prices', []) as $customerId => $prices) {
+                if (is_array($prices)) {
+                    $product->customerPrices()->updateOrCreate(
+                        ['customer_id' => $customerId],
+                        ['selling_price' => $prices['selling_price'] ?? 0]
+                    );
+                }
+            }
+
+
+            /* ====================================================
+            🔹 4. Update / Create Company-wise Department Mapping
+            =====================================================*/
+            foreach ((array) $request->input('company_departments', []) as $companyId => $dept) {
+                $departmentId = $dept['department_id'] ?? null;
+
+                // Skip if department ID is missing or invalid
+                if (!$departmentId) continue;
+
+                $product->productDepartmentWise()->updateOrCreate(
+                    ['company_id' => $companyId],
+                    ['department_id' => $departmentId]
                 );
             }
         });
@@ -207,6 +255,7 @@ class ProductController extends Controller
             ->route('products.index')
             ->with('success', 'Product updated successfully.');
     }
+
 
     /* ============================================================
        DELETE PRODUCT

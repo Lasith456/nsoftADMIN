@@ -82,6 +82,11 @@
                 <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-200 mb-3">Company Wise Prices</h3>
 
                 @php
+                    $companyDepartments = $product->relationLoaded('productDepartmentWise')
+                        ? $product->productDepartmentWise
+                        : $product->productDepartmentWise()->with(['company', 'department'])->get();
+                @endphp
+                @php
                     $companyPrices = $product->relationLoaded('companyPrices')
                         ? $product->companyPrices
                         : $product->companyPrices()->with('company')->get();
@@ -95,15 +100,22 @@
                             <thead>
                                 <tr class="bg-gray-100 dark:bg-gray-700/40">
                                     <th class="p-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200">Company</th>
+                                    <th class="p-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200">Department</th>
                                     <th class="p-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200">Selling Price</th>
                                     <th class="p-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200">Updated</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($companyPrices as $row)
+                                    @php
+                                        $dept = $companyDepartments->firstWhere('company_id', $row->company_id);
+                                    @endphp
                                     <tr class="border-t border-gray-200 dark:border-gray-700">
                                         <td class="p-2 text-sm text-gray-900 dark:text-gray-200">
                                             {{ optional($row->company)->company_name ?? optional($row->company)->name ?? ('Company #'.$row->company_id) }}
+                                        </td>
+                                        <td class="p-2 text-sm text-gray-900 dark:text-gray-200">
+                                            {{ optional($dept?->department)->name ?? 'N/A' }}
                                         </td>
                                         <td class="p-2 text-sm text-gray-900 dark:text-gray-200">
                                             {{ number_format((float) $row->selling_price, 2) }}
