@@ -192,6 +192,7 @@
                         <li><a href="{{ route('reports.outstanding') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Outstanding Payments Report</a></li>
                         <li><a href="{{ route('reports.company.select') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Company Report</a></li>
                         <li><a href="{{ route('reports.companyOutstanding') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Customer Outstanding Report</a></li>
+                        <li><a href="{{ route('reports.returnnotes') }}" class="block rounded-md py-2 pr-2 pl-9 text-sm leading-6 text-gray-400 hover:bg-gray-800 hover:text-white">Return Note Report</a></li>
 
                     </ul>
                 </li>

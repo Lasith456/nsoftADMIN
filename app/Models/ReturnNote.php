@@ -23,6 +23,11 @@ class ReturnNote extends Model
         'created_by',
         'session_token'
     ];
+protected $casts = [
+    'return_date' => 'datetime',
+    'created_at'  => 'datetime',
+    'updated_at'  => 'datetime',
+];
 
     protected static function booted()
     {

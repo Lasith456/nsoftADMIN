@@ -291,6 +291,11 @@ Route::get('/grns/create/from-po/{grnpo}', [GrnController::class, 'createFromPo'
 
 // Keep this after
 Route::resource('grns', GrnController::class);
+Route::prefix('reports')->middleware('auth')->group(function () {
+    Route::get('return-notes', [ReportController::class, 'returnNoteReport'])->name('reports.returnnotes');
+    Route::get('return-notes/export-excel', [ReportController::class, 'exportReturnNotesExcel'])->name('reports.returnnotes.export.excel');
+    Route::get('return-notes/export-pdf', [ReportController::class, 'exportReturnNotesPdf'])->name('reports.returnnotes.export.pdf');
+});
 
 
 });

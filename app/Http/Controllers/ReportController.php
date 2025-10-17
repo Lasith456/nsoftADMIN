@@ -1535,6 +1535,118 @@ public function exportCompanyOutstandingPdf(Request $request)
 
     return $pdf->download('customer_outstanding_report.pdf');
 }
+public function returnNoteReport(Request $request): View
+{
+    $query = \App\Models\ReturnNote::with(['company', 'customer', 'agent', 'receiveNote', 'product']);
+
+    // ✅ Filters
+    if ($request->filled('company_id')) {
+        $query->where('company_id', $request->company_id);
+    }
+    if ($request->filled('customer_id')) {
+        $query->where('customer_id', $request->customer_id);
+    }
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('start_date')) {
+        $query->whereDate('return_date', '>=', $request->start_date);
+    }
+    if ($request->filled('end_date')) {
+        $query->whereDate('return_date', '<=', $request->end_date);
+    }
+
+    $returnNotes = $query->latest()->paginate(15)->withQueryString();
+
+    // Dropdown data
+    $companies = \App\Models\Company::orderBy('company_name')->get();
+    $customers = \App\Models\Customer::orderBy('customer_name')->get();
+
+    return view('reports.return_note_report', compact('returnNotes', 'companies', 'customers'));
+}
+public function exportReturnNotesExcel(Request $request)
+{
+    $query = \App\Models\ReturnNote::with(['company', 'customer', 'agent', 'receiveNote', 'product']);
+
+    // Apply filters
+    if ($request->filled('company_id')) {
+        $query->where('company_id', $request->company_id);
+    }
+    if ($request->filled('customer_id')) {
+        $query->where('customer_id', $request->customer_id);
+    }
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('start_date')) {
+        $query->whereDate('return_date', '>=', $request->start_date);
+    }
+    if ($request->filled('end_date')) {
+        $query->whereDate('return_date', '<=', $request->end_date);
+    }
+
+    $returnNotes = $query->get();
+
+    return \Maatwebsite\Excel\Facades\Excel::download(new class($returnNotes) implements 
+        \Maatwebsite\Excel\Concerns\FromCollection,
+        \Maatwebsite\Excel\Concerns\WithHeadings
+    {
+        private $returnNotes;
+        public function __construct($returnNotes) { $this->returnNotes = $returnNotes; }
+
+        public function collection()
+        {
+            return $this->returnNotes->map(fn($rn) => [
+                'Return Note ID' => $rn->return_note_id,
+                'Company'        => $rn->company->company_name ?? '-',
+                'Customer'       => $rn->customer->customer_name ?? '-',
+                'Agent'          => $rn->agent->name ?? '-',
+                'Product'        => $rn->product->name ?? '-',
+                'Quantity'       => $rn->quantity,
+                'Receive Note'   => $rn->receiveNote->receive_note_id ?? '-',
+                'Reason'         => $rn->reason ?? '-',
+                'Return Date'    => optional($rn->return_date)->format('Y-m-d') ?? '-',
+                'Status'         => ucfirst($rn->status),
+            ]);
+        }
+
+        public function headings(): array
+        {
+            return [
+                'Return Note ID', 'Company', 'Customer', 'Agent', 'Product',
+                'Quantity', 'Receive Note', 'Reason', 'Return Date', 'Status'
+            ];
+        }
+    }, 'return_note_report.xlsx');
+}
+public function exportReturnNotesPdf(Request $request)
+{
+    $query = \App\Models\ReturnNote::with(['company', 'customer', 'agent', 'receiveNote', 'product']);
+
+    // Apply filters
+    if ($request->filled('company_id')) {
+        $query->where('company_id', $request->company_id);
+    }
+    if ($request->filled('customer_id')) {
+        $query->where('customer_id', $request->customer_id);
+    }
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+    if ($request->filled('start_date')) {
+        $query->whereDate('return_date', '>=', $request->start_date);
+    }
+    if ($request->filled('end_date')) {
+        $query->whereDate('return_date', '<=', $request->end_date);
+    }
+
+    $returnNotes = $query->get();
+
+    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.pdf.return_note_report', compact('returnNotes'))
+            ->setPaper('a4', 'landscape');
+
+    return $pdf->download('return_note_report.pdf');
+}
 
 
 }
