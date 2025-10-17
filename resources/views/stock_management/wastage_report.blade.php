@@ -31,7 +31,7 @@
     </div>
 
     {{-- Filters --}}
-    <form method="GET" action="{{ route('stock.wastage.report') }}" class="mb-4 grid grid-cols-1 md:grid-cols-5 gap-4">
+    <form method="GET" action="{{ route('stock.wastage.report') }}" class="mb-4 grid grid-cols-1 md:grid-cols-7 gap-4">
         <select name="product_id" class="border border-gray-300 rounded-md p-2 text-sm text-black">
             <option value="">All Products</option>
             @foreach($products as $product)
@@ -50,14 +50,30 @@
             @endforeach
         </select>
 
+        {{-- 🆕 Stock Type Filter --}}
+        <select name="stock_type" class="border border-gray-300 rounded-md p-2 text-sm text-black">
+            <option value="">All Stock Types</option>
+            <option value="clear" @selected(request('stock_type') == 'clear')>Clear</option>
+            <option value="non-clear" @selected(request('stock_type') == 'non-clear')>Non-Clear</option>
+            <option value="RN_wastage" @selected(request('stock_type') == 'RN_wastage')>RN Wastage</option>
+        </select>
+
+        {{-- 🆕 Status Filter --}}
+        <select name="status" class="border border-gray-300 rounded-md p-2 text-sm text-black">
+            <option value="">All Status</option>
+            <option value="pending" @selected(request('status') == 'pending')>Pending</option>
+            <option value="returned" @selected(request('status') == 'returned')>Returned</option>
+        </select>
+
         <input type="date" name="from_date" value="{{ request('from_date') }}"
-               class="border border-gray-300 rounded-md p-2 text-sm text-black">
+            class="border border-gray-300 rounded-md p-2 text-sm text-black">
 
         <input type="date" name="to_date" value="{{ request('to_date') }}"
-               class="border border-gray-300 rounded-md p-2 text-sm text-black">
+            class="border border-gray-300 rounded-md p-2 text-sm text-black">
 
         <button class="bg-blue-600 text-white px-4 py-2 rounded text-xs font-semibold hover:bg-blue-700">Filter</button>
     </form>
+
 
     {{-- Table --}}
     <div class="overflow-x-auto">

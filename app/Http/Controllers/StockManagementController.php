@@ -162,6 +162,13 @@ class StockManagementController extends Controller
         if ($request->filled('to_date')) {
             $query->whereDate('created_at', '<=', $request->to_date);
         }
+        if ($request->filled('stock_type')) {
+            $query->where('stock_type', $request->stock_type);
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
 
         $logs = $query->get();
 
@@ -190,7 +197,12 @@ class StockManagementController extends Controller
         if ($request->filled('to_date')) {
             $query->whereDate('created_at', '<=', $request->to_date);
         }
-
+        if ($request->filled('stock_type')) {
+            $query->where('stock_type', $request->stock_type);
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
         $wastageLogs = $query->paginate(20);
         $products = Product::orderBy('name')->get();
         $departments = Department::orderBy('name')->get();
