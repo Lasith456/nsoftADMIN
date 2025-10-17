@@ -604,115 +604,168 @@ private function getInvoiceGroupLabel($key)
 
 
 
-    public function createAgentInvoice(): View
-    {
-        $agents = Agent::whereHas('deliveryItems', function ($query) {
-            $query->where('agent_invoiced', false);
-        })->with(['deliveryItems' => function ($query) {
+public function createAgentInvoice(): View
+{
+    // ✅ Fetch agents with at least one uninvoiced item that is received into stock
+    $agents = Agent::whereHas('deliveryItems', function ($query) {
             $query->where('agent_invoiced', false)
-                ->with(['deliveryNote', 'product']);
-        }])->get();
-        foreach ($agents as $agent) {
-            foreach ($agent->deliveryItems as $item) {
-                $qty = \App\Models\InvoiceItem::where('product_id', $item->product_id)
-                    ->whereHas('invoice.receiveNotes.deliveryNotes.items', function ($q) use ($item) {
-                        $q->where('id', $item->id);
-                    })
-                    ->sum('quantity');
+                  ->whereNotNull('agent_id')
+                  // ✅ Only include items that have been received into stock
+                  ->whereExists(function ($sub) {
+                      $sub->select(DB::raw(1))
+                          ->from('receive_note_items')
+                          ->whereColumn('receive_note_items.product_id', 'delivery_note_items.product_id')
+                          ->whereColumn('receive_note_items.purchase_order_id', 'delivery_note_items.purchase_order_id');
+                  });
+        })
+        ->with(['deliveryItems' => function ($query) {
+            $query->where('agent_invoiced', false)
+                  ->whereNotNull('agent_id')
+                  ->with(['deliveryNote', 'product'])
+                  // ✅ Only include items that are received into stock
+                  ->whereExists(function ($sub) {
+                      $sub->select(DB::raw(1))
+                          ->from('receive_note_items')
+                          ->whereColumn('receive_note_items.product_id', 'delivery_note_items.product_id')
+                          ->whereColumn('receive_note_items.purchase_order_id', 'delivery_note_items.purchase_order_id');
+                  });
+        }])
+        ->get();
 
-                $item->to_invoice_qty = $qty;
-            }
+    // ✅ Calculate pending quantities for each item
+    foreach ($agents as $agent) {
+        foreach ($agent->deliveryItems as $item) {
+            $alreadyInvoicedQty = InvoiceItem::where('product_id', $item->product_id)
+                ->whereHas('invoice.receiveNotes.deliveryNotes.items', function ($q) use ($item) {
+                    $q->where('id', $item->id);
+                })
+                ->sum('quantity');
+
+            $item->to_invoice_qty = max(0, $item->quantity_from_agent - $alreadyInvoicedQty);
         }
-
-        return view('invoices.create_agent_invoice', compact('agents'));
     }
+
+    return view('invoices.create_agent_invoice', compact('agents'));
+}
+
 
     public function storeAgentInvoice(Request $request): RedirectResponse
-    {
-        $validated = $request->validate([
-            'agent_id'            => 'required|exists:agents,id',
-            'delivery_item_ids'   => 'required|array|min:1',
-            'delivery_item_ids.*' => 'exists:delivery_note_items,id',
+{
+    $validated = $request->validate([
+        'agent_id'            => 'required|exists:agents,id',
+        'delivery_item_ids'   => 'required|array|min:1',
+        'delivery_item_ids.*' => 'exists:delivery_note_items,id',
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+        $agent = Agent::findOrFail($validated['agent_id']);
+
+        // ✅ Fetch uninvoiced items for that agent only
+        $itemsToInvoice = DeliveryNoteItem::where('agent_id', $agent->id)
+            ->where('quantity_from_agent', '>', 0)
+            ->where('agent_invoiced', false)
+            ->whereIn('id', $validated['delivery_item_ids'])
+            ->with(['deliveryNote.receiveNotes', 'product', 'agent'])
+            ->get();
+
+        if ($itemsToInvoice->isEmpty()) {
+            return back()->withErrors(['error' => 'No pending items found for the selected delivery notes.']);
+        }
+
+        // ✅ Check for Receive Note discrepancies
+        $discrepancyItems = $itemsToInvoice->filter(function ($item) {
+            return $item->deliveryNote->receiveNotes
+                ->contains(fn($rn) => $rn->status === 'discrepancy');
+        });
+
+        if ($discrepancyItems->isNotEmpty()) {
+            $blockedList = $discrepancyItems
+                ->map(fn($i) => "DN {$i->deliveryNote->delivery_note_id} / Product {$i->product?->name}")
+                ->implode('<br>');
+
+            return back()->withErrors([
+                'error' => "Cannot generate Agent Invoice because some linked Receive Notes have discrepancies:<br>{$blockedList}"
+            ]);
+        }
+
+        // ✅ Ensure all selected items were actually received into stock
+        $unreceivedItems = $itemsToInvoice->filter(function ($item) {
+            return !\App\Models\ReceiveNoteItem::where('product_id', $item->product_id)
+                ->where('purchase_order_id', $item->purchase_order_id)
+                ->exists();
+        });
+
+        if ($unreceivedItems->isNotEmpty()) {
+            $list = $unreceivedItems
+                ->map(fn($i) => "DN {$i->deliveryNote->delivery_note_id} / Product {$i->product?->name}")
+                ->implode('<br>');
+
+            return back()->withErrors([
+                'error' => "Cannot generate Agent Invoice because some items were not yet received into stock:<br>{$list}"
+            ]);
+        }
+
+        // ✅ Compute totals and prepare invoice items
+        $totalAmount = 0;
+        $invoiceItemsData = [];
+
+        foreach ($itemsToInvoice as $item) {
+            $pivot = $item->agent->products()
+                ->where('products.id', $item->product_id)
+                ->first();
+
+            if (!$pivot || is_null($pivot->pivot->price_per_case)) {
+                throw new \Exception("No price_per_case found for Agent {$item->agent->name} and Product {$item->product?->name}");
+            }
+
+            $unitPrice = $pivot->pivot->price_per_case;
+            $lineTotal = $unitPrice * $item->quantity_from_agent;
+
+            $invoiceItemsData[] = [
+                'description' => "Fulfilled Shortage: {$item->quantity_from_agent} × " .
+                                ($item->product?->name ?? $item->product_name) .
+                                " for DN-{$item->deliveryNote->delivery_note_id}",
+                'quantity'   => $item->quantity_from_agent,
+                'unit_price' => $unitPrice,
+                'total'      => $lineTotal,
+            ];
+
+            $totalAmount += $lineTotal;
+        }
+
+        // ✅ Create invoice header
+        $invoice = $agent->invoices()->create([
+            'invoice_id'     => 'INV_AGENT-' . strtoupper(Str::random(6)),
+            'due_date'       => now()->addDays(30),
+            'sub_total'      => $totalAmount,
+            'vat_percentage' => 0,
+            'vat_amount'     => 0,
+            'total_amount'   => $totalAmount,
+            'status'         => 'unpaid',
+            'is_vat_invoice' => false,
         ]);
 
-        DB::beginTransaction();
-        try {
-            $agent = Agent::findOrFail($validated['agent_id']);
-            $itemsToInvoice = DeliveryNoteItem::where('agent_id', $agent->id)
-                ->where('quantity_from_agent', '>', 0)
-                ->where('agent_invoiced', false)
-                ->whereIn('id', $validated['delivery_item_ids'])
-                ->with(['deliveryNote.receiveNotes', 'product', 'agent'])
-                ->get();
+        // ✅ Attach invoice items
+        $invoice->items()->createMany($invoiceItemsData);
 
-            if ($itemsToInvoice->isEmpty()) {
-                return back()->withErrors(['error' => 'No pending items found for the selected delivery notes.']);
-            }
-            $discrepancyItems = $itemsToInvoice->filter(function ($item) {
-                return $item->deliveryNote
-                    ->receiveNotes
-                    ->contains(fn($rn) => $rn->status === 'discrepancy');
-            });
+        // ✅ Mark delivery items as invoiced
+        DeliveryNoteItem::whereIn('id', $itemsToInvoice->pluck('id'))
+            ->update(['agent_invoiced' => true]);
 
-            if ($discrepancyItems->isNotEmpty()) {
-                $blockedList = $discrepancyItems
-                    ->map(fn($i) => "DN {$i->deliveryNote->delivery_note_id} / Product {$i->product?->name}")
-                    ->implode('<br>');
+        DB::commit();
 
-                return back()->withErrors([
-                    'error' => "Cannot generate Agent Invoice because some linked Receive Notes have discrepancies:<br>{$blockedList}"
-                ]);
-            }
-            $totalAmount = 0;
-            $invoiceItemsData = [];
+        return redirect()->route('invoices.show', $invoice->id)
+            ->with('success', 'Agent invoice generated successfully.');
 
-            foreach ($itemsToInvoice as $item) {
-                $pivot = $item->agent->products()
-                    ->where('products.id', $item->product_id)
-                    ->first();
-
-                if (!$pivot || is_null($pivot->pivot->price_per_case)) {
-                    throw new \Exception("No price_per_case found for Agent {$item->agent->id} and Product {$item->product_id}");
-                }
-
-                $unitPrice = $pivot->pivot->price_per_case;
-                $total     = $unitPrice * $item->quantity_from_agent;
-
-                $invoiceItemsData[] = [
-                    'description' => "Fulfilled Shortage: {$item->quantity_from_agent} x " .
-                                    ($item->product?->name ?? $item->product_name) .
-                                    " for DN-{$item->deliveryNote->delivery_note_id}",
-                    'quantity'   => $item->quantity_from_agent,
-                    'unit_price' => $unitPrice,
-                    'total'      => $total,
-                ];
-
-                $totalAmount += $total;
-            }
-            $invoice = $agent->invoices()->create([
-                'invoice_id'     => 'INV_AGENT-' . strtoupper(Str::random(6)),
-                'due_date'       => now()->addDays(30),
-                'sub_total'      => $totalAmount,
-                'vat_percentage' => 0,
-                'vat_amount'     => 0,
-                'total_amount'   => $totalAmount,
-                'status'         => 'unpaid',
-                'is_vat_invoice' => false,
-            ]);
-
-            $invoice->items()->createMany($invoiceItemsData);
-            DeliveryNoteItem::whereIn('id', $itemsToInvoice->pluck('id'))
-                ->update(['agent_invoiced' => true]);
-
-            DB::commit();
-
-            return redirect()->route('invoices.show', $invoice->id)
-                ->with('success', 'Agent invoice generated successfully.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->withInput()->withErrors(['error' => $e->getMessage()]);
-        }
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->withInput()->withErrors([
+            'error' => 'Error generating invoice: ' . $e->getMessage()
+        ]);
     }
+}
 
 //Bill Show NAVY
     public function showOpt2($id)
@@ -721,17 +774,73 @@ private function getInvoiceGroupLabel($key)
         return view('invoices.showopt2', compact('invoice'));
     }
     
-    public function printInvoice($id)
-    {
-        $invoice = Invoice::with('items')->findOrFail($id);
-    if (!$invoice->invoice_date && $invoice->created_at) {
-            $invoice->invoice_date = $invoice->created_at;
-        }
-        $invoice->amount_in_words = $this->convertToWords($invoice->total_amount);
+public function printInvoice($id)
+{
+    // ✅ Load all essential relationships in one go
+    $invoice = Invoice::with([
+        'items.product.category',
+        'items.product.department',
+        'items.purchaseOrder.deliveryNotes.receiveNotes',
+        'invoiceable',
+    ])->findOrFail($id);
 
-        return view('invoices.printopt3', compact('invoice'));
+    // ✅ Ensure invoice date is set
+    if (!$invoice->invoice_date && $invoice->created_at) {
+        $invoice->invoice_date = $invoice->created_at;
     }
 
+    // ✅ Convert numeric total to words (e.g., "Two Hundred Fifty Rupees Only")
+    $invoice->amount_in_words = $this->convertToWords($invoice->total_amount);
+
+    // ✅ Derive PO date range (covers multi-PO invoices)
+    $poDates = $invoice->items
+        ->filter(fn($item) => $item->purchaseOrder)
+        ->pluck('purchaseOrder')
+        ->unique('id')
+        ->map(fn($po) => [
+            'start' => $po->po_start_date,
+            'end'   => $po->po_end_date,
+        ]);
+
+    $invoice->po_start_date = $poDates->min('start');
+    $invoice->po_end_date   = $poDates->max('end');
+
+    // ✅ Group items by department or category for printing
+    $groupedItems = $invoice->items->groupBy(function ($item) use ($invoice) {
+        $product = $item->product;
+        $po = $item->purchaseOrder;
+        $companyId = $invoice->invoiceable?->company_id ?? null;
+
+        // --- Determine department/category name ---
+        if ($po?->is_categorized) {
+            $name = $product?->category?->name
+                ?? $po?->category?->name
+                ?? 'CATEGORY';
+        } else {
+            $dept = $product?->department ?? $po?->department;
+
+            // Check company-specific naming
+            $customDept = \App\Models\ProductDepartmentWise::where('product_id', $product?->id)
+                ->where('company_id', $companyId)
+                ->with('department')
+                ->first()?->department?->name;
+
+            $appearName = \App\Models\CompanyDepartmentName::where('company_id', $companyId)
+                ->where('department_id', $dept?->id)
+                ->value('appear_name');
+
+            $name = $customDept ?: ($appearName ?: ($dept?->name ?? 'GENERAL'));
+        }
+
+        return strtoupper("SUPPLY OF {$name}");
+    });
+
+    // ✅ Return data to bilingual print view
+    return view('invoices.printopt3', [
+        'invoice' => $invoice,
+        'groupedItems' => $groupedItems,
+    ]);
+}
 
     private function convertToWords($number)
     {

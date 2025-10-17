@@ -152,7 +152,7 @@
                         <!-- Curly brace -->
                         <div class="text-3xl font-bold leading-none mx-3">}</div>
                         <!-- Number block: keep small, fixed width -->
-                        <div class="text-center flex-shrink-0 font-semibold text-[11px] dotted-fill">Koggala</div>
+                        <div class="text-center flex-shrink-0 font-semibold text-[11px] dotted-fill">{{ $invoice->invoiceable->customer_name }}</div>
                     </div>
                 </div>
 
@@ -180,7 +180,7 @@
                         <!-- Curly brace -->
                         <div class="text-3xl font-bold leading-none mx-3">}</div>
                         <!-- Number block: keep small, fixed width -->
-                        <div class="text-center flex-shrink-0 font-semibold text-[11px] dotted-fill">16/09/2025</div>
+                        <div class="text-center flex-shrink-0 font-semibold text-[11px] dotted-fill">{{ optional($invoice->invoice_date)->format('d/m/Y') }}</div>
                     </div>
                 </div>
             </div>
@@ -333,7 +333,7 @@
                                     <span class="block">இந்த பட்டியலை ஏற்றுக்கொள்ளும் ஒப்பந்தக்காரரின் தொடர் எண் </span>
                                 </div>
                                 <div class="text-3xl font-bold leading-none">}</div>
-                                <div class="font-semibold text-[11px] dotted-fill">5216 AF</div>
+                                <div class="font-semibold text-[11px] dotted-fill">{{ $invoice->invoice_id }}</div>
                             </div>
                         </td>
                     </tr>
@@ -358,41 +358,111 @@
     </div>
 
     <!-- ================= ITEM TABLE ================= -->
-    <table class="w-full border-collapse border border-black text-[10px]">
-        <thead>
+<table class="w-full border-collapse border border-black text-[10px] leading-tight">
+    <thead>
+        <tr class="bg-gray-100">
+            <th class="border border-black p-1 text-center">සැපයූ දිනය<br>வழங்கப்பட்ட தேதி</th>
+            <th class="border border-black p-1 text-center">සැපයීම් හා පරීක්ෂා කිරීම් පත් අංකය<br>வழங்கிடும் பரிசோதனை பத்திர இலக்கம்</th>
+            <th class="border border-black p-1 text-center">ඉන්වොයිස් අංකය<br>விலைப்பட்டியல் எண்</th>
+            <th class="border border-black p-1 text-center">කොන්ත්‍රාත් භාණ්ඩ අංකය<br>ஒப்பந்த பொருள் எண்</th>
+            <th class="border border-black p-1 text-center">භාණ්ඩ විස්තරය හෝ සේවාවේ විස්තරය<br>பொருள் / சேவை விவரம்</th>
+            <th class="border border-black p-1 text-center">ප්‍රමාණය<br>அளவு</th>
+            <th class="border border-black p-1 text-center">එකක මිල<br>ஒன்றின் விலை</th>
+            <th class="border border-black p-1 text-center">මුදල<br>தொகை</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        @foreach($invoice->items as $item)
+@php
+    $po = $item->purchaseOrder;
+    $product = $item->product;
+
+    // ✅ Supply date range (handle single or multiple POs gracefully)
+    $fromDate = $po?->po_start_date ? \Carbon\Carbon::parse($po->po_start_date)->format('d/m/Y') : '-';
+    $toDate   = $po?->po_end_date ? \Carbon\Carbon::parse($po->po_end_date)->format('d/m/Y') : '-';
+
+    // ✅ Collect linked delivery notes and receive notes properly
+    $deliveryIds = $po?->deliveryNotes?->pluck('delivery_note_id')->filter()->implode(', ') ?? '-';
+    $receiveIds  = $po?->deliveryNotes
+        ?->flatMap(fn($dn) => $dn->receiveNotes)
+        ->pluck('receive_note_id')
+        ->filter()
+        ->implode(', ') ?? '-';
+
+    // ✅ Contract number (fallback to product field)
+    $contractNo = $product?->contract_no ?? '-';
+@endphp
+
+
             <tr>
-                <th class="border border-black p-1">සැපයූ දිනය <br>வழங்கப்பட்ட தேதி</th>
-                <th class="border border-black p-1">සැපයීම් හා පරීක්ෂා කිරීම් පත් අංකය <br>வழங்கிடும் பரிசோதைப் பத்திரத்தின் இலக்கம் </th>
-                <th class="border border-black p-1">ඉන්වොයිස් පත්‍ර අංකය <br>வஅனுப்பும் பொருள் எண்</th>
-                <th class="border border-black p-1">කොන්ත්‍රාත්‍තු භාණ්ඩ අංකය <br>ஒப்பந்த பொருள்களின் இலக்கம் </th>
-                <th class="border border-black p-1">භාණ්ඩ විස්තරය හෝ සේවාවේ විස්තරය <br>பொருள்களின் விளக்கம் அல்லது சேவை விளக்கம்</th>
-                <th class="border border-black p-1">ප්‍රමාණය <br>அளவு</th>
-                <th class="border border-black p-1">එකක මිළ <br>ஒன்றின் விலை</th>
-                <th class="border border-black p-1">මුදල <br>தொகை</th>
+{{-- 1. Supply Date --}}
+    <td class="border border-black p-1 text-center">
+        From {{ $fromDate }} <br> To {{ $toDate }}
+    </td>
+
+
+                {{-- 2. Delivery & Inspection Notes --}}
+                <td class="border border-black p-1 text-center">
+                    @if($deliveryIds)
+                        DN: {{ $deliveryIds }}
+                    @endif
+                    @if($receiveIds)
+                        <br> RN: {{ $receiveIds }}
+                    @endif
+                </td>
+
+                {{-- 3. Invoice Item No --}}
+                <td class="border border-black p-1 text-center">{{ $invoice->invoice_id }}</td>
+
+                {{-- 4. Contract Item No --}}
+                <td class="border border-black p-1 text-center">
+                    {{ $product?->contract_no ?? '-' }}
+                </td>
+
+                {{-- 5. Product / Service Description --}}
+                <td class="border border-black p-1">
+                    {{ $item->description ?? $product?->name ?? 'N/A' }}
+                </td>
+
+                {{-- 6. Quantity --}}
+                <td class="border border-black p-1 text-right">
+                    {{ number_format($item->quantity, 2) }}
+                </td>
+
+                {{-- 7. Unit Price --}}
+                <td class="border border-black p-1 text-right">
+                    {{ number_format($item->unit_price, 2) }}
+                </td>
+
+                {{-- 8. Amount --}}
+                <td class="border border-black p-1 text-right">
+                    {{ number_format($item->total, 2) }}
+                </td>
             </tr>
-        </thead>
-        <tbody>
-            @foreach($invoice->items as $item)
-                <tr>
-                    <td class="border border-black p-1 text-center">
-                        From {{ $item->from_date }} <br> To {{ $item->to_date }}
-                    </td>
-                    <td class="border border-black p-1">{{ $item->description }}</td>
-                    <td class="border border-black p-1 text-right">{{ $item->quantity }}</td>
-                    <td class="border border-black p-1 text-right">{{ number_format($item->unit_price, 2) }}</td>
-                    <td class="border border-black p-1 text-right">{{ number_format($item->amount, 2) }}</td>
-                </tr>
-            @endforeach
-            <tr>
-                <td colspan="4" class="border border-black p-1 text-right"><b>VAT {{ $invoice->vat_rate }}%</b></td>
-                <td class="border border-black p-1 text-right">{{ number_format($invoice->vat_amount, 2) }}</td>
-            </tr>
-            <tr>
-                <td colspan="4" class="border border-black p-1 text-right"><b>Total</b></td>
-                <td class="border border-black p-1 text-right font-bold">{{ number_format($invoice->total_amount, 2) }}</td>
-            </tr>
-        </tbody>
-    </table>
+        @endforeach
+
+        {{-- VAT Row --}}
+        <tr class="font-semibold bg-gray-50">
+            <td colspan="7" class="border border-black p-1 text-right">
+                VAT {{ $invoice->vat_percentage }}%
+            </td>
+            <td class="border border-black p-1 text-right">
+                {{ number_format($invoice->vat_amount, 2) }}
+            </td>
+        </tr>
+
+        {{-- Grand Total Row --}}
+        <tr class="font-bold bg-gray-100">
+            <td colspan="7" class="border border-black p-1 text-right">
+                TOTAL
+            </td>
+            <td class="border border-black p-1 text-right">
+                {{ number_format($invoice->total_amount, 2) }}
+            </td>
+        </tr>
+    </tbody>
+</table>
 
     <!-- ================= AMOUNT IN WORDS ================= -->
     <p class="mt-2 text-[10.5px]">
