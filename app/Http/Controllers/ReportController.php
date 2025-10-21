@@ -276,11 +276,16 @@ public function receiveNoteReport(Request $request): View
     
     public function stockLevelReport(Request $request): View
     {
-        $query = Product::query();
+        $query = \App\Models\Product::query();
 
-        // Filter by department
+        // ✅ Filter by department
         if ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
+        }
+
+        // ✅ Filter by product name (partial match)
+        if ($request->filled('product_name')) {
+            $query->where('name', 'like', '%' . $request->product_name . '%');
         }
 
         $products = $query->orderBy('name')->paginate(15)->withQueryString();
@@ -288,6 +293,7 @@ public function receiveNoteReport(Request $request): View
 
         return view('reports.stock_level_report', compact('products', 'departments'));
     }
+
 
 
     public function orderFlowReport(Request $request): View
@@ -542,53 +548,71 @@ public function outstandingPayments(Request $request)
     }
     public function exportStockLevelExcel(Request $request)
     {
-        $query = Product::query();
+        $query = \App\Models\Product::query();
 
+        // ✅ Filter by department
         if ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
 
+        // ✅ Filter by product name (partial match)
+        if ($request->filled('product_name')) {
+            $query->where('name', 'like', '%' . $request->product_name . '%');
+        }
+
         $products = $query->orderBy('name')->get();
 
-        return Excel::download(new class($products) implements \Maatwebsite\Excel\Concerns\FromCollection,
-                                                        \Maatwebsite\Excel\Concerns\WithHeadings {
-            private $products;
-            public function __construct($products) { $this->products = $products; }
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new class($products) implements \Maatwebsite\Excel\Concerns\FromCollection,
+                                        \Maatwebsite\Excel\Concerns\WithHeadings {
+                private $products;
+                public function __construct($products) { $this->products = $products; }
 
-            public function collection() {
-                return $this->products->map(fn($p) => [
-                    'Product Name'    => $p->name,
-                    'Clear Stock'     => $p->clear_stock_quantity,
-                    'Non-Clear Stock' => $p->non_clear_stock_quantity,
-                    'Total Stock'     => $p->total_stock,
-                ]);
-            }
+                public function collection() {
+                    return $this->products->map(fn($p) => [
+                        'Product Name'    => $p->name,
+                        'Clear Stock'     => $p->clear_stock_quantity,
+                        'Non-Clear Stock' => $p->non_clear_stock_quantity,
+                        'Total Stock'     => $p->total_stock,
+                    ]);
+                }
 
-            public function headings(): array {
-                return ['Product Name', 'Clear Stock', 'Non-Clear Stock', 'Total Stock'];
-            }
-        }, 'stock_level_report.xlsx');
+                public function headings(): array {
+                    return ['Product Name', 'Clear Stock', 'Non-Clear Stock', 'Total Stock'];
+                }
+            },
+            'stock_level_report.xlsx'
+        );
     }
 
     public function exportStockLevelPdf(Request $request)
     {
-        $query = Product::query();
+        $query = \App\Models\Product::query();
 
+        // ✅ Filter by department
         if ($request->filled('department_id')) {
             $query->where('department_id', $request->department_id);
         }
 
+        // ✅ Filter by product name
+        if ($request->filled('product_name')) {
+            $query->where('name', 'like', '%' . $request->product_name . '%');
+        }
+
         $products = $query->orderBy('name')->get();
+
+        // ✅ Optional: show selected department name in PDF
         $department = null;
         if ($request->filled('department_id')) {
             $department = \App\Models\Department::find($request->department_id);
         }
 
-        $pdf = Pdf::loadView('reports.pdf.stock_level_report', compact('products', 'department'))
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.pdf.stock_level_report', compact('products', 'department'))
                 ->setPaper('a4', 'landscape');
 
         return $pdf->download('stock_level_report.pdf');
     }
+
     public function exportSupplierExcel(Request $request)
     {
         $query = Supplier::withCount('grns')

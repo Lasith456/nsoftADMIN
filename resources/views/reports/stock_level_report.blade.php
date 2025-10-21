@@ -19,10 +19,14 @@
             </div>
         </div>
         <!-- Department Filter -->
-        <form action="{{ route('reports.stock_levels') }}" method="GET" class="mb-4 print:hidden flex items-center space-x-2">
+        <form action="{{ route('reports.stock_levels') }}" method="GET" 
+            class="mb-4 print:hidden flex flex-wrap items-center gap-3">
+
+            <!-- Department Filter -->
             <div>
-                <label for="department_id" class="text-sm">Department:</label>
-                <select name="department_id" id="department_id" class="border rounded-md p-1 text-sm">
+                <label for="department_id" class="text-sm font-medium text-gray-700">Department:</label>
+                <select name="department_id" id="department_id" 
+                        class="border rounded-md p-1 text-sm">
                     <option value="">-- All Departments --</option>
                     @foreach ($departments as $dept)
                         <option value="{{ $dept->id }}" {{ request('department_id') == $dept->id ? 'selected' : '' }}>
@@ -31,9 +35,26 @@
                     @endforeach
                 </select>
             </div>
-            <button type="submit" class="px-4 py-2 bg-gray-800 text-white rounded-md text-xs uppercase">Filter</button>
-            <a href="{{ route('reports.stock_levels') }}" class="px-4 py-2 bg-gray-200 text-black rounded-md text-xs uppercase">Clear</a>
+
+            <!-- ✅ New Product Name Filter -->
+            <div>
+                <label for="product_name" class="text-sm font-medium text-gray-700">Product Name:</label>
+                <input type="text" name="product_name" id="product_name"
+                    value="{{ request('product_name') }}"
+                    placeholder="Search product..."
+                    class="border rounded-md p-1 text-sm w-48">
+            </div>
+
+            <button type="submit" 
+                    class="px-4 py-2 bg-gray-800 text-white rounded-md text-xs uppercase font-semibold">
+                Filter
+            </button>
+            <a href="{{ route('reports.stock_levels') }}" 
+            class="px-4 py-2 bg-gray-200 text-black rounded-md text-xs uppercase font-semibold">
+                Clear
+            </a>
         </form>
+
         <div class="overflow-x-auto">
             <table class="w-full min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
