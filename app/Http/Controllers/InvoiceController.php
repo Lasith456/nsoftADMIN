@@ -228,19 +228,22 @@ public function createCustomerInvoice(Request $request): View
 {
     $companies = \App\Models\Company::orderBy('company_name')->get();
 
-    // Base query for completed receive notes
+    // 🔹 Base query for completed receive notes linked to valid customers
     $query = \App\Models\ReceiveNote::where('status', 'completed')
         ->whereHas('deliveryNotes.purchaseOrders.customer')
-        ->with('deliveryNotes.purchaseOrders.customer');
+        ->with([
+            'deliveryNotes.purchaseOrders.customer',
+            'deliveryNotes.items.product' // ✅ eager-load product to avoid N+1 queries
+        ]);
 
-    // ✅ Filter by company if provided
+    // 🔹 Filter by company if provided
     if ($request->filled('company_id')) {
         $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
             $q->where('company_id', $request->company_id);
         });
     }
 
-    // ✅ Filter by customer if provided
+    // 🔹 Filter by customer if provided
     if ($request->filled('customer_id')) {
         $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
             $q->where('id', $request->customer_id);
@@ -255,7 +258,7 @@ public function createCustomerInvoice(Request $request): View
         return $rn->deliveryNotes->first()?->purchaseOrders->first()?->customer?->id;
     })->filter();
 
-    // ✅ Build customer data with price hierarchy
+    // ✅ Build customer data with per-RN/PO price mapping
     $customersWithInvoices = $groupedByCustomer->map(function ($notes, $customerId) {
         $customer = $notes->first()->deliveryNotes->first()->purchaseOrders->first()->customer;
         $companyId = $customer->company_id;
@@ -275,37 +278,61 @@ public function createCustomerInvoice(Request $request): View
         // --------------------------
         // 3️⃣ Default product prices
         // --------------------------
-        $defaultPrices = \App\Models\Product::pluck('selling_price', 'id');
+        $defaultPrices = \App\Models\Product::pluck('selling_price', 'id'); // product_id => default price
 
-        // ✅ Combine hierarchy
+        // --------------------------
+        // 4️⃣ Build detailed product-level prices (unique per RN + PO)
+        // --------------------------
         $finalPrices = collect();
-        foreach ($defaultPrices as $productId => $defaultPrice) {
-            $price = $customerPrices[$productId]
-                ?? $companyPrices[$productId]
-                ?? $defaultPrice;
 
-            $productName = \App\Models\Product::find($productId)?->name ?? 'N/A';
-            $finalPrices->push([
-                'product_id' => $productId,
-                'product_name' => $productName,
-                'selling_price' => (float) $price,
-                'source' => isset($customerPrices[$productId]) ? 'Customer'
-                            : (isset($companyPrices[$productId]) ? 'Company' : 'Default'),
-            ]);
+        foreach ($notes as $rn) {
+            foreach ($rn->deliveryNotes as $dn) {
+                foreach ($dn->items as $item) {
+                    $productId = $item->product_id;
+                    $poId = $item->purchase_order_id ?? 'NA';
+                    $rnId = $rn->id ?? 'NA';
+
+                    // ✅ Agent price has highest priority
+                    if ($item->agent_id && !$item->agent_invoiced && $item->agent_price_per_case) {
+                        $price = (float) $item->agent_price_per_case;
+                        $source = 'Agent';
+                    } 
+                    // ✅ Otherwise follow Customer > Company > Default hierarchy
+                    else {
+                        $price = $customerPrices[$productId]
+                            ?? $companyPrices[$productId]
+                            ?? $defaultPrices[$productId]
+                            ?? 0;
+
+                        $source = isset($customerPrices[$productId])
+                            ? 'Customer'
+                            : (isset($companyPrices[$productId]) ? 'Company' : 'Default');
+                    }
+
+                    $finalPrices->push([
+                        'product_id'        => $productId,
+                        'product_name'      => $item->product->name ?? 'N/A',
+                        'selling_price'     => (float) $price,
+                        'source'            => $source,
+                        'receive_note_id'   => $rnId,
+                        'purchase_order_id' => $poId,
+                    ]);
+                }
+            }
         }
 
-        // ✅ Return structured data
+        // ✅ Return structured customer + product data
         return [
-            'id' => $customer->id,
-            'customer_name' => $customer->customer_name,
-            'customer_id' => $customer->customer_id,
-            'company_id' => $companyId,
-            'uninvoiced_receive_notes' => $notes->map(fn($rn) => [
-                'id' => $rn->id,
-                'receive_note_id' => $rn->receive_note_id,
-                'received_date' => $rn->received_date,
+            'id'                       => $customer->id,
+            'customer_name'             => $customer->customer_name,
+            'customer_id'               => $customer->customer_id,
+            'company_id'                => $companyId,
+            'uninvoiced_receive_notes'  => $notes->map(fn($rn) => [
+                'id'             => $rn->id,
+                'receive_note_id'=> $rn->receive_note_id,
+                'received_date'  => $rn->received_date,
             ])->values()->all(),
-            'product_prices' => $finalPrices->values(), // ✅ unified pricing
+            'product_prices'            => $finalPrices->values(), // ✅ per-RN/PO pricing
         ];
     })->sortBy('customer_name')->values();
 
@@ -314,8 +341,104 @@ public function createCustomerInvoice(Request $request): View
         $q->where('status', 'completed');
     })->orderBy('customer_name')->get();
 
+    // ✅ Return the full view
     return view('invoices.create_customer_invoice', compact('companies', 'allCustomers', 'customersWithInvoices'));
 }
+
+
+
+// public function createCustomerInvoice(Request $request): View
+// {
+//     $companies = \App\Models\Company::orderBy('company_name')->get();
+
+//     // Base query for completed receive notes
+//     $query = \App\Models\ReceiveNote::where('status', 'completed')
+//         ->whereHas('deliveryNotes.purchaseOrders.customer')
+//         ->with('deliveryNotes.purchaseOrders.customer');
+
+//     // ✅ Filter by company if provided
+//     if ($request->filled('company_id')) {
+//         $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
+//             $q->where('company_id', $request->company_id);
+//         });
+//     }
+
+//     // ✅ Filter by customer if provided
+//     if ($request->filled('customer_id')) {
+//         $query->whereHas('deliveryNotes.purchaseOrders.customer', function ($q) use ($request) {
+//             $q->where('id', $request->customer_id);
+//         });
+//     }
+
+//     // ✅ Fetch all relevant receive notes
+//     $receiveNotes = $query->get();
+
+//     // ✅ Group receive notes by customer
+//     $groupedByCustomer = $receiveNotes->groupBy(function ($rn) {
+//         return $rn->deliveryNotes->first()?->purchaseOrders->first()?->customer?->id;
+//     })->filter();
+
+//     // ✅ Build customer data with price hierarchy
+//     $customersWithInvoices = $groupedByCustomer->map(function ($notes, $customerId) {
+//         $customer = $notes->first()->deliveryNotes->first()->purchaseOrders->first()->customer;
+//         $companyId = $customer->company_id;
+
+//         // --------------------------
+//         // 1️⃣ Customer-specific prices
+//         // --------------------------
+//         $customerPrices = \App\Models\CustomerProductPrice::where('customer_id', $customer->id)
+//             ->pluck('selling_price', 'product_id'); // product_id => price
+
+//         // --------------------------
+//         // 2️⃣ Company-specific prices
+//         // --------------------------
+//         $companyPrices = \App\Models\CompanyProductPrice::where('company_id', $companyId)
+//             ->pluck('selling_price', 'product_id'); // product_id => price
+
+//         // --------------------------
+//         // 3️⃣ Default product prices
+//         // --------------------------
+//         $defaultPrices = \App\Models\Product::pluck('selling_price', 'id');
+
+//         // ✅ Combine hierarchy
+//         $finalPrices = collect();
+//         foreach ($defaultPrices as $productId => $defaultPrice) {
+//             $price = $customerPrices[$productId]
+//                 ?? $companyPrices[$productId]
+//                 ?? $defaultPrice;
+
+//             $productName = \App\Models\Product::find($productId)?->name ?? 'N/A';
+//             $finalPrices->push([
+//                 'product_id' => $productId,
+//                 'product_name' => $productName,
+//                 'selling_price' => (float) $price,
+//                 'source' => isset($customerPrices[$productId]) ? 'Customer'
+//                             : (isset($companyPrices[$productId]) ? 'Company' : 'Default'),
+//             ]);
+//         }
+
+//         // ✅ Return structured data
+//         return [
+//             'id' => $customer->id,
+//             'customer_name' => $customer->customer_name,
+//             'customer_id' => $customer->customer_id,
+//             'company_id' => $companyId,
+//             'uninvoiced_receive_notes' => $notes->map(fn($rn) => [
+//                 'id' => $rn->id,
+//                 'receive_note_id' => $rn->receive_note_id,
+//                 'received_date' => $rn->received_date,
+//             ])->values()->all(),
+//             'product_prices' => $finalPrices->values(), // ✅ unified pricing
+//         ];
+//     })->sortBy('customer_name')->values();
+
+//     // ✅ Get all customers who have completed receive notes
+//     $allCustomers = \App\Models\Customer::whereHas('purchaseOrders.deliveryNotes.receiveNotes', function ($q) {
+//         $q->where('status', 'completed');
+//     })->orderBy('customer_name')->get();
+
+//     return view('invoices.create_customer_invoice', compact('companies', 'allCustomers', 'customersWithInvoices'));
+// }
 
 
 public function storeCustomerInvoice(Request $request): RedirectResponse
@@ -356,16 +479,18 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
     }
 
     // ✅ Map updated prices (from frontend JSON inputs)
-    $updated = collect($request->input('updated_prices', []))
-        ->map(function ($json) {
-            $data = json_decode($json, true);
-            if (is_array($data) && isset($data['product_id'])) {
-                $key = $data['product_id'] . '_' . ($data['receive_note_id'] ?? 'NA') . '_' . ($data['purchase_order_id'] ?? 'NA');
-                return [$key => $data];
-            }
-            return [];
-        })
-        ->collapse();
+    // $updated = collect($request->input('updated_prices', []))
+    //     ->map(function ($json) {
+    //         $data = json_decode($json, true);
+    //         if (is_array($data) && isset($data['product_id'])) {
+    //             $key = $data['product_id'] . '_' . ($data['receive_note_id'] ?? 'NA') . '_' . ($data['purchase_order_id'] ?? 'NA');
+    //             return [$key => $data];
+    //         }
+    //         return [];
+    //     })
+    //     ->collapse();
+// ✅ Map updated prices (keyed by product_id_receiveNoteId_poId)
+$updated = collect($request->input('updated_prices', []));
 
     $vatRate = (float)(\App\Models\Setting::where('key', 'vat_rate')->value('value') ?? 12);
     $vatLines = collect();
@@ -381,11 +506,10 @@ public function storeCustomerInvoice(Request $request): RedirectResponse
             if ($qty <= 0) continue;
 
             $poId = $item->purchase_order_id ?? 'NA';
-            $key  = $product->id . '_' . $rn->id . '_' . $poId;
-
-            $unitPrice = $updated->has($key)
-                ? (float)$updated->get($key)['updated_price']
-                : (float)($product->selling_price ?? 0);
+$key = "{$product->id}_{$rn->id}_{$poId}";
+$unitPrice = $updated->has($key)
+    ? (float)$updated->get($key)
+    : (float)($product->selling_price ?? 0);
 
             $po = optional($rn->deliveryNotes->first()?->purchaseOrders->first());
             $isCategorized = $po?->is_categorized ?? false;
@@ -606,47 +730,33 @@ private function getInvoiceGroupLabel($key)
 
 public function createAgentInvoice(): View
 {
-    // ✅ Fetch agents with at least one uninvoiced item that is received into stock
     $agents = Agent::whereHas('deliveryItems', function ($query) {
             $query->where('agent_invoiced', false)
-                  ->whereNotNull('agent_id')
-                  // ✅ Only include items that have been received into stock
-                  ->whereExists(function ($sub) {
-                      $sub->select(DB::raw(1))
-                          ->from('receive_note_items')
-                          ->whereColumn('receive_note_items.product_id', 'delivery_note_items.product_id')
-                          ->whereColumn('receive_note_items.purchase_order_id', 'delivery_note_items.purchase_order_id');
-                  });
+                  ->whereNotNull('agent_id');
         })
         ->with(['deliveryItems' => function ($query) {
             $query->where('agent_invoiced', false)
                   ->whereNotNull('agent_id')
-                  ->with(['deliveryNote', 'product'])
-                  // ✅ Only include items that are received into stock
-                  ->whereExists(function ($sub) {
-                      $sub->select(DB::raw(1))
-                          ->from('receive_note_items')
-                          ->whereColumn('receive_note_items.product_id', 'delivery_note_items.product_id')
-                          ->whereColumn('receive_note_items.purchase_order_id', 'delivery_note_items.purchase_order_id');
-                  });
+                  ->with(['deliveryNote', 'product']);
         }])
         ->get();
 
-    // ✅ Calculate pending quantities for each item
+    // ✅ Attach received quantity from Receive Notes
     foreach ($agents as $agent) {
         foreach ($agent->deliveryItems as $item) {
-            $alreadyInvoicedQty = InvoiceItem::where('product_id', $item->product_id)
-                ->whereHas('invoice.receiveNotes.deliveryNotes.items', function ($q) use ($item) {
-                    $q->where('id', $item->id);
-                })
-                ->sum('quantity');
+            // Find matching receive note item for same product + PO
+            $received = \App\Models\ReceiveNoteItem::where('product_id', $item->product_id)
+                ->where('purchase_order_id', $item->purchase_order_id)
+                ->value('quantity_received');
 
-            $item->to_invoice_qty = max(0, $item->quantity_from_agent - $alreadyInvoicedQty);
+            // Add received qty (fallback to 0 if not found)
+            $item->received_qty = $received ?? 0;
         }
     }
 
     return view('invoices.create_agent_invoice', compact('agents'));
 }
+
 
 
     public function storeAgentInvoice(Request $request): RedirectResponse
@@ -662,16 +772,15 @@ public function createAgentInvoice(): View
     try {
         $agent = Agent::findOrFail($validated['agent_id']);
 
-        // ✅ Fetch uninvoiced items for that agent only
+        // ✅ Fetch relevant uninvoiced agent items
         $itemsToInvoice = DeliveryNoteItem::where('agent_id', $agent->id)
-            ->where('quantity_from_agent', '>', 0)
             ->where('agent_invoiced', false)
             ->whereIn('id', $validated['delivery_item_ids'])
-            ->with(['deliveryNote.receiveNotes', 'product', 'agent'])
+            ->with(['deliveryNote.receiveNotes.items', 'product'])
             ->get();
 
         if ($itemsToInvoice->isEmpty()) {
-            return back()->withErrors(['error' => 'No pending items found for the selected delivery notes.']);
+            return back()->withErrors(['error' => 'No pending agent items found.']);
         }
 
         // ✅ Check for Receive Note discrepancies
@@ -684,60 +793,54 @@ public function createAgentInvoice(): View
             $blockedList = $discrepancyItems
                 ->map(fn($i) => "DN {$i->deliveryNote->delivery_note_id} / Product {$i->product?->name}")
                 ->implode('<br>');
-
             return back()->withErrors([
                 'error' => "Cannot generate Agent Invoice because some linked Receive Notes have discrepancies:<br>{$blockedList}"
             ]);
         }
 
-        // ✅ Ensure all selected items were actually received into stock
-        $unreceivedItems = $itemsToInvoice->filter(function ($item) {
-            return !\App\Models\ReceiveNoteItem::where('product_id', $item->product_id)
-                ->where('purchase_order_id', $item->purchase_order_id)
-                ->exists();
-        });
-
-        if ($unreceivedItems->isNotEmpty()) {
-            $list = $unreceivedItems
-                ->map(fn($i) => "DN {$i->deliveryNote->delivery_note_id} / Product {$i->product?->name}")
-                ->implode('<br>');
-
-            return back()->withErrors([
-                'error' => "Cannot generate Agent Invoice because some items were not yet received into stock:<br>{$list}"
-            ]);
-        }
-
-        // ✅ Compute totals and prepare invoice items
-        $totalAmount = 0;
+        // ✅ Prepare invoice line items based on Receive Note quantities
         $invoiceItemsData = [];
+        $totalAmount = 0;
 
         foreach ($itemsToInvoice as $item) {
-            $pivot = $item->agent->products()
-                ->where('products.id', $item->product_id)
+            $productId = $item->product_id;
+            $poId = $item->purchase_order_id;
+
+            // ✅ Find matching receive note item
+            $receiveItem = \App\Models\ReceiveNoteItem::where('product_id', $productId)
+                ->where('purchase_order_id', $poId)
                 ->first();
 
-            if (!$pivot || is_null($pivot->pivot->price_per_case)) {
-                throw new \Exception("No price_per_case found for Agent {$item->agent->name} and Product {$item->product?->name}");
+            if (!$receiveItem) {
+                throw new \Exception("No Receive Note found for Product {$item->product?->name}");
             }
 
-            $unitPrice = $pivot->pivot->price_per_case;
-            $lineTotal = $unitPrice * $item->quantity_from_agent;
+            $receivedQty = (float) $receiveItem->quantity_received;
+            $unitPrice = (float) $item->agent_price_per_case;
+
+            if ($unitPrice <= 0) {
+                throw new \Exception("Missing agent price for Product {$item->product?->name}");
+            }
+
+            // ✅ Calculate line total
+            $lineTotal = $unitPrice * $receivedQty;
+            $totalAmount += $lineTotal;
 
             $invoiceItemsData[] = [
-                'description' => "Fulfilled Shortage: {$item->quantity_from_agent} × " .
-                                ($item->product?->name ?? $item->product_name) .
-                                " for DN-{$item->deliveryNote->delivery_note_id}",
-                'quantity'   => $item->quantity_from_agent,
-                'unit_price' => $unitPrice,
-                'total'      => $lineTotal,
+                'description' => "Agent supply for DN-{$item->deliveryNote->delivery_note_id} | Product: {$item->product?->name}",
+                'quantity'    => $receivedQty,
+                'unit_price'  => $unitPrice,
+                'total'       => $lineTotal,
+                'product_id'  => $productId,
             ];
-
-            $totalAmount += $lineTotal;
         }
 
-        // ✅ Create invoice header
+        // ✅ Generate unique agent invoice code
+        $invoiceCode = 'INV_AGENT-' . strtoupper(Str::random(6));
+
+        // ✅ Create Agent Invoice
         $invoice = $agent->invoices()->create([
-            'invoice_id'     => 'INV_AGENT-' . strtoupper(Str::random(6)),
+            'invoice_id'     => $invoiceCode,
             'due_date'       => now()->addDays(30),
             'sub_total'      => $totalAmount,
             'vat_percentage' => 0,
@@ -756,13 +859,14 @@ public function createAgentInvoice(): View
 
         DB::commit();
 
-        return redirect()->route('invoices.show', $invoice->id)
-            ->with('success', 'Agent invoice generated successfully.');
+        return redirect()
+            ->route('invoices.show', $invoice->id)
+            ->with('success', "✅ Agent Invoice {$invoiceCode} created successfully.");
 
     } catch (\Exception $e) {
         DB::rollBack();
         return back()->withInput()->withErrors([
-            'error' => 'Error generating invoice: ' . $e->getMessage()
+            'error' => 'Error generating invoice: ' . $e->getMessage(),
         ]);
     }
 }
@@ -1009,7 +1113,6 @@ private function nextInvoiceCode(bool $isVat, string $companyName, string $custo
 
     return 'INV-'.str_pad($next, 4, '0', STR_PAD_LEFT)."-{$c}{$u}{$suffix}";
 }
-
 
 
 }

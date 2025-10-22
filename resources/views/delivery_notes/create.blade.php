@@ -338,12 +338,21 @@
                             Manage Stock
                         </button>
 
-                        <!-- Hidden agent selections -->
-                        <template x-for="(agentId, key) in agentSelections" :key="key">
-                            <input type="hidden"
-                                   :name="`agent_selections[${key}]`"
-                                   :value="agentId">
-                        </template>
+<!-- ✅ Hidden agent selections -->
+<template x-for="item in items" :key="'agent-'+item.purchase_order_id+'-'+item.product_id">
+    <input type="hidden"
+        :name="`agent_selections[${item.purchase_order_id}_${item.product_id}]`"
+        :value="agentSelections[item.purchase_order_id + '-' + item.product_id] || ''">
+</template>
+
+<!-- ✅ Hidden agent prices -->
+<template x-for="item in items" :key="'price-'+item.purchase_order_id+'-'+item.product_id">
+    <input type="hidden"
+        :name="`agent_prices[${item.purchase_order_id}_${item.product_id}]`"
+        :value="(item.final_price || getAgentPrice(item)) ? parseFloat(item.final_price || getAgentPrice(item)).toFixed(2) : ''">
+</template>
+
+
                     </form>
                 </div>
             </div>
@@ -361,6 +370,7 @@
                                 <th class="px-2 py-2 text-right text-xs font-medium uppercase">Clear</th>
                                 <th class="px-2 py-2 text-right text-xs font-medium uppercase">Non-Clear</th>
                                 <th class="px-2 py-2 text-right text-xs font-medium uppercase">Shortage</th>
+                                <th class="px-3 py-3 text-right text-xs font-medium uppercase">Price (Rs.)</th>
                                 <th class="px-2 py-2 text-left text-xs font-medium uppercase">Action</th>
                             </tr>
                         </thead>
@@ -376,6 +386,22 @@
                                     <td class="px-2 py-2 text-sm text-right font-bold"
                                         :class="item.clear_stock_shortage > 0 ? 'text-red-500' : 'text-green-600'"
                                         x-text="item.clear_stock_shortage"></td>
+                                    <td class="px-3 py-3 text-right text-sm font-semibold text-gray-800 w-32">
+                                        <template x-if="stockFulfillment[item.purchase_order_id + '-' + item.product_id]?.type === 'agent'">
+                                            <div class="flex justify-end">
+                                                <input type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    class="w-24 border rounded p-1 text-right focus:ring focus:ring-blue-200"
+                                                    x-model.number="item.final_price"
+                                                    :placeholder="getAgentPrice(item)"
+                                                    @input="updateAgentPrice(item)">
+                                            </div>
+                                        </template>
+                                        <template x-if="!(stockFulfillment[item.purchase_order_id + '-' + item.product_id]?.type === 'agent')">
+                                            <span class="text-gray-400">–</span>
+                                        </template>
+                                    </td>
                                     <td class="px-2 py-2 text-sm">
 
                                         <div x-show="item.clear_stock_shortage > 0 && item.non_clear_stock >= item.clear_stock_shortage"
@@ -591,6 +617,16 @@ document.addEventListener('alpine:init', () => {
             const url = `/grns/create?supplier_id=${item.supplier_id}&department_id=${item.department_id}&product_id=${item.product_id}&product_name=${encodeURIComponent(item.product_name)}&shortage=${item.clear_stock_shortage}`;
             window.location.href = url;
         },
+getAgentPrice(item) {
+    const key = item.purchase_order_id + '-' + item.product_id;
+    const agentId = this.agentSelections[key];
+    const agent = item.agents?.find(a => a.id == agentId);
+    return agent ? parseFloat(agent.price_per_case).toFixed(2) : '';
+},
+updateAgentPrice(item) {
+    // Optional: validation or recalculation hooks can go here later
+},
+
 
         convert: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', quantity: 1 },
         wastage: { department_name: '', selectedDepartment: '', departmentError: '', product_id: '', stock_type: 'clear', quantity: 1, reason: '' }

@@ -115,8 +115,11 @@
                                 <tr class="border-b dark:border-gray-600">
                                     <td class="px-3 py-2" x-text="p.name"></td>
                                     <td class="px-3 py-2 text-center" x-text="p.quantity"></td>
-                                    <td class="px-3 py-2 text-center" x-text="p.default_price.toFixed(2)"></td>
-                                    <td class="px-3 py-2 text-center">
+    <td class="px-3 py-2 text-center">
+        <span x-text="p.default_price.toFixed(2)"></span>
+        <!-- <span class="text-xs text-gray-400 ml-1" x-text="p.source"></span> -->
+    </td>
+                                        <td class="px-3 py-2 text-center">
                                         <input type="number" step="0.01"
                                                x-model.number="p.updated_price"
                                                class="border rounded-md px-2 py-1 w-24 text-right dark:bg-gray-900">
@@ -140,14 +143,10 @@
             </template>
 <template x-for="(p, idx) in productList" :key="'price-'+idx">
     <input type="hidden"
-           name="updated_prices[]"
-           :value="JSON.stringify({
-               product_id: p.product_id,
-               receive_note_id: p.receive_note_id,
-               updated_price: Number(p.updated_price),
-               purchase_order_id: p.purchase_order_id,
-           })">
+           :name="`updated_prices[${p.product_id}_${p.receive_note_id}_${p.purchase_order_id}]`"
+           :value="p.updated_price">
 </template>
+
 
 
 
@@ -221,6 +220,8 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            console.log('🔹 Fetching products for receive notes:', this.selectedReceiveNotes);
+
             const res = await fetch("{{ route('receive-notes.products') }}", {
                 method: "POST",
                 headers: {
@@ -229,32 +230,48 @@ document.addEventListener('alpine:init', () => {
                 },
                 body: JSON.stringify({
                     receive_note_ids: this.selectedReceiveNotes,
-                    customer_id: this.selectedCustomer // ✅ added
+                    customer_id: this.selectedCustomer
                 })
             });
             const data = await res.json();
 
-            // ✅ match each product with customer's prices
+            console.log('📦 Raw product data from backend:', data);
+
             const currentCustomer = this.customersWithInvoices.find(c => c.id == this.selectedCustomer);
             const customerPrices = currentCustomer ? currentCustomer.product_prices || [] : [];
 
-            this.productList = data.map(d => {
-                const matched = customerPrices.find(p => p.product_id === d.product_id);
-                const price = matched ? matched.selling_price : parseFloat(d.default_price);
+            console.log('💰 Customer price list (from controller):', customerPrices);
 
-                return {
+            this.productList = data.map(d => {
+                const matched = customerPrices.find(
+                    p =>
+                        p.product_id === d.product_id &&
+                        p.receive_note_id === d.receive_note_id &&
+                        p.purchase_order_id === d.purchase_order_id
+                );
+
+                const price = matched ? Number(matched.selling_price) : Number(d.default_price);
+
+                const row = {
                     product_id: d.product_id,
                     receive_note_id: d.receive_note_id,
-                    purchase_order_id: d.purchase_order_id,        // 👈 new field for display if needed
+                    purchase_order_id: d.purchase_order_id,
                     name: d.product_name,
-                    quantity: d.quantity_received,
+                    quantity: Number(d.quantity_received),
                     default_price: price,
                     updated_price: price,
+                    source: matched ? matched.source : 'Default',
                 };
+
+                console.log(`🧾 Product [${row.name}] (RN ${row.receive_note_id}, PO ${row.purchase_order_id}) → Price: ${row.default_price} (${row.source})`);
+
+                return row;
             });
+
+            console.log('✅ Final productList to display:', this.productList);
         },
 
-handleSubmit(e) {
+        handleSubmit(e) {
             if (!this.selectedCustomer || this.selectedReceiveNotes.length === 0) {
                 alert('Please select a company, customer, and at least one receive note.');
                 return;
@@ -263,22 +280,26 @@ handleSubmit(e) {
             // ✅ remove existing hidden inputs before appending fresh ones
             document.querySelectorAll('input[name="updated_prices[]"]').forEach(el => el.remove());
 
-            // ✅ dynamically append the latest prices to the form
             const form = document.getElementById('customer-invoice-form');
+
+            console.log('🚀 Submitting invoice with product prices:');
             this.productList.forEach(p => {
+                console.log(
+                    `→ ${p.name} | RN ${p.receive_note_id} | PO ${p.purchase_order_id} | Price ${p.updated_price}`
+                );
+
                 const input = document.createElement('input');
                 input.type = 'hidden';
                 input.name = 'updated_prices[]';
                 input.value = JSON.stringify({
                     product_id: p.product_id,
                     receive_note_id: p.receive_note_id,
-                    purchase_order_id: p.purchase_order_id, 
-                    updated_price: Number(p.updated_price)
+                    purchase_order_id: p.purchase_order_id,
+                    updated_price: Number(p.updated_price),
                 });
                 form.appendChild(input);
             });
 
-            // ✅ now submit
             form.submit();
         },
 
@@ -289,4 +310,5 @@ handleSubmit(e) {
     }));
 });
 </script>
+
 @endsection

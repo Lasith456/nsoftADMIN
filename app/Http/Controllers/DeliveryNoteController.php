@@ -193,17 +193,32 @@ public function store(Request $request): RedirectResponse
             $agentId = null;
             $fromAgent = 0;
 
-            // ✅ Lookup per-PO agent selection using poId-productId key
+            // ✅ Adjusted key format
+            $inputKey = $itemData['po_id'] . '_' . $itemData['product_id'];
+
             if ($shortage > 0) {
-                if (isset($request->agent_selections[$key]) && $request->agent_selections[$key] != '') {
-                    $agentId = $request->agent_selections[$key];
+                if (isset($request->agent_selections[$inputKey]) && $request->agent_selections[$inputKey] != '') {
+                    $agentId = $request->agent_selections[$inputKey];
                     $fromAgent = $shortage;
                 } else {
                     throw new \Exception("A stock shortage for {$product->name} (PO: {$itemData['po_code']}) requires an agent to be assigned.");
                 }
             }
 
-            // ✅ Each PO-product gets its own DeliveryNoteItem
+            // ✅ Lookup entered or default agent price
+            $enteredPrice = $request->agent_prices[$inputKey] ?? null;
+            $agentPrice = $enteredPrice;
+
+            if ($agentId && !$agentPrice) {
+                $pivot = DB::table('agent_product_pivot')
+                    ->where('agent_id', $agentId)
+                    ->where('product_id', $itemData['product_id'])
+                    ->value('price_per_case');
+                $agentPrice = $pivot ?: 0;
+            }
+
+            $totalAgentPrice = $agentPrice * $fromAgent;
+
             $deliveryNote->items()->create([
                 'purchase_order_id'    => $itemData['po_id'],
                 'product_id'           => $itemData['product_id'],
@@ -212,13 +227,15 @@ public function store(Request $request): RedirectResponse
                 'quantity_from_stock'  => $fromClearStock,
                 'agent_id'             => $agentId,
                 'quantity_from_agent'  => $fromAgent,
+                'agent_price_per_case' => $agentPrice,
+                'agent_total_price'    => $totalAgentPrice,
             ]);
 
-            // ✅ Deduct clear stock if used
             if ($fromClearStock > 0) {
                 $product->decrement('clear_stock_quantity', $fromClearStock);
             }
         }
+
 
         // ✅ Update PO statuses after processing
         PurchaseOrder::whereIn('id', $po_ids)->update(['status' => 'processing']);

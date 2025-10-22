@@ -20,12 +20,16 @@ class DeliveryNoteItem extends Model
         'agent_id',
         'quantity_from_agent',
         'product_name',
+        'agent_price_per_case',
+        'agent_total_price',  
         'agent_invoiced',
     ];
     protected function casts(): array
     {
         return [
-            'agent_invoiced' => 'boolean', 
+            'agent_invoiced' => 'boolean',
+            'agent_price_per_case' => 'decimal:2',
+            'agent_total_price' => 'decimal:2',
         ];
     }
     /**
