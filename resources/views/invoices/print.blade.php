@@ -80,11 +80,19 @@
                 $department = $product?->department 
                     ?? $purchaseOrder?->department; // fallback to PO’s department
 
-                $companyId = $invoice->invoiceable?->company_id ?? null;
+                    $companyId = $invoice->invoiceable?->company_id ?? null;
+                    $productDeptName = $product
+                        ? \App\Models\ProductDepartmentWise::where('product_id', $product->id)
+                            ->where('company_id', $companyId)
+                            ->with('department')
+                            ->first()?->department?->name
+                        : null;
+
+                <!-- $companyId = $invoice->invoiceable?->company_id ?? null;
                 $productDeptName = \App\Models\ProductDepartmentWise::where('product_id', $product->id)
                     ->where('company_id', $companyId)
                     ->with('department')
-                    ->first()?->department?->name;
+                    ->first()?->department?->name; -->
                 // 🟢 Custom appear name from CompanyDepartmentName table
                 $appearName = \App\Models\CompanyDepartmentName::where('company_id', $companyId)
                     ->where('department_id', $department?->id)

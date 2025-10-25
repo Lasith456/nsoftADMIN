@@ -151,6 +151,32 @@ document.addEventListener('alpine:init', () => {
             this.items.splice(index, 1);
         },
 
+        // ✅ Validation before submitting the form
+        validateBeforeSubmit(event) {
+            const invalidItem = this.items.find(
+                item => !item.cost_price || item.cost_price <= 0
+            );
+
+            if (invalidItem) {
+                event.preventDefault(); // stop form submission
+                alert(`❌ Cost price cannot be 0 or empty for product: "${invalidItem.product_name}".`);
+                return false;
+            }
+
+            // ✅ Optional: also check received quantity
+            const invalidQty = this.items.find(
+                item => item.quantity_received < 0
+            );
+
+            if (invalidQty) {
+                event.preventDefault();
+                alert(`❌ Received quantity cannot be negative for product: "${invalidQty.product_name}".`);
+                return false;
+            }
+
+            return true;
+        },
+
         get totals() {
             let totalAmount = 0;
             let totalDiscount = 0;
@@ -166,5 +192,17 @@ document.addEventListener('alpine:init', () => {
         }
     }));
 });
+
+// ✅ Attach validation to form submission
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function (e) {
+        const alpineComponent = Alpine.$data(document.querySelector('[x-data]'));
+        if (!alpineComponent.validateBeforeSubmit(e)) {
+            e.preventDefault();
+        }
+    });
+});
 </script>
+
 @endsection

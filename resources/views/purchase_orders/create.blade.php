@@ -55,7 +55,7 @@
                     <input list="customers-list" id="customer_name" x-model="customerName" @change="setCustomerId"
                            placeholder="Type customer name..."
                            class="mt-1 block w-full dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md py-2 px-3"
-                           required :disabled="!selectedCompany">
+                           required :disabled="!selectedCompany" autocomplete="off">
                     <datalist id="customers-list">
                         <template x-for="cust in filteredCustomers" :key="cust.id">
                             <option :value="cust.customer_name" :data-id="cust.id"></option>
@@ -145,7 +145,7 @@
                             <input list="departments-list" id="department_name"
                                    x-model="departmentName" @change="departmentChangedByName"
                                    placeholder="Type department..."
-                                   class="mt-1 block w-full border rounded-md py-2 px-3 dark:bg-gray-900">
+                                   class="mt-1 block w-full border rounded-md py-2 px-3 dark:bg-gray-900" autocomplete="off">
                             <datalist id="departments-list">
                                 @foreach($departments as $dept)
                                     <option value="{{ $dept->name }}" data-id="{{ $dept->id }}"></option>
@@ -160,7 +160,7 @@
                             <input list="products-list" x-model="currentItem.product_name" @change="productChangedByName"
                                    :disabled="!selectedDepartment"
                                    placeholder="Select department first"
-                                   class="mt-1 block w-full border rounded-md py-2 px-3 dark:bg-gray-900">
+                                   class="mt-1 block w-full border rounded-md py-2 px-3 dark:bg-gray-900" autocomplete="off">
                             <datalist id="products-list">
                                 <template x-for="product in filteredProducts" :key="product.id">
                                     <option :value="product.name" :data-id="product.id"></option>

@@ -379,7 +379,15 @@ init() {
                 alert('Please select department, product, and enter a valid quantity (0 or more).');
                 return;
             }
+                if (this.currentItem.quantity < 0) {
+                alert('Quantity cannot be negative.');
+                return;
+            }
 
+            if (this.currentItem.cost_price <= 0) {
+                alert('Cost price must be greater than 0.');
+                return;
+            }
             let discount = 0;
             if (this.discountAsPercentage) {
                 const effectiveQty = this.currentItem.unit_type === 'Case'
